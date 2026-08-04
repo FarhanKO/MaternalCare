@@ -132,3 +132,23 @@ const daysFromNow = (n) => iso(new Date(Date.now() + n * DAY));
 /* ------------------------------------------------------------------ seed */
 const isEmpty = db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0;
 
+if (isEmpty) {
+  const run = (sql, ...args) => db.prepare(sql).run(...args);
+
+  run(`INSERT INTO users (name, role, email, age, blood_group) VALUES (?,?,?,?,?)`,
+    'Ayesha Rahman', 'mother', 'ayesha@example.com', 28, 'B+');
+
+  // Pregnancy: LMP 26 weeks ago  →  currently week 26, EDD in 14 weeks
+  run(`INSERT INTO pregnancies (user_id, lmp, height_cm, pre_weight_kg) VALUES (1,?,?,?)`,
+    daysFromNow(-26 * 7), 158, 55.0);
+
+  // Weekly vitals, week 14 → 26 (older → newer), gentle upward drift
+  const vitalRows = [
+    [-84, 108, 70,  88, 58.2, 36.7], [-77, 109, 71,  90, 58.9, 36.8],
+    [-70, 111, 72,  91, 59.6, 36.7], [-63, 112, 72,  93, 60.4, 36.8],
+    [-56, 113, 74,  95, 61.1, 36.9], [-49, 115, 74,  96, 61.9, 36.8],
+    [-42, 116, 75,  97, 62.6, 36.8], [-35, 118, 77,  99, 63.4, 36.9],
+    [-28, 119, 78, 100, 64.1, 36.8], [-21, 121, 79, 101, 64.9, 37.0],
+    [-14, 122, 80, 102, 65.6, 36.9], [ -7, 123, 81, 103, 66.1, 36.9],
+    [  0, 124, 82, 104, 66.5, 37.0],
+  ];
