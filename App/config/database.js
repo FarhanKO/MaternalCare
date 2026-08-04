@@ -124,3 +124,11 @@ CREATE TABLE IF NOT EXISTS hospitals (
 );
 `);
 
+/* ------------------------------------------------------------- date utils */
+const DAY = 86400000;
+const iso = (d) => d.toISOString().slice(0, 10);
+const daysFromNow = (n) => iso(new Date(Date.now() + n * DAY));
+
+/* ------------------------------------------------------------------ seed */
+const isEmpty = db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0;
+
