@@ -25,3 +25,10 @@ exports.addGrowth = (req, res) => {
     age_months: Number(age_months), weight_kg: Number(weight_kg),
     height_cm: Number(height_cm), head_cm: Number(head_cm),
   });
+  res.redirect('/child?saved=1');
+};
+
+exports.toggleMilestone = (req, res) => {
+  childModel.toggleMilestone(Number(req.params.id));
+  res.redirect('/child#milestones');
+};
