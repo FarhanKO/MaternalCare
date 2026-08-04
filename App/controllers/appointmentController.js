@@ -18,3 +18,11 @@ exports.index = (req, res) => {
 exports.book = (req, res) => {
   const user = userModel.current();
   const { doctor_id, date, time, reason } = req.body;
+  appointmentModel.book(user.id, {
+    doctor_id: Number(doctor_id),
+    date: date || new Date().toISOString().slice(0, 10),
+    time: time || '10:00 AM',
+    reason: reason || 'Consultation',
+  });
+  res.redirect('/appointments?booked=1');
+};
