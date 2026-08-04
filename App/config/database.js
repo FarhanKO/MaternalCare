@@ -152,3 +152,20 @@ if (isEmpty) {
     [-14, 122, 80, 102, 65.6, 36.9], [ -7, 123, 81, 103, 66.1, 36.9],
     [  0, 124, 82, 104, 66.5, 37.0],
   ];
+  for (const [d, sys, dia, sug, w, t] of vitalRows)
+    run(`INSERT INTO vitals (user_id, date, systolic, diastolic, sugar, weight_kg, temp_c)
+         VALUES (1,?,?,?,?,?,?)`, daysFromNow(d), sys, dia, sug, w, t);
+
+  // Child: Zara, ~14 months old
+  run(`INSERT INTO children (user_id, name, dob, gender) VALUES (1,?,?,?)`,
+    'Zara', daysFromNow(-437), 'female');
+
+  const growthRows = [ // [ageMonths, weight, height, head]
+    [0, 3.2, 49.5, 34.2], [2, 5.0, 57.0, 38.0], [4, 6.2, 62.0, 40.5],
+    [6, 7.1, 65.5, 42.0], [9, 8.2, 70.0, 43.8], [12, 9.0, 74.5, 45.0],
+    [14, 9.6, 77.0, 45.8],
+  ];
+  for (const [m, w, h, hc] of growthRows)
+    run(`INSERT INTO growth_records (child_id, date, age_months, weight_kg, height_cm, head_cm)
+         VALUES (1,?,?,?,?,?)`, daysFromNow(-437 + Math.round(m * 30.44)), m, w, h, hc);
+
