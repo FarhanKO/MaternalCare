@@ -257,3 +257,24 @@ if (isEmpty) {
     ['Rumana H.', 'Mental health', 'It is okay to ask for help — my postpartum story',
      'I want other mothers to know that feeling overwhelmed is common and support changes everything.', 31, 112, '3 d ago'],
   ];
+  for (const r of postRows)
+    run(`INSERT INTO posts (author, tag, title, body, replies, likes, time_ago) VALUES (?,?,?,?,?,?,?)`, ...r);
+
+  run(`INSERT INTO emergency_contacts (user_id, name, relation, phone) VALUES (1,?,?,?)`,
+    'Imran Rahman', 'Husband', '+880 17XX-XXXXXX');
+  run(`INSERT INTO emergency_contacts (user_id, name, relation, phone) VALUES (1,?,?,?)`,
+    'Salma Begum', 'Mother', '+880 19XX-XXXXXX');
+  run(`INSERT INTO emergency_contacts (user_id, name, relation, phone) VALUES (1,?,?,?)`,
+    'Dr. Nusrat Jahan', 'Obstetrician', '+880 18XX-XXXXXX');
+
+  const hospitalRows = [
+    ['City Maternity Hospital', 1.2, '+880 2-XXXXXXX', 1, 1],
+    ['Square Hospital', 3.1, '+880 2-XXXXXXX', 1, 1],
+    ['Green Life Children Clinic', 2.4, '+880 2-XXXXXXX', 0, 1],
+    ['Popular Diagnostic Centre', 4.2, '+880 2-XXXXXXX', 1, 0],
+  ];
+  for (const r of hospitalRows)
+    run(`INSERT INTO hospitals (name, distance_km, phone, ambulance, open24) VALUES (?,?,?,?,?)`, ...r);
+}
+
+module.exports = db;
