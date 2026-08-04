@@ -102,3 +102,25 @@ CREATE TABLE IF NOT EXISTS articles (
   icon TEXT,
   excerpt TEXT
 );
+CREATE TABLE IF NOT EXISTS posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author TEXT,
+  tag TEXT,
+  title TEXT NOT NULL,
+  body TEXT,
+  replies INTEGER DEFAULT 0,
+  likes INTEGER DEFAULT 0,
+  time_ago TEXT
+);
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  name TEXT, relation TEXT, phone TEXT
+);
+CREATE TABLE IF NOT EXISTS hospitals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT, distance_km REAL, phone TEXT,
+  ambulance INTEGER DEFAULT 1, open24 INTEGER DEFAULT 1
+);
+`);
+
