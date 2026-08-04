@@ -14,3 +14,7 @@ exports.index = (req, res) => {
     booked: req.query.booked === '1',
   });
 };
+
+exports.book = (req, res) => {
+  const user = userModel.current();
+  const { doctor_id, date, time, reason } = req.body;
