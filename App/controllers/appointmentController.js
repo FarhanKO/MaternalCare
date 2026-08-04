@@ -6,3 +6,11 @@ exports.index = (req, res) => {
   const specialty = req.query.specialty || 'All';
   const availableOnly = req.query.available === '1';
   res.render('appointments', {
+    page: 'appointments', user,
+    doctors: appointmentModel.doctors({ specialty, availableOnly }),
+    specialties: appointmentModel.specialties(),
+    specialty, availableOnly,
+    appointments: appointmentModel.forUser(user.id),
+    booked: req.query.booked === '1',
+  });
+};
