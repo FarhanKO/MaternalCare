@@ -169,3 +169,91 @@ if (isEmpty) {
     run(`INSERT INTO growth_records (child_id, date, age_months, weight_kg, height_cm, head_cm)
          VALUES (1,?,?,?,?,?)`, daysFromNow(-437 + Math.round(m * 30.44)), m, w, h, hc);
 
+  const milestoneRows = [ // [title, typical, icon, achieved, achievedDaysAgo]
+    ['Social smile', '1–2 months', '😊', 1, -390], ['Holds head steady', '3–4 months', '🙆', 1, -330],
+    ['Rolls over', '4–6 months', '🔄', 1, -300], ['Sits without support', '6–8 months', '🧘', 1, -240],
+    ['First babbling', '6–9 months', '🗣️', 1, -230], ['Crawling', '8–10 months', '🐾', 1, -160],
+    ['Pincer grasp', '9–12 months', '🤏', 1, -120], ['Stands holding on', '9–12 months', '🧍', 1, -100],
+    ['First words', '10–14 months', '💬', 1, -45], ['Walks alone', '12–16 months', '🚶', 0, null],
+    ['Stacks two blocks', '13–16 months', '🧱', 0, null], ['Points to objects', '12–16 months', '👉', 0, null],
+  ];
+  for (const [t, ty, ic, ach, d] of milestoneRows)
+    run(`INSERT INTO milestones (child_id, title, typical, icon, achieved, achieved_on)
+         VALUES (1,?,?,?,?,?)`, t, ty, ic, ach, d === null ? null : daysFromNow(d));
+
+  const vaxRows = [ // [subject, name, dose, dueOffsetDays, status, completedOffset]
+    ['child', 'BCG', 'Single dose', -437, 'done', -436],
+    ['child', 'Pentavalent (DTP-HepB-Hib)', 'Dose 1', -395, 'done', -394],
+    ['child', 'OPV + PCV', 'Dose 1', -395, 'done', -394],
+    ['child', 'Pentavalent (DTP-HepB-Hib)', 'Dose 2', -365, 'done', -363],
+    ['child', 'Pentavalent (DTP-HepB-Hib)', 'Dose 3', -335, 'done', -333],
+    ['child', 'Measles–Rubella (MR)', 'Dose 1', -163, 'done', -160],
+    ['child', 'Measles–Rubella (MR)', 'Dose 2', 19, 'upcoming', null],
+    ['child', 'Vitamin A supplement', 'Round 2', 34, 'upcoming', null],
+    ['mother', 'Tetanus Toxoid (TT)', 'Dose 1', -70, 'done', -70],
+    ['mother', 'Tetanus Toxoid (TT)', 'Dose 2', -42, 'done', -41],
+    ['mother', 'Influenza (seasonal)', 'Single dose', 5, 'due', null],
+    ['mother', 'Tdap booster', 'Week 28 dose', 14, 'upcoming', null],
+  ];
+  for (const [s, n, dose, due, st, comp] of vaxRows)
+    run(`INSERT INTO vaccinations (subject, name, dose, due_date, status, completed_on)
+         VALUES (?,?,?,?,?,?)`, s, n, dose, daysFromNow(due), st, comp === null ? null : daysFromNow(comp));
+
+  const doctorRows = [
+    ['Dr. Nusrat Jahan', 'Gynecologist & Obstetrician', 'City Maternity Hospital', 4.9, 1.2, 1, 124],
+    ['Dr. Kamal Hossain', 'Pediatrician', 'Green Life Children Clinic', 4.8, 2.4, 1, 96],
+    ['Dr. Sara Ahmed', 'Maternal-Fetal Medicine', 'Square Hospital', 4.7, 3.1, 0, 88],
+    ['Dr. Rafiq Islam', 'Nutritionist', 'Wellness Care Center', 4.6, 1.8, 1, 61],
+    ['Dr. Farzana Karim', 'Gynecologist', 'Popular Diagnostic Centre', 4.5, 4.2, 1, 105],
+    ['Dr. Tanvir Alam', 'Pediatric Neurologist', 'National Children Hospital', 4.8, 5.0, 0, 42],
+  ];
+  for (const r of doctorRows)
+    run(`INSERT INTO doctors (name, specialty, hospital, rating, distance_km, available, patients)
+         VALUES (?,?,?,?,?,?,?)`, ...r);
+
+  const apptRows = [ // [doctorId, dayOffset, time, reason, status]
+    [1, 4,  '10:30 AM', 'Antenatal check-up — Week 26', 'upcoming'],
+    [3, 17, '09:00 AM', 'Anomaly ultrasound scan', 'upcoming'],
+    [2, 26, '11:15 AM', "Zara's 15-month wellness visit", 'upcoming'],
+    [1, -24, '10:00 AM', 'Antenatal check-up — Week 22', 'completed'],
+    [4, -38, '04:30 PM', 'Nutrition plan review', 'completed'],
+    [1, -52, '10:00 AM', 'Antenatal check-up — Week 18', 'completed'],
+    [2, -80, '12:00 PM', "Zara's 12-month check-up", 'completed'],
+  ];
+  for (const [docId, d, time, reason, st] of apptRows)
+    run(`INSERT INTO appointments (user_id, doctor_id, date, time, reason, status)
+         VALUES (1,?,?,?,?,?)`, docId, daysFromNow(d), time, reason, st);
+
+  const articleRows = [
+    ['Nutrition essentials for the third trimester', 'Nutrition', 6, '🥗',
+     'Iron, calcium and omega-3 needs rise sharply after week 27. A practical plate-by-plate guide.'],
+    ['Understanding fetal movement counting', 'Pregnancy', 4, '🤰',
+     'Kick counts are a simple daily habit that helps you notice changes early. Learn the 2-hour method.'],
+    ['Safe exercise in pregnancy: a week-by-week guide', 'Fitness', 7, '🧘‍♀️',
+     'Which activities are safe in each trimester, and warning signs that mean you should stop.'],
+    ['Newborn sleep: what is actually normal?', 'Infant care', 5, '🌙',
+     'Sleep cycles, safe sleeping positions, and how patterns evolve during the first year.'],
+    ['Warning signs that need urgent medical attention', 'Safety', 3, '🚨',
+     'Severe headache, blurred vision, reduced movement, bleeding — know when to call your doctor now.'],
+    ['Breastfeeding basics for the first two weeks', 'Infant care', 8, '🍼',
+     'Latch technique, feeding frequency, and how to know your baby is getting enough milk.'],
+    ['Managing gestational diabetes with diet', 'Nutrition', 6, '🩺',
+     'Meal timing, carbohydrate awareness and glucose self-monitoring, explained simply.'],
+    ['Your week 26 guide: what is happening now', 'Weekly tips', 4, '📅',
+     'Baby’s eyes are opening this week. Here is what to expect and what to prepare next.'],
+  ];
+  for (const r of articleRows)
+    run(`INSERT INTO articles (title, category, minutes, icon, excerpt) VALUES (?,?,?,?,?)`, ...r);
+
+  const postRows = [
+    ['Maliha S.', 'Third trimester', 'Anyone else dealing with swollen feet at week 30?',
+     'My ankles swell every evening. Elevating helps a bit — any other tips that worked for you?', 14, 32, '2 h ago'],
+    ['Tania R.', 'Vaccination', 'MR dose 2 experience — mild fever after?',
+     'My son had a mild fever the evening after MR-2. Doctor said it is normal. Sharing for other worried moms!', 8, 21, '6 h ago'],
+    ['Nadia K.', 'Nutrition', 'Iron-rich meal ideas that are actually tasty',
+     'Sharing my week of iron-rich Bangladeshi meals that helped raise my hemoglobin from 9.8 to 11.2.', 23, 67, '1 d ago'],
+    ['Sharmin A.', 'Newborn care', 'How I got my 4-month-old to sleep longer stretches',
+     'A consistent bath-feed-lullaby routine changed everything for us within two weeks.', 17, 45, '2 d ago'],
+    ['Rumana H.', 'Mental health', 'It is okay to ask for help — my postpartum story',
+     'I want other mothers to know that feeling overwhelmed is common and support changes everything.', 31, 112, '3 d ago'],
+  ];
