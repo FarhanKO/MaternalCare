@@ -26,3 +26,8 @@ exports.book = (req, res) => {
   });
   res.redirect('/appointments?booked=1');
 };
+
+exports.cancel = (req, res) => {
+  appointmentModel.cancel(Number(req.params.id));
+  res.redirect('/appointments');
+};
