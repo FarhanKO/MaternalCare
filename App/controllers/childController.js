@@ -16,4 +16,12 @@ exports.index = (req, res) => {
   });
 };
 
-
+exports.addGrowth = (req, res) => {
+  const user = userModel.current();
+  const child = childModel.forUser(user.id);
+  const { date, age_months, weight_kg, height_cm, head_cm } = req.body;
+  childModel.addGrowth(child.id, {
+    date: date || new Date().toISOString().slice(0, 10),
+    age_months: Number(age_months), weight_kg: Number(weight_kg),
+    height_cm: Number(height_cm), head_cm: Number(head_cm),
+  });
