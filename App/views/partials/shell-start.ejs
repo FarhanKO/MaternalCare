@@ -62,5 +62,18 @@
       <a href="/risk" class="btn btn-primary btn-sm">Check my risk</a>
     </div>
   </aside>
-
-
+  <main class="main">
+    <div class="topbar">
+      <button class="menu-btn" aria-label="Menu">☰</button>
+      <div class="page-title">
+        <h1><%= heading %></h1>
+        <p><%= sub %></p>
+      </div>
+      <div class="topbar-right">
+        <div class="chip-date">📅 <%= new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) %></div>
+        <a class="avatar" href="/dashboard">
+          <div class="avatar-pic"><%= user.name.split(' ').map(w => w[0]).join('').slice(0,2) %></div>
+          <div><b><%= user.name %></b><small><%= user.role === 'mother' ? 'Mother · Week view' : user.role %></small></div>
+        </a>
+      </div>
+    </div>
