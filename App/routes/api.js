@@ -17,3 +17,17 @@ router.get('/me', (req, res) => {
   res.json({ data: { user, pregnancy } });
 });
 
+/* symptoms */
+router.get('/symptoms', symptomApi.index);
+router.put('/symptoms', symptomApi.replace);
+router.post('/symptoms', symptomApi.create);
+router.patch('/symptoms/:id', symptomApi.update);
+router.delete('/symptoms/:id', symptomApi.destroy);
+router.post('/symptoms/end-entry', symptomApi.clearConfirmations);
+
+/* reminders & appointments */
+router.get('/reminders', reminderApi.index);
+router.post('/reminders', reminderApi.create);
+router.delete('/reminders/:id', reminderApi.destroy);
+
+module.exports = router;
