@@ -1,1 +1,8 @@
+<%- include('partials/head', { title: 'Vaccinations' }) %>
+<%- include('partials/shell-start', {
+      heading: 'Vaccination Schedule 💉',
+      sub: `Immunisation timelines for ${child.name} and mother, with smart reminders`,
+      toast: null }) %>
+
+<% const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); %>
 
