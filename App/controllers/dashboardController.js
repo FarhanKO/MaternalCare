@@ -10,3 +10,7 @@ exports.home = (req, res) => {
   res.render('home', { page: 'home' });
 };
 
+exports.dashboard = (req, res) => {
+  const user = userModel.current();
+  const pregnancy = pregnancyModel.forUser(user.id);
+  const vitals = vitalModel.history(user.id);
