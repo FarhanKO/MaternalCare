@@ -68,3 +68,45 @@
     <div class="chart-box" style="height:240px"><canvas id="weightChart"></canvas></div>
   </div>
 
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📋</span> Recent readings</div>
+        <div class="card-sub">Latest entries first</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="glass-table">
+        <thead><tr><th>Date</th><th>BP</th><th>Sugar</th><th>Weight</th><th>Temp</th><th>Status</th></tr></thead>
+        <tbody>
+          <% for (const v of [...vitals].reverse().slice(0, 7)) {
+               const flag = v.systolic >= 140 || v.diastolic >= 90 || v.sugar >= 126 || v.temp_c >= 38 ? 'critical'
+                          : v.systolic >= 130 || v.diastolic >= 85 || v.sugar >= 95 || v.temp_c >= 37.5 ? 'warning' : 'good'; %>
+            <tr>
+              <td><%= fmt(v.date) %></td>
+              <td><%= v.systolic %>/<%= v.diastolic %></td>
+              <td><%= v.sugar %></td>
+              <td><%= v.weight_kg %> kg</td>
+              <td><%= v.temp_c %>°</td>
+              <td><span class="pill pill-<%= flag %>"><%= flag === 'good' ? '● Normal' : flag === 'warning' ? '● Watch' : '● Alert' %></span></td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.MC = {
+    vitals: {
+      labels: <%- JSON.stringify(vitals.map(v => fmt(v.date))) %>,
+      systolic: <%- JSON.stringify(vitals.map(v => v.systolic)) %>,
+      diastolic: <%- JSON.stringify(vitals.map(v => v.diastolic)) %>,
+      sugar: <%- JSON.stringify(vitals.map(v => v.sugar)) %>,
+      weight: <%- JSON.stringify(vitals.map(v => v.weight_kg)) %>
+    }
+  };
+</script>
+
+<%- include('partials/shell-end') %>
