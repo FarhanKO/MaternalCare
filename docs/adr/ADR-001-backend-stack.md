@@ -1,8 +1,8 @@
 # ADR-001 — Backend stack: Node/Express MVC instead of ASP.NET Core
 
 **Status:** Accepted
-**Date:** <!-- FILL: decision date -->
-**Deciders:** <!-- FILL: team members present -->
+**Date:** 5 August 2026
+**Deciders:** All Team Members
 **Supersedes:** the Sprint 1 intention to build an ASP.NET Core backend
 
 ---
@@ -64,6 +64,7 @@ EJS views.
 ## Consequences
 
 ### Positive
+
 - MVC compliance is demonstrable in one codebase, with one Model layer.
 - Persistence was delivered inside Sprint 2 (SQLite via the Model layer).
 - Both a server-rendered and a client-rendered View share the same domain logic —
@@ -71,6 +72,7 @@ EJS views.
 - Single `npm install` per package; no SDK prerequisites for graders.
 
 ### Negative
+
 - The team does not gain ASP.NET Core / C# experience on this project.
 - The Sprint 1 plan referenced ASP.NET; this ADR is the formal record of the change,
   and the Sprint 2 report must state the pivot openly.
@@ -80,6 +82,7 @@ EJS views.
   out of controllers.
 
 ### Neutral
+
 - If ASP.NET Core is required later, the API contract in `routes/api.js` is small and
   documented, so a C# implementation could replace it without touching the React client.
 
@@ -87,20 +90,20 @@ EJS views.
 
 ## Alternatives considered
 
-| Option | Why rejected |
-|---|---|
-| **Build ASP.NET Core now** | Highest risk. Required installing the .NET SDK, learning EF Core, and re-implementing 8 models and 10 controllers mid-sprint, with no new user-facing value. |
-| **Run both backends** | Two sources of truth for the same data; doubles maintenance; no academic benefit. |
-| **Keep React state-only, no backend** | Fails the MVC requirement and loses all data on refresh. This was the state at the start of Sprint 2 and is what prompted this ADR. |
-| **Delete the Express app and go client-only** | Would remove the only MVC implementation in the project. |
+| Option                                        | Why rejected                                                                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Build ASP.NET Core now**                    | Highest risk. Required installing the .NET SDK, learning EF Core, and re-implementing 8 models and 10 controllers mid-sprint, with no new user-facing value. |
+| **Run both backends**                         | Two sources of truth for the same data; doubles maintenance; no academic benefit.                                                                            |
+| **Keep React state-only, no backend**         | Fails the MVC requirement and loses all data on refresh. This was the state at the start of Sprint 2 and is what prompted this ADR.                          |
+| **Delete the Express app and go client-only** | Would remove the only MVC implementation in the project.                                                                                                     |
 
 ---
 
 ## Compliance check
 
-| Requirement | Status |
-|---|---|
-| MVC architecture | ✅ `models/` · `views/` + `frontend/` · `controllers/` · `routes/` |
-| Django / Flask / FastAPI not used | ✅ Node.js + Express only |
-| Clean, modular, maintainable | ✅ One responsibility per model/controller; DTO mapping; no SQL outside models |
-| Data persistence | ✅ SQLite via the Model layer |
+| Requirement                       | Status                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| MVC architecture                  | ✅ `models/` · `views/` + `frontend/` · `controllers/` · `routes/`             |
+| Django / Flask / FastAPI not used | ✅ Node.js + Express only                                                      |
+| Clean, modular, maintainable      | ✅ One responsibility per model/controller; DTO mapping; no SQL outside models |
+| Data persistence                  | ✅ SQLite via the Model layer                                                  |
