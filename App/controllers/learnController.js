@@ -13,3 +13,10 @@ exports.index = (req, res) => {
   });
 };
 
+exports.post = (req, res) => {
+  const user = userModel.current();
+  const { tag, title, body } = req.body;
+  if (title && title.trim())
+    contentModel.addPost({ author: user.name, tag: tag || 'General', title: title.trim(), body: (body || '').trim() });
+  res.redirect('/learn?posted=1#community');
+};
