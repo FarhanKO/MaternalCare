@@ -48,4 +48,19 @@
         <%- icons[key] %><span><%= label %></span>
       </a>
     <% } %>
+    <div class="nav-label">Support</div>
+    <% for (const [key, href, label] of nav2) { %>
+      <a class="nav-item <%= page === key ? 'active' : '' %>" href="<%= href %>">
+        <%- icons[key] %><span><%= label %></span>
+        <% if (key === 'emergency') { %><span class="dot"></span><% } %>
+      </a>
+    <% } %>
+
+    <div class="sidebar-cta">
+      <div class="emoji">🍼</div>
+      <p>Week-by-week guidance, reminders and AI insight — all in one place.</p>
+      <a href="/risk" class="btn btn-primary btn-sm">Check my risk</a>
+    </div>
+  </aside>
+
 
