@@ -1,0 +1,114 @@
+<%- include('partials/head', { title: 'Doctor Portal' }) %>
+<%- include('partials/shell-start', {
+      heading: 'Doctor Portal 🩺',
+      sub: 'Secure clinical view · Dr. Nusrat Jahan · Gynecology & Obstetrics',
+      toast: null }) %>
+
+<% const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); %>
+
+<div class="grid grid-4">
+  <div class="card hoverable reveal">
+    <div class="stat-ico tint-violet">👥</div>
+    <div class="stat"><span class="k">Assigned patients</span><span class="v">124</span>
+    <span class="d up">● 6 new this week</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d1">
+    <div class="stat-ico tint-rose">🔔</div>
+    <div class="stat"><span class="k">Active alerts</span><span class="v"><%= alerts.length %></span>
+    <span class="d watch">● Requires review today</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d2">
+    <div class="stat-ico tint-aqua">🗓️</div>
+    <div class="stat"><span class="k">Today's consultations</span><span class="v">8</span>
+    <span class="d">● Next at 10:30 AM</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d3">
+    <div class="stat-ico tint-peach">🧠</div>
+    <div class="stat"><span class="k">AI-flagged pregnancies</span><span class="v">3</span>
+    <span class="d watch">● Medium/high risk profiles</span></div>
+  </div>
+</div>
+
+<div class="grid grid-3 mt">
+  <div class="card hoverable col-span-2 reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📈</span> Patient — <%= patient.name %> · longitudinal blood pressure</div>
+        <div class="card-sub">Week <%= pregnancy.week %> · G1P0 · <%= patient.blood_group %> · dashed line = 140 mmHg limit</div>
+      </div>
+      <div class="right">
+        <span class="pill pill-<%= risk.level === 'low' ? 'good' : risk.level === 'medium' ? 'warning' : 'critical' %>">AI: <%= risk.label %> (<%= risk.score %>)</span>
+      </div>
+    </div>
+    <div class="chart-box" style="height:250px"><canvas id="bpChart"></canvas></div>
+    <% if (alerts.length) { %>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px">
+        <% for (const a of alerts) { %>
+          <div class="alert alert-<%= a.level %>">
+            <span class="aico"><%= a.level === 'critical' ? '⛔' : '⚠️' %></span>
+            <div><b><%= a.metric %> — <%= a.value %></b><%= a.message %></div>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📋</span> Patient snapshot</div>
+        <div class="card-sub">Latest recorded values</div>
+      </div>
+    </div>
+    <div class="row-item"><div class="row-ico tint-violet">🫀</div>
+      <div><b>Blood pressure</b><small>Trending upward since week 22</small></div>
+      <div class="right"><b><%= latest.systolic %>/<%= latest.diastolic %></b><small>mmHg</small></div></div>
+    <div class="row-item"><div class="row-ico tint-rose">🩸</div>
+      <div><b>Fasting glucose</b><small>Above 95 target — recommend OGTT</small></div>
+      <div class="right"><b><%= latest.sugar %></b><small>mg/dL</small></div></div>
+    <div class="row-item"><div class="row-ico tint-aqua">⚖️</div>
+      <div><b>Weight</b><small>+11.5 kg from baseline</small></div>
+      <div class="right"><b><%= latest.weight_kg %></b><small>kg</small></div></div>
+    <div class="row-item"><div class="row-ico tint-peach">🌡️</div>
+      <div><b>Temperature</b><small>Normal</small></div>
+      <div class="right"><b><%= latest.temp_c %></b><small>°C</small></div></div>
+    <button class="btn btn-primary btn-sm" style="width:100%; margin-top:12px" onclick="showToast('Consultation note added to patient record', '📝')">＋ Add consultation note</button>
+    <button class="btn btn-glass btn-sm" style="width:100%; margin-top:8px" onclick="showToast('Full AI risk report opened', '🧠')">View AI risk report</button>
+  </div>
+</div>
+
+<div class="card mt reveal">
+  <div class="card-head">
+    <div>
+      <div class="card-title"><span class="ico">🗂️</span> Consultation history — <%= patient.name %></div>
+      <div class="card-sub">Complete digital medical record</div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="glass-table">
+      <thead><tr><th>Date</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead>
+      <tbody>
+        <% for (const a of appointments) { %>
+          <tr>
+            <td><%= fmt(a.date) %> · <%= a.time %></td>
+            <td><b style="color:var(--ink)"><%= a.doctor_name %></b> <small style="color:var(--ink-3)">· <%= a.specialty %></small></td>
+            <td><%= a.reason %></td>
+            <td><span class="pill <%= a.status === 'upcoming' ? 'pill-info' : 'pill-good' %>"><%= a.status === 'upcoming' ? '🗓️ Upcoming' : '✓ Completed' %></span></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  window.MC = {
+    vitals: {
+      labels: <%- JSON.stringify(vitals.map(v => fmt(v.date))) %>,
+      systolic: <%- JSON.stringify(vitals.map(v => v.systolic)) %>,
+      diastolic: <%- JSON.stringify(vitals.map(v => v.diastolic)) %>
+    }
+  };
+</script>
+
+<%- include('partials/shell-end') %>

@@ -1,0 +1,80 @@
+<%- include('partials/head', { title: 'Emergency SOS' }) %>
+<%- include('partials/shell-start', {
+      heading: 'Emergency SOS 🚨',
+      sub: 'One touch shares your live location with contacts and nearby hospitals',
+      toast: null }) %>
+
+<div class="grid grid-3">
+  <div class="card hoverable reveal" style="text-align:center; padding:38px 24px">
+    <div class="card-title" style="justify-content:center; margin-bottom:6px">One-touch emergency alert</div>
+    <p style="font-size:12.5px; color:var(--ink-2); margin-bottom:26px">Hold or tap the button — help is on the way.</p>
+    <div style="display:grid; place-items:center">
+      <div class="sos-ripple" style="position:relative; display:grid; place-items:center">
+        <button id="sosBtn" class="sos-btn">SOS<br><span style="font-size:12px; font-weight:700; letter-spacing:0.08em; opacity:0.9">TAP FOR HELP</span></button>
+      </div>
+    </div>
+    <div id="sosStatus" style="margin-top:30px"></div>
+    <p style="font-size:11.5px; color:var(--ink-3); margin-top:18px; line-height:1.6">
+      Voice assistant activates automatically after an SOS —<br>say "cancel" within 10 seconds to stop the alert.
+    </p>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">👥</span> Emergency contacts</div>
+        <div class="card-sub">Notified instantly with your location</div>
+      </div>
+    </div>
+    <% contacts.forEach((c, i) => { %>
+      <div class="row-item">
+        <div class="row-ico <%= ['tint-rose','tint-violet','tint-aqua'][i % 3] %>"><%= ['👨','👩','🩺'][i % 3] %></div>
+        <div><b><%= c.name %></b><small><%= c.relation %></small></div>
+        <div class="right"><span class="pill pill-neutral">📞 <%= c.phone %></span></div>
+      </div>
+    <% }) %>
+    <button class="btn btn-glass btn-sm" style="width:100%; margin-top:12px" onclick="showToast('Caregiver invitation link copied', '🔗')">＋ Add caregiver</button>
+
+    <div class="card-head" style="margin:22px 0 12px">
+      <div>
+        <div class="card-title"><span class="ico">🚑</span> Quick dial</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <button class="btn btn-glass" onclick="showToast('Calling national ambulance service…', '🚑')">🚑 Ambulance 999</button>
+      <button class="btn btn-glass" onclick="showToast('Calling your obstetrician…', '🩺')">🩺 My doctor</button>
+    </div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d2">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🏥</span> Nearby facilities</div>
+        <div class="card-sub">Sorted by distance from you</div>
+      </div>
+    </div>
+    <% for (const h of hospitals) { %>
+      <div class="row-item">
+        <div class="row-ico tint-aqua">🏥</div>
+        <div>
+          <b style="font-size:13px"><%= h.name %></b>
+          <small>
+            <%= h.distance_km %> km away
+            <% if (h.open24) { %> · <span style="color:var(--success-text)">Open 24/7</span><% } %>
+            <% if (h.ambulance) { %> · 🚑 Ambulance<% } %>
+          </small>
+        </div>
+        <div class="right"><button class="btn btn-ghost btn-sm" onclick="showToast('Opening directions to <%= h.name %>', '🗺️')">Route →</button></div>
+      </div>
+    <% } %>
+
+    <div class="alert alert-critical" style="margin-top:14px">
+      <span class="aico">⚠️</span>
+      <div><b>Warning signs — seek help immediately</b>
+        Heavy bleeding · severe headache with blurred vision · reduced fetal movement ·
+        fever above 38.5°C · sudden severe swelling.</div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/shell-end') %>

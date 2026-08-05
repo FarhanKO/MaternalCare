@@ -1,0 +1,15 @@
+{
+  "name": "maternitycare-plus",
+  "version": "1.0.0",
+  "description": "MaternityCare+ — Maternity and Childcare monitoring platform (MVC architecture)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.9",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2"
+  }
+}

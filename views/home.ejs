@@ -1,0 +1,116 @@
+<%- include('partials/head', { title: 'Every heartbeat, cared for' }) %>
+<body>
+<div class="scene"></div>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<div class="landing">
+
+  <nav class="landing-nav">
+    <a class="brand" href="/" style="padding:0">
+      <div class="brand-mark">🤍</div>
+      <div>
+        <div class="brand-name">Maternity<span>Care+</span></div>
+      </div>
+    </a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#impact">Why it matters</a>
+      <a href="/learn">Knowledge base</a>
+      <a href="/doctor">For doctors</a>
+    </div>
+    <a href="/dashboard" class="btn btn-primary btn-sm" style="margin-left:18px">Open app →</a>
+  </nav>
+
+  <header class="hero">
+    <div class="float-chip" style="top:120px; left:-8px; --tilt:-4deg">
+      <span style="font-size:20px">🫀</span>
+      <div>BP 118/76 <small>All vitals normal</small></div>
+    </div>
+    <div class="float-chip" style="top:96px; right:-6px; --tilt:3deg; animation-delay:-2s">
+      <span style="font-size:20px">👶</span>
+      <div>Week 26 <small>Baby is the size of a lettuce</small></div>
+    </div>
+    <div class="float-chip" style="bottom:130px; left:40px; --tilt:2.5deg; animation-delay:-4s">
+      <span style="font-size:20px">💉</span>
+      <div>MR dose 2 <small>Reminder · in 19 days</small></div>
+    </div>
+    <div class="float-chip" style="bottom:110px; right:36px; --tilt:-3deg; animation-delay:-3s">
+      <span style="font-size:20px">🧠</span>
+      <div>Low risk <small>AI health assessment</small></div>
+    </div>
+
+    <span class="hero-badge">✨ AI-powered maternity &amp; childcare monitoring</span>
+    <h1 class="reveal in">Every heartbeat,<br><span class="grad">beautifully cared for.</span></h1>
+    <p class="lede">MaternityCare+ brings pregnancy tracking, child growth monitoring, vaccinations,
+      appointments and AI health insight into one calm, glass-clear space — for mothers,
+      doctors and caregivers together.</p>
+    <div class="hero-cta">
+      <a href="/dashboard" class="btn btn-primary">🤰 Start monitoring</a>
+      <a href="#features" class="btn btn-glass">Explore features</a>
+    </div>
+  </header>
+
+  <section class="stats-band" id="impact">
+    <div class="card hoverable reveal"><div class="num" data-count="98" data-suffix="%">0</div><div class="lbl">of maternal deaths are preventable with timely care</div></div>
+    <div class="card hoverable reveal reveal-d1"><div class="num" data-count="20">0</div><div class="lbl">integrated care features in a single platform</div></div>
+    <div class="card hoverable reveal reveal-d2"><div class="num" data-count="24" data-suffix="/7">0</div><div class="lbl">emergency SOS with live location sharing</div></div>
+    <div class="card hoverable reveal reveal-d3"><div class="num" data-count="3">0</div><div class="lbl">risk levels classified by the AI engine</div></div>
+  </section>
+
+  <div class="section-head" id="features">
+    <h2>One platform. The whole journey.</h2>
+    <p>From the first week of pregnancy to your child's first steps.</p>
+  </div>
+
+  <div class="feature-grid">
+    <a href="/pregnancy" class="card hoverable feature-card reveal">
+      <div class="fico tint-rose">🤰</div>
+      <h3>Pregnancy week tracker</h3>
+      <p>Automatic gestational age and delivery date from your LMP, with week-by-week guidance and a beautiful journey timeline.</p>
+    </a>
+    <a href="/vitals" class="card hoverable feature-card reveal reveal-d1">
+      <div class="fico tint-violet">🫀</div>
+      <h3>Vitals &amp; smart alerts</h3>
+      <p>Log blood pressure, sugar, weight and temperature. Interactive trend charts raise alerts when values cross safe thresholds.</p>
+    </a>
+    <a href="/child" class="card hoverable feature-card reveal reveal-d2">
+      <div class="fico tint-aqua">👶</div>
+      <h3>Child growth &amp; WHO curves</h3>
+      <p>Track height, weight and milestones, visualised against WHO growth-standard percentiles in real time.</p>
+    </a>
+    <a href="/vaccinations" class="card hoverable feature-card reveal">
+      <div class="fico tint-peach">💉</div>
+      <h3>Vaccination scheduler</h3>
+      <p>Personalised immunisation timelines for mother and child, with smart reminders and a digital vaccine record.</p>
+    </a>
+    <a href="/risk" class="card hoverable feature-card reveal reveal-d1">
+      <div class="fico tint-violet">🧠</div>
+      <h3>AI risk prediction</h3>
+      <p>An intelligent engine classifies pregnancies as Low, Medium or High risk and generates personalised lifestyle plans.</p>
+    </a>
+    <a href="/emergency" class="card hoverable feature-card reveal reveal-d2">
+      <div class="fico tint-rose">🚨</div>
+      <h3>One-touch emergency SOS</h3>
+      <p>Instantly share your live location with emergency contacts and find the nearest 24/7 maternity hospitals.</p>
+    </a>
+  </div>
+
+  <div class="cta-panel reveal">
+    <h2>Built for mothers. Trusted by doctors.</h2>
+    <p>Appointments, records, community and AI insight — all in one calm place.</p>
+    <div class="hero-cta">
+      <a href="/dashboard" class="btn btn-primary">Open the dashboard</a>
+      <a href="/doctor" class="btn btn-glass">🩺 Doctor portal</a>
+    </div>
+  </div>
+
+  <footer class="landing-footer">
+    MaternityCare+ · Maternity &amp; childcare monitoring platform · MVC architecture · Built with Node.js + Express
+  </footer>
+</div>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(node -e \"const {DatabaseSync} = require\\('node:sqlite'\\); const db = new DatabaseSync\\(':memory:'\\); db.exec\\('CREATE TABLE t\\(a\\)'\\); console.log\\('node:sqlite OK'\\)\")",
+      "PowerShell(foreach \\($r in '/','/dashboard','/pregnancy','/vitals','/child','/vaccinations','/appointments','/risk','/emergency','/learn','/doctor','/nope'\\) { try { $s = \\(Invoke-WebRequest -Uri \"http://localhost:3000$r\" -UseBasicParsing -TimeoutSec 10\\).StatusCode } catch { $s = $_.Exception.Response.StatusCode.value__ }; Write-Output \"$r -> $s\" })",
+      "PowerShell($today = Get-Date -Format 'yyyy-MM-dd'; $r = Invoke-WebRequest -Uri 'http://localhost:3000/vitals' -Method POST -Body @{date=$today; systolic=125; diastolic=82; sugar=103; weight_kg=66.7; temp_c=36.9} -UseBasicParsing -MaximumRedirection 5; Write-Output \"Status: $\\($r.StatusCode\\)\"; Write-Output \\($r.Content -match '66.7'\\))",
+      "PowerShell(foreach \\($r in '/dashboard','/pregnancy','/risk','/vitals'\\) { try { $s = \\(Invoke-WebRequest -Uri \"http://localhost:3000$r\" -UseBasicParsing -TimeoutSec 10\\).StatusCode } catch { $s = \"ERR $\\($_.Exception.Message\\)\" }; Write-Output \"$r -> $s\" })",
+      "WebFetch(domain:unsplash.com)"
+    ]
+  }
+}

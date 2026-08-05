@@ -1,0 +1,103 @@
+<%- include('partials/head', { title: 'AI Risk Insight' }) %>
+<%- include('partials/shell-start', {
+      heading: 'AI Health Risk Insight 🧠',
+      sub: 'Intelligent maternal risk classification with a personalised care plan',
+      toast: custom ? 'Assessment updated with your values' : null }) %>
+
+<div class="grid grid-3">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🎯</span> Risk classification</div>
+        <div class="card-sub"><%= custom ? 'From your entered values' : 'From your latest logged vitals' %></div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:170px"><canvas id="riskGauge"></canvas></div>
+    <div style="text-align:center; margin-top:-64px; position:relative; pointer-events:none">
+      <div style="font-size:30px; font-weight:800; letter-spacing:-0.02em"><%= result.score %></div>
+      <div style="font-size:10.5px; color:var(--ink-3); font-weight:700">OF 100</div>
+    </div>
+    <div style="text-align:center; margin-top:26px">
+      <span class="pill pill-<%= result.level === 'low' ? 'good' : result.level === 'medium' ? 'warning' : 'critical' %>" style="font-size:13px; padding:8px 18px">
+        <%= result.level === 'low' ? '🟢' : result.level === 'medium' ? '🟡' : '🔴' %> <%= result.label %>
+      </span>
+      <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6; margin-top:14px">
+        The engine evaluates age, blood pressure, glucose, temperature and gestational stage —
+        the same clinical features used in maternal-risk ML models.
+      </p>
+      <button class="btn btn-glass btn-sm" style="margin-top:12px" onclick="showToast('PDF health report generated for your doctor', '📄')">
+        📄 Download PDF report
+      </button>
+    </div>
+  </div>
+
+  <div class="card hoverable col-span-2 reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🧩</span> Contributing factors</div>
+        <div class="card-sub">How each factor adds to the overall score</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:200px"><canvas id="factorChart"></canvas></div>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px">
+      <% for (const f of result.factors) { %>
+        <div class="row-item" style="padding:9px 12px">
+          <span class="pill <%= f.points >= 30 ? 'pill-critical' : f.points >= 10 ? 'pill-warning' : 'pill-good' %>" style="min-width:64px; justify-content:center">
+            +<%= f.points %> pts
+          </span>
+          <div><b style="font-size:12.8px"><%= f.name %></b><small><%= f.detail %></small></div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<div class="card mt reveal">
+  <div class="card-head">
+    <div>
+      <div class="card-title"><span class="ico">🧪</span> Run a what-if assessment</div>
+      <div class="card-sub">Enter any values to see how they change the classification — useful before doctor visits</div>
+    </div>
+  </div>
+  <form method="POST" action="/risk" class="form-grid" style="grid-template-columns:repeat(5, 1fr); align-items:end">
+    <div class="field"><label>Age (years)</label><input type="number" name="age" min="14" max="55" value="<%= user.age %>" required></div>
+    <div class="field"><label>Systolic BP</label><input type="number" name="systolic" min="70" max="220" value="<%= latest.systolic %>" required></div>
+    <div class="field"><label>Diastolic BP</label><input type="number" name="diastolic" min="40" max="140" value="<%= latest.diastolic %>" required></div>
+    <div class="field"><label>Fasting sugar</label><input type="number" name="sugar" min="40" max="400" value="<%= latest.sugar %>" required></div>
+    <div class="field"><label>Temperature °C</label><input type="number" name="temp" step="0.1" min="34" max="43" value="<%= latest.temp_c %>" required></div>
+    <button class="btn btn-primary" style="grid-column:1 / -1; justify-self:end">✨ Assess risk</button>
+  </form>
+</div>
+
+<div class="section-head" style="margin:36px 0 20px; text-align:left">
+  <h2 style="font-size:21px">Your personalised care plan</h2>
+  <p style="margin-top:5px; font-size:13.5px">AI-generated nutrition, activity and monitoring guidance for a <b><%= result.label.toLowerCase() %></b> profile</p>
+</div>
+
+<div class="grid grid-4">
+  <% result.recommendations.forEach((r, i) => { %>
+    <div class="card hoverable reveal <%= ['','reveal-d1','reveal-d2','reveal-d3'][i % 4] %>">
+      <div class="stat-ico <%= ['tint-aqua','tint-violet','tint-rose','tint-peach'][i % 4] %>"><%= r.icon %></div>
+      <b style="font-size:14px"><%= r.title %></b>
+      <p style="font-size:12.6px; color:var(--ink-2); line-height:1.6; margin-top:7px"><%= r.text %></p>
+    </div>
+  <% }) %>
+</div>
+
+<div class="alert alert-warning mt reveal">
+  <span class="aico">⚕️</span>
+  <div><b>Medical disclaimer</b>This assessment is decision support, not a diagnosis. Always consult your
+  obstetrician about any concerning readings or symptoms.</div>
+</div>
+
+<script>
+  window.MC = {
+    risk: {
+      score: <%= result.score %>,
+      level: '<%= result.level %>',
+      factors: <%- JSON.stringify(result.factors.map(f => ({ name: f.name, points: f.points }))) %>
+    }
+  };
+</script>
+
+<%- include('partials/shell-end') %>

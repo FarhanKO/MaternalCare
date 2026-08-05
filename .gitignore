@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+
+# build output
+frontend/dist/
+dist/
+
+# database (regenerated + seeded on first run)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# environment
+.env
+.env.local
+frontend/.env.local
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*

@@ -1,0 +1,82 @@
+<%- include('partials/head', { title: 'Learn & Community' }) %>
+<%- include('partials/shell-start', {
+      heading: 'Learn & Community 📚',
+      sub: 'Doctor-reviewed guides and a supportive space for mothers',
+      toast: posted ? 'Your post is live in the community' : null }) %>
+
+<div class="card reveal" style="display:flex; gap:10px; flex-wrap:wrap; padding:16px 20px">
+  <a href="/learn" class="btn <%= category === 'All' ? 'btn-primary' : 'btn-glass' %> btn-sm">All topics</a>
+  <% for (const c of categories) { %>
+    <a href="/learn?category=<%= encodeURIComponent(c) %>" class="btn <%= category === c ? 'btn-primary' : 'btn-glass' %> btn-sm"><%= c %></a>
+  <% } %>
+</div>
+
+<div class="grid grid-4 mt">
+  <% articles.forEach((a, i) => { %>
+    <div class="card hoverable reveal <%= ['','reveal-d1','reveal-d2','reveal-d3'][i % 4] %>" style="cursor:pointer" onclick="showToast('Opening: <%= a.title.replace(/'/g, '') %>', '📖')">
+      <div class="stat-ico <%= ['tint-rose','tint-violet','tint-aqua','tint-peach'][i % 4] %>"><%= a.icon %></div>
+      <div style="display:flex; gap:7px; margin-bottom:9px">
+        <span class="pill pill-violet"><%= a.category %></span>
+        <span class="pill pill-neutral">⏱ <%= a.minutes %> min</span>
+      </div>
+      <b style="font-size:14px; line-height:1.4; display:block"><%= a.title %></b>
+      <p style="font-size:12.4px; color:var(--ink-2); line-height:1.6; margin-top:8px"><%= a.excerpt %></p>
+      <div style="margin-top:12px; font-size:11.5px; font-weight:700; color:var(--success-text)">✓ Doctor reviewed</div>
+    </div>
+  <% }) %>
+</div>
+
+<div class="section-head" style="margin:44px 0 20px; text-align:left" id="community">
+  <h2 style="font-size:21px">Community forum 💬</h2>
+  <p style="margin-top:5px; font-size:13.5px">Moderated space — misleading content can be reported and is reviewed by admins</p>
+</div>
+
+<div class="grid grid-3">
+  <div class="card hoverable col-span-2 reveal">
+    <% for (const p of posts) { %>
+      <div class="row-item" style="align-items:flex-start; padding:15px 14px">
+        <div class="row-ico tint-violet" style="border-radius:50%"><%= p.author[0] %></div>
+        <div style="flex:1">
+          <div style="display:flex; gap:9px; align-items:center; flex-wrap:wrap">
+            <b style="font-size:13.5px"><%= p.title %></b>
+            <span class="pill pill-neutral" style="font-size:10.5px"><%= p.tag %></span>
+          </div>
+          <p style="font-size:12.6px; color:var(--ink-2); line-height:1.55; margin-top:5px"><%= p.body %></p>
+          <div style="display:flex; gap:16px; margin-top:9px; font-size:11.5px; font-weight:700; color:var(--ink-3)">
+            <span><%= p.author %> · <%= p.time_ago %></span>
+            <span>💬 <%= p.replies %> replies</span>
+            <span>❤️ <%= p.likes %></span>
+            <button class="btn btn-ghost btn-sm" style="padding:2px 10px; font-size:11px" onclick="showToast('Reported to moderators — thank you', '🚩')">Report</button>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1" style="align-self:start">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">✍️</span> Ask the community</div>
+        <div class="card-sub">Posting as <%= user.name %></div>
+      </div>
+    </div>
+    <form method="POST" action="/learn/post" style="display:flex; flex-direction:column; gap:13px">
+      <div class="field">
+        <label>Topic</label>
+        <select name="tag">
+          <option>General</option><option>Pregnancy</option><option>Nutrition</option>
+          <option>Vaccination</option><option>Newborn care</option><option>Mental health</option>
+        </select>
+      </div>
+      <div class="field"><label>Title</label><input name="title" placeholder="What would you like to ask?" required maxlength="120"></div>
+      <div class="field"><label>Details</label><textarea name="body" rows="4" placeholder="Share more context…" maxlength="600"></textarea></div>
+      <button class="btn btn-primary">Post to community</button>
+    </form>
+    <div class="alert alert-good" style="margin-top:14px">
+      <span class="aico">🛡️</span>
+      <div>Be kind and specific. Medical questions get flagged for doctor review.</div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/shell-end') %>
