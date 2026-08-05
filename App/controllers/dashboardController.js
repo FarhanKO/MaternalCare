@@ -22,3 +22,8 @@ exports.dashboard = (req, res) => {
   const appointments = appointmentModel.upcoming(user.id, 3);
   const risk = riskModel.fromLatestVitals(user, pregnancy);
 
+  res.render('dashboard', {
+    page: 'dashboard', user, pregnancy, vitals, latest, alerts,
+    child, vaxStats, nextVax, appointments, risk,
+  });
+};
