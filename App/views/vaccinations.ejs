@@ -81,3 +81,18 @@
       <input type="file" hidden onchange="showToast('Document attached to your record', '📎')">
     </label>
   </div>
+  <div class="card hoverable reveal reveal-d2">
+    <div class="card-head"><div><div class="card-title"><span class="ico">📖</span> Why it matters</div></div></div>
+    <p style="font-size:13px; color:var(--ink-2); line-height:1.65">
+      Full immunisation prevents an estimated <b>4–5 million deaths every year</b> (WHO).
+      Staying on schedule protects your baby during their most vulnerable months.
+    </p>
+    <a href="/learn" class="btn btn-glass btn-sm" style="margin-top:14px">Read the vaccination guide →</a>
+  </div>
+</div>
+
+<script>
+  window.MC = { vax: { done: <%= stats.done %>, due: <%= stats.due %>, upcoming: <%= stats.upcoming %> } };
+</script>
+
+<%- include('partials/shell-end') %>
