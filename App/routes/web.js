@@ -24,3 +24,21 @@ router.get('/child', childController.index);
 router.post('/child/growth', childController.addGrowth);
 router.post('/child/milestone/:id/toggle', childController.toggleMilestone);
 
+router.get('/vaccinations', vaccinationController.index);
+router.post('/vaccinations/:id/done', vaccinationController.markDone);
+
+router.get('/appointments', appointmentController.index);
+router.post('/appointments', appointmentController.book);
+router.post('/appointments/:id/cancel', appointmentController.cancel);
+
+router.get('/risk', riskController.index);
+router.post('/risk', riskController.assess);
+
+router.get('/emergency', emergencyController.index);
+
+router.get('/learn', learnController.index);
+router.post('/learn/post', learnController.post);
+
+router.get('/doctor', doctorController.index);
+
+module.exports = router;
