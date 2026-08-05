@@ -18,3 +18,29 @@ const PORT = process.env.PORT || 3000;
 // Vite dev server origin — the React client during development
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/vendor/chartjs', express.static(path.join(__dirname, 'node_modules', 'chart.js', 'dist')));
+
+// Allow the Vite dev server to call the API during development
+app.use('/api', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', CLIENT_ORIGIN);
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+app.use('/api', apiRoutes);
+app.use(routes);
+
+// 404
+app.use((req, res) => res.status(404).render('404', { page: '' }));
+
+app.listen(PORT, () => {
+  console.log(`\n  MaternityCare+ running →  http://localhost:${PORT}\n`);
+});
