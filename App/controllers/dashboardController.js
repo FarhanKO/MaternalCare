@@ -6,3 +6,7 @@ const vaccinationModel = require('../models/vaccinationModel');
 const appointmentModel = require('../models/appointmentModel');
 const riskModel = require('../models/riskModel');
 
+exports.home = (req, res) => {
+  res.render('home', { page: 'home' });
+};
+
