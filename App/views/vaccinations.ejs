@@ -6,3 +6,18 @@
 
 <% const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); %>
 
+<div class="grid grid-3">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🛡️</span> Coverage overview</div>
+        <div class="card-sub">All scheduled doses</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:210px"><canvas id="vaxChart"></canvas></div>
+    <div style="text-align:center; margin-top:14px">
+      <span style="font-size:26px; font-weight:800; letter-spacing:-0.02em"><%= stats.pct %>%</span>
+      <div style="font-size:11.5px; color:var(--ink-3); font-weight:700">SCHEDULE COMPLETED</div>
+    </div>
+  </div>
+
