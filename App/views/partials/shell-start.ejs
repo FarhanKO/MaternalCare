@@ -18,3 +18,34 @@
       learn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 016.5 3H20v15.5H6.5A2.5 2.5 0 004 21V5.5z"/><path d="M4 18.5A2.5 2.5 0 016.5 16H20"/></svg>',
       doctor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v6a5 5 0 0010 0V3"/><path d="M10 14v2.5a4.5 4.5 0 009 0V14"/><circle cx="19" cy="11.5" r="2"/></svg>',
     };
+    const nav = [
+      ['dashboard', '/dashboard', 'Dashboard'],
+      ['pregnancy', '/pregnancy', 'Pregnancy'],
+      ['vitals', '/vitals', 'Health Vitals'],
+      ['child', '/child', 'Child Growth'],
+      ['vaccinations', '/vaccinations', 'Vaccinations'],
+      ['appointments', '/appointments', 'Appointments'],
+      ['risk', '/risk', 'AI Risk Insight'],
+    ];
+    const nav2 = [
+      ['emergency', '/emergency', 'Emergency SOS'],
+      ['learn', '/learn', 'Learn & Community'],
+      ['doctor', '/doctor', 'Doctor Portal'],
+    ];
+  %>
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <div class="brand-mark">🤍</div>
+      <div>
+        <div class="brand-name">Maternity<span>Care+</span></div>
+        <div class="brand-sub">Mother &amp; child health</div>
+      </div>
+    </a>
+
+    <div class="nav-label">Care</div>
+    <% for (const [key, href, label] of nav) { %>
+      <a class="nav-item <%= page === key ? 'active' : '' %>" href="<%= href %>">
+        <%- icons[key] %><span><%= label %></span>
+      </a>
+    <% } %>
+
