@@ -17,3 +17,54 @@
   </div>
 <% } %>
 
+<div class="card reveal">
+  <div class="card-head">
+    <div>
+      <div class="card-title"><span class="ico">📝</span> Log today's vitals</div>
+      <div class="card-sub">Values outside safe thresholds trigger an automatic alert</div>
+    </div>
+  </div>
+  <form method="POST" action="/vitals" class="form-grid" style="grid-template-columns:repeat(6, 1fr); align-items:end">
+    <div class="field"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>" required></div>
+    <div class="field"><label>Systolic (mmHg)</label><input type="number" name="systolic" min="70" max="220" placeholder="120" required></div>
+    <div class="field"><label>Diastolic (mmHg)</label><input type="number" name="diastolic" min="40" max="140" placeholder="80" required></div>
+    <div class="field"><label>Fasting sugar (mg/dL)</label><input type="number" name="sugar" min="40" max="400" placeholder="90" required></div>
+    <div class="field"><label>Weight (kg)</label><input type="number" name="weight_kg" min="30" max="200" step="0.1" placeholder="66.5" required></div>
+    <div class="field"><label>Temp (°C)</label><input type="number" name="temp_c" min="34" max="43" step="0.1" placeholder="36.8" required></div>
+    <button class="btn btn-primary" style="grid-column:1 / -1; justify-self:end">＋ Save reading</button>
+  </form>
+</div>
+
+<div class="grid grid-2 mt">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🫀</span> Blood pressure</div>
+        <div class="card-sub">Systolic &amp; diastolic · safe limit 140/90 mmHg</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:240px"><canvas id="bpChart"></canvas></div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🩸</span> Fasting glucose</div>
+        <div class="card-sub">Pregnancy fasting target &lt; 95 mg/dL</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:240px"><canvas id="sugarChart"></canvas></div>
+  </div>
+</div>
+
+<div class="grid grid-2 mt">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">⚖️</span> Weight journey</div>
+        <div class="card-sub">Healthy gain for your profile: ~11.5–16 kg total</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:240px"><canvas id="weightChart"></canvas></div>
+  </div>
+
