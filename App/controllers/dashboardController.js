@@ -14,3 +14,11 @@ exports.dashboard = (req, res) => {
   const user = userModel.current();
   const pregnancy = pregnancyModel.forUser(user.id);
   const vitals = vitalModel.history(user.id);
+  const latest = vitalModel.latest(user.id);
+  const alerts = vitalModel.alerts(user.id);
+  const child = childModel.forUser(user.id);
+  const vaxStats = vaccinationModel.stats();
+  const nextVax = vaccinationModel.upcoming(2);
+  const appointments = appointmentModel.upcoming(user.id, 3);
+  const risk = riskModel.fromLatestVitals(user, pregnancy);
+
