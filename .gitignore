@@ -5,6 +5,7 @@ frontend/node_modules/
 # build output
 frontend/dist/
 dist/
+*.tsbuildinfo
 
 # database (regenerated + seeded on first run)
 data/*.db
