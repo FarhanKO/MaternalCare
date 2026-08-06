@@ -1,1 +1,6 @@
+<%- include('partials/head', { title: 'Child Growth' }) %>
+<%- include('partials/shell-start', {
+      heading: `${child.name}'s Growth 🌱`,
+      sub: `${child.agePretty} old · tracked against WHO growth standards`,
+      toast: saved ? 'Growth record saved' : null }) %>
 
