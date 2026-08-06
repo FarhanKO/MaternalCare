@@ -17,3 +17,25 @@
   </div>
 <% } %>
 
+<div class="grid grid-4">
+  <div class="card hoverable reveal">
+    <div class="stat-ico tint-rose">🤰</div>
+    <div class="stat">
+      <span class="k">Pregnancy progress</span>
+      <span class="v">Week <%= pregnancy.week %> <small>· T<%= pregnancy.trimester %></small></span>
+      <div class="progress" style="margin:9px 0 7px"><span data-w="<%= pregnancy.progress %>"></span></div>
+      <span class="d">EDD · <%= pregnancy.eddPretty %></span>
+    </div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="stat-ico tint-violet">🫀</div>
+    <div class="stat">
+      <span class="k">Latest blood pressure</span>
+      <span class="v"><%= latest.systolic %>/<%= latest.diastolic %> <small>mmHg</small></span>
+      <span class="d <%= latest.systolic >= 130 ? 'watch' : 'up' %>">
+        <%= latest.systolic >= 130 ? '● Elevated — monitor daily' : '● Within normal range' %>
+      </span>
+    </div>
+  </div>
+
