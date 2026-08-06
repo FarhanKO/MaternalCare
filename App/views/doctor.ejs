@@ -53,3 +53,51 @@
     <% } %>
   </div>
 
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📋</span> Patient snapshot</div>
+        <div class="card-sub">Latest recorded values</div>
+      </div>
+    </div>
+    <div class="row-item"><div class="row-ico tint-violet">🫀</div>
+      <div><b>Blood pressure</b><small>Trending upward since week 22</small></div>
+      <div class="right"><b><%= latest.systolic %>/<%= latest.diastolic %></b><small>mmHg</small></div></div>
+    <div class="row-item"><div class="row-ico tint-rose">🩸</div>
+      <div><b>Fasting glucose</b><small>Above 95 target — recommend OGTT</small></div>
+      <div class="right"><b><%= latest.sugar %></b><small>mg/dL</small></div></div>
+    <div class="row-item"><div class="row-ico tint-aqua">⚖️</div>
+      <div><b>Weight</b><small>+11.5 kg from baseline</small></div>
+      <div class="right"><b><%= latest.weight_kg %></b><small>kg</small></div></div>
+    <div class="row-item"><div class="row-ico tint-peach">🌡️</div>
+      <div><b>Temperature</b><small>Normal</small></div>
+      <div class="right"><b><%= latest.temp_c %></b><small>°C</small></div></div>
+    <button class="btn btn-primary btn-sm" style="width:100%; margin-top:12px" onclick="showToast('Consultation note added to patient record', '📝')">＋ Add consultation note</button>
+    <button class="btn btn-glass btn-sm" style="width:100%; margin-top:8px" onclick="showToast('Full AI risk report opened', '🧠')">View AI risk report</button>
+  </div>
+</div>
+
+<div class="card mt reveal">
+  <div class="card-head">
+    <div>
+      <div class="card-title"><span class="ico">🗂️</span> Consultation history — <%= patient.name %></div>
+      <div class="card-sub">Complete digital medical record</div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="glass-table">
+      <thead><tr><th>Date</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead>
+      <tbody>
+        <% for (const a of appointments) { %>
+          <tr>
+            <td><%= fmt(a.date) %> · <%= a.time %></td>
+            <td><b style="color:var(--ink)"><%= a.doctor_name %></b> <small style="color:var(--ink-3)">· <%= a.specialty %></small></td>
+            <td><%= a.reason %></td>
+            <td><span class="pill <%= a.status === 'upcoming' ? 'pill-info' : 'pill-good' %>"><%= a.status === 'upcoming' ? '🗓️ Upcoming' : '✓ Completed' %></span></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
