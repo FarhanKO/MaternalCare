@@ -76,3 +76,59 @@
   </div>
 </div>
 
+<div class="grid grid-3 mt">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📈</span> Height &amp; head growth</div>
+        <div class="card-sub">All recorded check-ups</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:230px"><canvas id="heightChart"></canvas></div>
+  </div>
+
+  <div class="card hoverable col-span-2 reveal reveal-d1" id="milestones">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🏆</span> Developmental milestones</div>
+        <div class="card-sub">Tap a milestone to mark it achieved</div>
+      </div>
+      <div class="right"><span class="pill pill-violet"><%= achieved %> / <%= milestones.length %> done</span></div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px">
+      <% for (const m of milestones) { %>
+        <form method="POST" action="/child/milestone/<%= m.id %>/toggle" style="display:contents">
+          <button style="all:unset; cursor:pointer; display:block">
+            <div class="row-item" style="border:1px solid <%= m.achieved ? 'rgba(12,163,12,0.25)' : 'rgba(140,120,200,0.16)' %>; background:<%= m.achieved ? 'rgba(12,163,12,0.07)' : 'rgba(255,255,255,0.45)' %>">
+              <div class="row-ico" style="background:<%= m.achieved ? 'rgba(12,163,12,0.12)' : 'rgba(124,92,240,0.09)' %>; font-size:19px"><%= m.icon %></div>
+              <div>
+                <b style="font-size:12.8px"><%= m.title %></b>
+                <small><%= m.achieved ? '✓ ' + new Date(m.achieved_on + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' }) : 'Typical: ' + m.typical %></small>
+              </div>
+            </div>
+          </button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.MC = {
+    who: {
+      months: <%- JSON.stringify(who.months) %>,
+      p3: <%- JSON.stringify(who.p3) %>,
+      p50: <%- JSON.stringify(who.p50) %>,
+      p97: <%- JSON.stringify(who.p97) %>,
+      child: <%- JSON.stringify(growth.map(g => ({ x: g.age_months, y: g.weight_kg }))) %>,
+      childName: '<%= child.name %>'
+    },
+    growth: {
+      labels: <%- JSON.stringify(growth.map(g => g.age_months + ' mo')) %>,
+      height: <%- JSON.stringify(growth.map(g => g.height_cm)) %>,
+      head: <%- JSON.stringify(growth.map(g => g.head_cm)) %>
+    }
+  };
+</script>
+
+<%- include('partials/shell-end') %>
