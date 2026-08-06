@@ -19,3 +19,52 @@
     </p>
   </div>
 
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">👥</span> Emergency contacts</div>
+        <div class="card-sub">Notified instantly with your location</div>
+      </div>
+    </div>
+    <% contacts.forEach((c, i) => { %>
+      <div class="row-item">
+        <div class="row-ico <%= ['tint-rose','tint-violet','tint-aqua'][i % 3] %>"><%= ['👨','👩','🩺'][i % 3] %></div>
+        <div><b><%= c.name %></b><small><%= c.relation %></small></div>
+        <div class="right"><span class="pill pill-neutral">📞 <%= c.phone %></span></div>
+      </div>
+    <% }) %>
+    <button class="btn btn-glass btn-sm" style="width:100%; margin-top:12px" onclick="showToast('Caregiver invitation link copied', '🔗')">＋ Add caregiver</button>
+
+    <div class="card-head" style="margin:22px 0 12px">
+      <div>
+        <div class="card-title"><span class="ico">🚑</span> Quick dial</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <button class="btn btn-glass" onclick="showToast('Calling national ambulance service…', '🚑')">🚑 Ambulance 999</button>
+      <button class="btn btn-glass" onclick="showToast('Calling your obstetrician…', '🩺')">🩺 My doctor</button>
+    </div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d2">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🏥</span> Nearby facilities</div>
+        <div class="card-sub">Sorted by distance from you</div>
+      </div>
+    </div>
+    <% for (const h of hospitals) { %>
+      <div class="row-item">
+        <div class="row-ico tint-aqua">🏥</div>
+        <div>
+          <b style="font-size:13px"><%= h.name %></b>
+          <small>
+            <%= h.distance_km %> km away
+            <% if (h.open24) { %> · <span style="color:var(--success-text)">Open 24/7</span><% } %>
+            <% if (h.ambulance) { %> · 🚑 Ambulance<% } %>
+          </small>
+        </div>
+        <div class="right"><button class="btn btn-ghost btn-sm" onclick="showToast('Opening directions to <%= h.name %>', '🗺️')">Route →</button></div>
+      </div>
+    <% } %>
+
