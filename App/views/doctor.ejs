@@ -6,3 +6,26 @@
 
 <% const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); %>
 
+<div class="grid grid-4">
+  <div class="card hoverable reveal">
+    <div class="stat-ico tint-violet">👥</div>
+    <div class="stat"><span class="k">Assigned patients</span><span class="v">124</span>
+    <span class="d up">● 6 new this week</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d1">
+    <div class="stat-ico tint-rose">🔔</div>
+    <div class="stat"><span class="k">Active alerts</span><span class="v"><%= alerts.length %></span>
+    <span class="d watch">● Requires review today</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d2">
+    <div class="stat-ico tint-aqua">🗓️</div>
+    <div class="stat"><span class="k">Today's consultations</span><span class="v">8</span>
+    <span class="d">● Next at 10:30 AM</span></div>
+  </div>
+  <div class="card hoverable reveal reveal-d3">
+    <div class="stat-ico tint-peach">🧠</div>
+    <div class="stat"><span class="k">AI-flagged pregnancies</span><span class="v">3</span>
+    <span class="d watch">● Medium/high risk profiles</span></div>
+  </div>
+</div>
+
