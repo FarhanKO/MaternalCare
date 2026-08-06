@@ -29,3 +29,27 @@
   </div>
 </div>
 
+<div class="grid grid-3 mt">
+  <div class="card hoverable col-span-2 reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📈</span> Patient — <%= patient.name %> · longitudinal blood pressure</div>
+        <div class="card-sub">Week <%= pregnancy.week %> · G1P0 · <%= patient.blood_group %> · dashed line = 140 mmHg limit</div>
+      </div>
+      <div class="right">
+        <span class="pill pill-<%= risk.level === 'low' ? 'good' : risk.level === 'medium' ? 'warning' : 'critical' %>">AI: <%= risk.label %> (<%= risk.score %>)</span>
+      </div>
+    </div>
+    <div class="chart-box" style="height:250px"><canvas id="bpChart"></canvas></div>
+    <% if (alerts.length) { %>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px">
+        <% for (const a of alerts) { %>
+          <div class="alert alert-<%= a.level %>">
+            <span class="aico"><%= a.level === 'critical' ? '⛔' : '⚠️' %></span>
+            <div><b><%= a.metric %> — <%= a.value %></b><%= a.message %></div>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+
