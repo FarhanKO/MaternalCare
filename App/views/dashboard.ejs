@@ -59,3 +59,82 @@
   </div>
 </div>
 
+<div class="grid grid-3 mt">
+  <div class="card hoverable col-span-2 reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📈</span> Blood pressure trend</div>
+        <div class="card-sub">Weekly readings · dashed line marks the 140 mmHg safe limit</div>
+      </div>
+      <div class="right"><a href="/vitals" class="btn btn-glass btn-sm">Log today's vitals</a></div>
+    </div>
+    <div class="chart-box" style="height:250px"><canvas id="sparkChart"></canvas></div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🧠</span> AI risk insight</div>
+        <div class="card-sub">From your latest vitals</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:150px"><canvas id="riskGauge"></canvas></div>
+    <div style="text-align:center; margin-top:-58px; position:relative; pointer-events:none">
+      <div style="font-size:25px; font-weight:800; letter-spacing:-0.02em"><%= risk.score %></div>
+      <div style="font-size:10.5px; color:var(--ink-3); font-weight:700">RISK SCORE</div>
+    </div>
+    <div style="text-align:center; margin-top:22px">
+      <span class="pill pill-<%= risk.level === 'low' ? 'good' : risk.level === 'medium' ? 'warning' : 'critical' %>">
+        <%= risk.level === 'low' ? '🟢' : risk.level === 'medium' ? '🟡' : '🔴' %> <%= risk.label %>
+      </span>
+      <p style="font-size:12px; color:var(--ink-2); margin-top:12px; line-height:1.55">
+        <%= risk.level === 'low' ? 'Everything looks steady. Keep logging vitals and rest well.'
+          : risk.level === 'medium' ? 'Some readings need attention — see your personalised plan.'
+          : 'Please contact your doctor today for a professional review.' %>
+      </p>
+      <a href="/risk" class="btn btn-primary btn-sm" style="margin-top:10px">View full report</a>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3 mt">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🗓️</span> Upcoming appointments</div>
+        <div class="card-sub">Next consultations</div>
+      </div>
+      <div class="right"><a href="/appointments" class="btn btn-ghost btn-sm">All →</a></div>
+    </div>
+    <% for (const a of appointments) { %>
+      <div class="row-item">
+        <div class="row-ico tint-violet">🩺</div>
+        <div><b><%= a.doctor_name %></b><small><%= a.reason %></small></div>
+        <div class="right"><b style="font-size:12.5px"><%= fmt(a.date) %></b><small><%= a.time %></small></div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">💉</span> Next vaccinations</div>
+        <div class="card-sub">Smart reminders active</div>
+      </div>
+      <div class="right"><a href="/vaccinations" class="btn btn-ghost btn-sm">All →</a></div>
+    </div>
+    <% for (const v of nextVax) { %>
+      <div class="row-item">
+        <div class="row-ico tint-peach"><%= v.subject === 'child' ? '👶' : '🤰' %></div>
+        <div><b><%= v.name %></b><small><%= v.dose %> · <%= v.subject === 'child' ? child.name : 'Mother' %></small></div>
+        <div class="right">
+          <span class="pill <%= v.status === 'due' ? 'pill-critical' : 'pill-info' %>"><%= fmt(v.due_date) %></span>
+        </div>
+      </div>
+    <% } %>
+    <div class="alert alert-good" style="margin-top:12px">
+      <span class="aico">🔔</span>
+      <div>Reminders will be sent 3 days and 1 day before each due date.</div>
+    </div>
+  </div>
+
