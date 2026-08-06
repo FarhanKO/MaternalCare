@@ -4,3 +4,39 @@
       sub: `${child.agePretty} old · tracked against WHO growth standards`,
       toast: saved ? 'Growth record saved' : null }) %>
 
+<div class="grid grid-4">
+  <div class="card hoverable reveal">
+    <div class="stat-ico tint-aqua">⚖️</div>
+    <div class="stat">
+      <span class="k">Latest weight</span>
+      <span class="v"><%= growth[growth.length-1].weight_kg %> <small>kg</small></span>
+      <span class="d up">● <%= percentile.band %> band</span>
+    </div>
+  </div>
+  <div class="card hoverable reveal reveal-d1">
+    <div class="stat-ico tint-violet">📏</div>
+    <div class="stat">
+      <span class="k">Latest height</span>
+      <span class="v"><%= growth[growth.length-1].height_cm %> <small>cm</small></span>
+      <span class="d up">● Steady growth curve</span>
+    </div>
+  </div>
+  <div class="card hoverable reveal reveal-d2">
+    <div class="stat-ico tint-rose">🧠</div>
+    <div class="stat">
+      <span class="k">Head circumference</span>
+      <span class="v"><%= growth[growth.length-1].head_cm %> <small>cm</small></span>
+      <span class="d up">● Normal development</span>
+    </div>
+  </div>
+  <div class="card hoverable reveal reveal-d3">
+    <div class="stat-ico tint-peach">🏆</div>
+    <div class="stat">
+      <span class="k">Milestones achieved</span>
+      <span class="v"><%= achieved %><small>/<%= milestones.length %></small></span>
+      <div class="progress aqua" style="margin:9px 0 7px"><span data-w="<%= milestonePct %>"></span></div>
+      <span class="d"><%= milestonePct %>% of tracked milestones</span>
+    </div>
+  </div>
+</div>
+
