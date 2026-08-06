@@ -40,3 +40,39 @@
   </div>
 </div>
 
+<div class="grid grid-3 mt">
+  <div class="card hoverable col-span-2 reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">📊</span> Weight vs WHO percentiles</div>
+        <div class="card-sub">Girls 0–24 months · shaded band spans P3–P97 (healthy range)</div>
+      </div>
+      <div class="right"><span class="pill pill-good">● <%= percentile.band %></span></div>
+    </div>
+    <div class="chart-box" style="height:290px"><canvas id="whoChart"></canvas></div>
+    <div class="alert alert-good" style="margin-top:14px">
+      <span class="aico">✅</span>
+      <div><b>WHO standard comparison</b><%= percentile.note %> Median (P50) weight at <%= percentile.ageMonths %> months is <%= percentile.p50 %> kg.</div>
+    </div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">➕</span> Add measurement</div>
+        <div class="card-sub">Record a new check-up</div>
+      </div>
+    </div>
+    <form method="POST" action="/child/growth" style="display:flex; flex-direction:column; gap:13px">
+      <div class="field"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>" required></div>
+      <div class="field"><label>Age (months)</label><input type="number" name="age_months" step="0.5" min="0" max="24" value="<%= child.ageMonths %>" required></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+        <div class="field"><label>Weight (kg)</label><input type="number" name="weight_kg" step="0.1" min="1" max="30" placeholder="9.6" required></div>
+        <div class="field"><label>Height (cm)</label><input type="number" name="height_cm" step="0.5" min="40" max="110" placeholder="77" required></div>
+      </div>
+      <div class="field"><label>Head circumference (cm)</label><input type="number" name="head_cm" step="0.1" min="30" max="60" placeholder="45.8" required></div>
+      <button class="btn btn-primary">Save record</button>
+    </form>
+  </div>
+</div>
+
