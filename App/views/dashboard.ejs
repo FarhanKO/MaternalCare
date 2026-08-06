@@ -39,3 +39,23 @@
     </div>
   </div>
 
+  <div class="card hoverable reveal reveal-d2">
+    <div class="stat-ico tint-aqua">👶</div>
+    <div class="stat">
+      <span class="k"><%= child.name %>'s age</span>
+      <span class="v"><%= child.ageMonths %> <small>months</small></span>
+      <span class="d up">● Growing along the healthy band</span>
+    </div>
+  </div>
+
+  <div class="card hoverable reveal reveal-d3">
+    <div class="stat-ico tint-peach">💉</div>
+    <div class="stat">
+      <span class="k">Vaccination compliance</span>
+      <span class="v"><%= vaxStats.pct %><small>%</small></span>
+      <div class="progress aqua" style="margin:9px 0 7px"><span data-w="<%= vaxStats.pct %>"></span></div>
+      <span class="d"><%= vaxStats.done %> of <%= vaxStats.total %> doses completed</span>
+    </div>
+  </div>
+</div>
+
