@@ -1,1 +1,6 @@
+<%- include('partials/head', { title: 'Dashboard' }) %>
+<%- include('partials/shell-start', {
+      heading: `Good day, ${user.name.split(' ')[0]} 🌸`,
+      sub: `Week ${pregnancy.week} of your pregnancy · ${pregnancy.daysLeft} days until you meet your baby`,
+      toast: null }) %>
 
