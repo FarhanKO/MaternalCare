@@ -101,3 +101,13 @@
   </div>
 </div>
 
+<script>
+  window.MC = {
+    vitals: {
+      labels: <%- JSON.stringify(vitals.map(v => fmt(v.date))) %>,
+      systolic: <%- JSON.stringify(vitals.map(v => v.systolic)) %>,
+      diastolic: <%- JSON.stringify(vitals.map(v => v.diastolic)) %>
+    }
+  };
+</script>
+
