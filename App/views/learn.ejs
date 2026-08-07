@@ -4,3 +4,10 @@
       sub: 'Doctor-reviewed guides and a supportive space for mothers',
       toast: posted ? 'Your post is live in the community' : null }) %>
 
+<div class="card reveal" style="display:flex; gap:10px; flex-wrap:wrap; padding:16px 20px">
+  <a href="/learn" class="btn <%= category === 'All' ? 'btn-primary' : 'btn-glass' %> btn-sm">All topics</a>
+  <% for (const c of categories) { %>
+    <a href="/learn?category=<%= encodeURIComponent(c) %>" class="btn <%= category === c ? 'btn-primary' : 'btn-glass' %> btn-sm"><%= c %></a>
+  <% } %>
+</div>
+
