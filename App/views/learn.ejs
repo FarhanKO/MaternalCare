@@ -65,4 +65,17 @@
         <select name="tag">
           <option>General</option><option>Pregnancy</option><option>Nutrition</option>
           <option>Vaccination</option><option>Newborn care</option><option>Mental health</option>
+        </select>
+      </div>
+      <div class="field"><label>Title</label><input name="title" placeholder="What would you like to ask?" required maxlength="120"></div>
+      <div class="field"><label>Details</label><textarea name="body" rows="4" placeholder="Share more context…" maxlength="600"></textarea></div>
+      <button class="btn btn-primary">Post to community</button>
+    </form>
+    <div class="alert alert-good" style="margin-top:14px">
+      <span class="aico">🛡️</span>
+      <div>Be kind and specific. Medical questions get flagged for doctor review.</div>
+    </div>
+  </div>
+</div>
 
+<%- include('partials/shell-end') %>
