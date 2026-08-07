@@ -4,4 +4,30 @@
       sub: 'Intelligent maternal risk classification with a personalised care plan',
       toast: custom ? 'Assessment updated with your values' : null }) %>
 
+<div class="grid grid-3">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🎯</span> Risk classification</div>
+        <div class="card-sub"><%= custom ? 'From your entered values' : 'From your latest logged vitals' %></div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:170px"><canvas id="riskGauge"></canvas></div>
+    <div style="text-align:center; margin-top:-64px; position:relative; pointer-events:none">
+      <div style="font-size:30px; font-weight:800; letter-spacing:-0.02em"><%= result.score %></div>
+      <div style="font-size:10.5px; color:var(--ink-3); font-weight:700">OF 100</div>
+    </div>
+    <div style="text-align:center; margin-top:26px">
+      <span class="pill pill-<%= result.level === 'low' ? 'good' : result.level === 'medium' ? 'warning' : 'critical' %>" style="font-size:13px; padding:8px 18px">
+        <%= result.level === 'low' ? '🟢' : result.level === 'medium' ? '🟡' : '🔴' %> <%= result.label %>
+      </span>
+      <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6; margin-top:14px">
+        The engine evaluates age, blood pressure, glucose, temperature and gestational stage —
+        the same clinical features used in maternal-risk ML models.
+      </p>
+      <button class="btn btn-glass btn-sm" style="margin-top:12px" onclick="showToast('PDF health report generated for your doctor', '📄')">
+        📄 Download PDF report
+      </button>
+    </div>
+  </div>
 
