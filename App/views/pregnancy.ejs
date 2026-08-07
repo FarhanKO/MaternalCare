@@ -22,3 +22,44 @@
     </div>
   </div>
 
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div><div class="card-title"><span class="ico">🗓️</span> Key dates</div></div>
+    </div>
+    <div class="row-item"><div class="row-ico tint-rose">🌱</div>
+      <div><b>Last menstrual period</b><small><%= new Date(pregnancy.lmp + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) %></small></div></div>
+    <div class="row-item"><div class="row-ico tint-violet">🎯</div>
+      <div><b>Estimated delivery</b><small><%= pregnancy.eddPretty %></small></div></div>
+    <div class="row-item"><div class="row-ico tint-aqua">⏳</div>
+      <div><b>Days remaining</b><small><%= pregnancy.daysLeft %> days to go</small></div></div>
+    <div class="alert alert-good" style="margin-top:10px">
+      <span class="aico">💡</span>
+      <div>EDD is calculated as LMP + 280 days using Naegele's rule.</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3 mt">
+  <div class="card hoverable reveal">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico"><%= pregnancy.babySize.emoji %></span> Baby this week</div>
+        <div class="card-sub">Approximate size &amp; weight</div>
+      </div>
+    </div>
+    <div style="text-align:center; padding:8px 0">
+      <div style="font-size:64px; filter:drop-shadow(0 12px 18px rgba(90,70,150,0.25))"><%= pregnancy.babySize.emoji %></div>
+      <div style="font-weight:800; font-size:18px; margin-top:10px"><%= pregnancy.babySize.fruit %></div>
+      <div style="display:flex; justify-content:center; gap:10px; margin-top:12px">
+        <span class="pill pill-violet">📏 <%= pregnancy.babySize.length %></span>
+        <span class="pill pill-violet">⚖️ <%= pregnancy.babySize.weight %></span>
+      </div>
+    </div>
+    <div class="row-item" style="margin-top:8px"><div class="row-ico tint-aqua">👂</div>
+      <div><b>Hearing</b><small>Baby recognises your voice</small></div></div>
+    <div class="row-item"><div class="row-ico tint-rose">👀</div>
+      <div><b>Eyes</b><small>Opening for the first time this week</small></div></div>
+    <div class="row-item"><div class="row-ico tint-peach">🫁</div>
+      <div><b>Lungs</b><small>Practising breathing movements</small></div></div>
+  </div>
+
