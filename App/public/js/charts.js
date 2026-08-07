@@ -93,4 +93,104 @@
     });
   }
 
+  /* ------------------------------------------------- glucose (single series) */
+  const sugarEl = document.getElementById('sugarChart');
+  if (sugarEl && D.vitals) {
+    const ctx = sugarEl.getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: D.vitals.labels,
+        datasets: [
+          line(S1, 'Fasting glucose', D.vitals.sugar, { backgroundColor: gradFill(ctx, S1), fill: true }),
+          line(WARN, 'Target limit (95)', D.vitals.labels.map(() => 95),
+            { borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false }),
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: hoverLine,
+        plugins: { legend: legendTop(), tooltip: glassTooltip },
+        scales: baseScales('mg/dL'),
+      },
+    });
+  }
+
+  /* -------------------------------------------------- weight (single series) */
+  const weightEl = document.getElementById('weightChart');
+  if (weightEl && D.vitals) {
+    const ctx = weightEl.getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: D.vitals.labels,
+        datasets: [line(S1, 'Weight', D.vitals.weight, { backgroundColor: gradFill(ctx, S1), fill: true })],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: hoverLine,
+        plugins: { legend: legendTop(false), tooltip: glassTooltip },
+        scales: baseScales('kg'),
+      },
+    });
+  }
+
+  /* -------------------------------------------- dashboard mini vitals spark */
+  const sparkEl = document.getElementById('sparkChart');
+  if (sparkEl && D.vitals) {
+    const ctx = sparkEl.getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: D.vitals.labels,
+        datasets: [
+          line(S1, 'Systolic', D.vitals.systolic, { backgroundColor: gradFill(ctx, S1), fill: true }),
+          line(S2, 'Diastolic', D.vitals.diastolic),
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: hoverLine,
+        plugins: { legend: legendTop(), tooltip: glassTooltip },
+        scales: baseScales('mmHg'),
+      },
+    });
+  }
+
+  /* --------------------------------------------------- WHO growth percentiles */
+  const whoEl = document.getElementById('whoChart');
+  if (whoEl && D.who) {
+    const ctx = whoEl.getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [
+          { label: 'WHO P97', data: D.who.months.map((m, i) => ({ x: m, y: D.who.p97[i] })),
+            borderColor: 'rgba(42,120,214,0.35)', borderWidth: 1.2, pointRadius: 0, tension: 0.3, fill: '+2',
+            backgroundColor: 'rgba(157,197,244,0.28)' },
+          { label: 'WHO P50 (median)', data: D.who.months.map((m, i) => ({ x: m, y: D.who.p50[i] })),
+            borderColor: S1, borderDash: [7, 5], borderWidth: 1.6, pointRadius: 0, tension: 0.3 },
+          { label: 'WHO P3', data: D.who.months.map((m, i) => ({ x: m, y: D.who.p3[i] })),
+            borderColor: 'rgba(42,120,214,0.35)', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
+          { label: (D.who.childName || 'Child') + ' — weight', data: D.who.child,
+            borderColor: S2, backgroundColor: '#fff', borderWidth: 2.4,
+            pointRadius: 4.5, pointBorderWidth: 2.4, pointBorderColor: S2, tension: 0.32 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: { legend: legendTop(), tooltip: { ...glassTooltip,
+          callbacks: { title: (it) => 'Age ' + it[0].parsed.x + ' months' } } },
+        scales: {
+          x: { type: 'linear', min: 0, max: 24, grid: { display: false },
+               border: { color: 'rgba(36,31,51,0.12)' },
+               title: { display: true, text: 'Age (months)', color: MUTED, font: { size: 10.5, weight: '600' } },
+               ticks: { stepSize: 3 } },
+          y: { grid: { color: GRID, drawTicks: false }, border: { display: false },
+               title: { display: true, text: 'Weight (kg)', color: MUTED, font: { size: 10.5, weight: '600' } } },
+        },
+      },
+    });
+  }
 
