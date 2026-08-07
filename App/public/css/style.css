@@ -1,1 +1,89 @@
+/* ==========================================================================
+   MaternityCare+  ·  Liquid-glass design system
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  /* ink */
+  --ink: #241f33;
+  --ink-2: #5c5575;
+  --ink-3: #8f88a6;
+
+  /* brand */
+  --rose: #f0568c;
+  --rose-soft: #fbd3e2;
+  --violet: #7c5cf0;
+  --violet-soft: #ddd4fb;
+  --aqua: #23b8a6;
+  --aqua-soft: #c9f0eb;
+  --peach: #ffb187;
+  --gold: #f5a623;
+
+  --grad-brand: linear-gradient(135deg, #f0568c 0%, #a05cf0 55%, #7c5cf0 100%);
+  --grad-aqua: linear-gradient(135deg, #23b8a6, #4bd0e8);
+  --grad-peach: linear-gradient(135deg, #ff9d6c, #ffc178);
+
+  /* glass */
+  --glass: rgba(255, 255, 255, 0.58);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-faint: rgba(255, 255, 255, 0.34);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-border-2: rgba(140, 120, 200, 0.16);
+
+  /* elevation */
+  --shadow-1: 0 2px 8px rgba(90, 70, 150, 0.06), 0 12px 32px rgba(90, 70, 150, 0.10);
+  --shadow-2: 0 4px 14px rgba(90, 70, 150, 0.10), 0 24px 60px rgba(90, 70, 150, 0.16);
+  --shadow-3: 0 8px 20px rgba(90, 70, 150, 0.14), 0 36px 90px rgba(90, 70, 150, 0.22);
+
+  /* chart series (validated dataviz palette — light mode) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  /* status (reserved) */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --success-text: #006300;
+
+  --radius: 22px;
+  --radius-sm: 14px;
+  --radius-xs: 10px;
+
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --sidebar-w: 264px;
+}
+
+/* ------------------------------------------------------------------- base */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: #f3f1fa;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+::selection { background: rgba(124, 92, 240, 0.22); }
+
+/* ------------------------------------------------- ambient gradient scene */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60% 55% at 8% 0%, #fde5ef 0%, transparent 60%),
+    radial-gradient(55% 50% at 100% 6%, #e3dcfd 0%, transparent 62%),
+    radial-gradient(50% 55% at 88% 96%, #d6f3ee 0%, transparent 60%),
+    radial-gradient(45% 45% at 0% 100%, #ffeede 0%, transparent 58%),
+    linear-gradient(180deg, #f7f5fd 0%, #f2effa 100%);
+}
 
