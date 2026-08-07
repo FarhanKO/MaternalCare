@@ -52,4 +52,17 @@
       </div>
     <% } %>
   </div>
+  <div class="card hoverable reveal reveal-d1" style="align-self:start">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">✍️</span> Ask the community</div>
+        <div class="card-sub">Posting as <%= user.name %></div>
+      </div>
+    </div>
+    <form method="POST" action="/learn/post" style="display:flex; flex-direction:column; gap:13px">
+      <div class="field">
+        <label>Topic</label>
+        <select name="tag">
+          <option>General</option><option>Pregnancy</option><option>Nutrition</option>
+          <option>Vaccination</option><option>Newborn care</option><option>Mental health</option>
 
