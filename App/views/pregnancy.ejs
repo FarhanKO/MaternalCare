@@ -83,3 +83,23 @@
     </div>
   </div>
 
+  <div class="card hoverable reveal reveal-d2">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">💜</span> This week's care tips</div>
+        <div class="card-sub">Personalised for week <%= pregnancy.week %></div>
+      </div>
+    </div>
+    <div class="row-item"><div class="row-ico tint-aqua">🥗</div>
+      <div><b>Iron &amp; calcium up</b><small>Add lentils, spinach and dairy daily</small></div></div>
+    <div class="row-item"><div class="row-ico tint-violet">🧪</div>
+      <div><b>Glucose screening</b><small>Recommended between weeks 24–28</small></div></div>
+    <div class="row-item"><div class="row-ico tint-rose">🦶</div>
+      <div><b>Kick counting begins soon</b><small>Start daily counts from week 28</small></div></div>
+    <div class="row-item"><div class="row-ico tint-peach">😴</div>
+      <div><b>Sleep on your left</b><small>Improves blood flow to your baby</small></div></div>
+    <a href="/learn" class="btn btn-glass btn-sm" style="margin-top:12px; width:100%">📚 Read week <%= pregnancy.week %> guide</a>
+  </div>
+</div>
+
+<%- include('partials/shell-end') %>
