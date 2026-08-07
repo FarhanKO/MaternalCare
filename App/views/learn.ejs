@@ -11,3 +11,20 @@
   <% } %>
 </div>
 
+<div class="grid grid-4 mt">
+  <% articles.forEach((a, i) => { %>
+    <div class="card hoverable reveal <%= ['','reveal-d1','reveal-d2','reveal-d3'][i % 4] %>" style="cursor:pointer" onclick="showToast('Opening: <%= a.title.replace(/'/g, '') %>', '📖')">
+      <div class="stat-ico <%= ['tint-rose','tint-violet','tint-aqua','tint-peach'][i % 4] %>"><%= a.icon %></div>
+      <div style="display:flex; gap:7px; margin-bottom:9px">
+        <span class="pill pill-violet"><%= a.category %></span>
+        <span class="pill pill-neutral">⏱ <%= a.minutes %> min</span>
+      </div>
+      <b style="font-size:14px; line-height:1.4; display:block"><%= a.title %></b>
+      <p style="font-size:12.4px; color:var(--ink-2); line-height:1.6; margin-top:8px"><%= a.excerpt %></p>
+      <div style="margin-top:12px; font-size:11.5px; font-weight:700; color:var(--success-text)">✓ Doctor reviewed</div>
+    </div>
+  <% }) %>
+</div>
+
+
+<%- include('partials/shell-end') %>
