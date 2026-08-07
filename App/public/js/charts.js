@@ -194,3 +194,74 @@
     });
   }
 
+  /* --------------------------------------------------------- height chart */
+  const heightEl = document.getElementById('heightChart');
+  if (heightEl && D.growth) {
+    const ctx = heightEl.getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: D.growth.labels,
+        datasets: [
+          line(S1, 'Height (cm)', D.growth.height, { backgroundColor: gradFill(ctx, S1), fill: true }),
+          line(S3, 'Head circ. (cm)', D.growth.head),
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: hoverLine,
+        plugins: { legend: legendTop(), tooltip: glassTooltip },
+        scales: baseScales('cm'),
+      },
+    });
+  }
+
+  /* ---------------------------------------------------------- risk gauge */
+  const gaugeEl = document.getElementById('riskGauge');
+  if (gaugeEl && D.risk) {
+    const color = { low: GOOD, medium: WARN, high: CRIT }[D.risk.level];
+    new Chart(gaugeEl.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Risk score', 'Remaining'],
+        datasets: [{
+          data: [D.risk.score, 100 - D.risk.score],
+          backgroundColor: [color, 'rgba(36,31,51,0.07)'],
+          borderWidth: 0,
+          borderRadius: 20,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '76%', rotation: -110, circumference: 220,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      },
+    });
+  }
+
+  /* ------------------------------------------------------ vaccination ring */
+  const vaxEl = document.getElementById('vaxChart');
+  if (vaxEl && D.vax) {
+    new Chart(vaxEl.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Completed', 'Due now', 'Upcoming'],
+        datasets: [{
+          data: [D.vax.done, D.vax.due, D.vax.upcoming],
+          backgroundColor: [S1, S2, S3],
+          borderColor: 'rgba(255,255,255,0.9)',
+          borderWidth: 2,
+          borderRadius: 8,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 12, color: INK2, font: { weight: '600' } } },
+          tooltip: glassTooltip,
+        },
+      },
+    });
+  }
+
