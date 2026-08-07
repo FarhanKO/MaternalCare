@@ -26,5 +26,30 @@
   <% }) %>
 </div>
 
+<div class="section-head" style="margin:44px 0 20px; text-align:left" id="community">
+  <h2 style="font-size:21px">Community forum 💬</h2>
+  <p style="margin-top:5px; font-size:13.5px">Moderated space — misleading content can be reported and is reviewed by admins</p>
+</div>
 
-<%- include('partials/shell-end') %>
+<div class="grid grid-3">
+  <div class="card hoverable col-span-2 reveal">
+    <% for (const p of posts) { %>
+      <div class="row-item" style="align-items:flex-start; padding:15px 14px">
+        <div class="row-ico tint-violet" style="border-radius:50%"><%= p.author[0] %></div>
+        <div style="flex:1">
+          <div style="display:flex; gap:9px; align-items:center; flex-wrap:wrap">
+            <b style="font-size:13.5px"><%= p.title %></b>
+            <span class="pill pill-neutral" style="font-size:10.5px"><%= p.tag %></span>
+          </div>
+          <p style="font-size:12.6px; color:var(--ink-2); line-height:1.55; margin-top:5px"><%= p.body %></p>
+          <div style="display:flex; gap:16px; margin-top:9px; font-size:11.5px; font-weight:700; color:var(--ink-3)">
+            <span><%= p.author %> · <%= p.time_ago %></span>
+            <span>💬 <%= p.replies %> replies</span>
+            <span>❤️ <%= p.likes %></span>
+            <button class="btn btn-ghost btn-sm" style="padding:2px 10px; font-size:11px" onclick="showToast('Reported to moderators — thank you', '🚩')">Report</button>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
