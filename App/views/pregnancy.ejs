@@ -63,3 +63,23 @@
       <div><b>Lungs</b><small>Practising breathing movements</small></div></div>
   </div>
 
+  <div class="card hoverable reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🛤️</span> Care timeline</div>
+        <div class="card-sub">Checkpoints on your journey</div>
+      </div>
+    </div>
+    <div class="timeline">
+      <% for (const t of timeline) { %>
+        <div class="tl-item <%= t.state %>">
+          <div class="tl-dot"><%= t.state === 'done' ? '✓' : t.icon %></div>
+          <div class="tl-body">
+            <b>Week <%= t.week %> · <%= t.label %></b>
+            <small><%= t.state === 'done' ? 'Completed' : t.state === 'now' ? 'This week — book if not done' : 'Coming up' %></small>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
