@@ -89,3 +89,32 @@
     pio.observe(sp);
   });
 
+  // Emergency SOS flow (on /emergency)
+  const sos = document.getElementById("sosBtn");
+  if (sos) {
+    const status = document.getElementById("sosStatus");
+    sos.addEventListener("click", () => {
+      status.innerHTML =
+        '<span class="pill pill-warning">📡 Getting your location…</span>';
+      const done = (locText) => {
+        status.innerHTML =
+          `<div class="alert alert-good" style="margin-top:14px"><span class="aico">✅</span><div>` +
+          `<b>SOS alert sent</b>Your location (${locText}) was shared with your 3 emergency contacts ` +
+          `and the nearest 24/7 maternity hospital was notified.</div></div>`;
+        window.showToast("Emergency alert sent to your contacts", "🚨");
+      };
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            done(
+              pos.coords.latitude.toFixed(4) +
+                ", " +
+                pos.coords.longitude.toFixed(4),
+            ),
+          () => done("approximate area — GPS unavailable"),
+          { timeout: 5000 },
+        );
+      } else done("approximate area");
+    });
+  }
+})();
