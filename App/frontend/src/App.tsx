@@ -20,3 +20,26 @@ const LOADER_COPY: Record<string, { title: string; subtitle: string }> = {
   '/mother': { title: 'Loading your dashboard', subtitle: 'Gathering your latest health insights' },
 };
 
+export default function App() {
+  const location = useLocation();
+  const copy = LOADER_COPY[location.pathname] ?? {
+    title: 'Preparing your care space...',
+    subtitle: 'Just a moment while we gather everything for you',
+  };
+
+  return (
+    <div className="relative min-h-screen overflow-x-clip">
+      <Background />
+      <Suspense fallback={<PageLoader title={copy.title} subtitle={copy.subtitle} />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/mother" element={<Mother />} />
+        </Routes>
+      </Suspense>
+    </div>
+  );
+}
