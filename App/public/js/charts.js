@@ -265,3 +265,32 @@
     });
   }
 
+  /* --------------------------------------------------- risk factor bars */
+  const factorEl = document.getElementById('factorChart');
+  if (factorEl && D.risk && D.risk.factors) {
+    new Chart(factorEl.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: D.risk.factors.map((f) => f.name),
+        datasets: [{
+          label: 'Contribution to risk score',
+          data: D.risk.factors.map((f) => f.points),
+          backgroundColor: S1,
+          borderRadius: { topRight: 6, bottomRight: 6 },
+          borderSkipped: 'start',
+          barThickness: 16,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legendTop(false), tooltip: glassTooltip },
+        scales: {
+          x: { grid: { color: GRID, drawTicks: false }, border: { display: false },
+               max: 45, title: { display: true, text: 'points', color: MUTED, font: { size: 10.5, weight: '600' } } },
+          y: { grid: { display: false }, border: { display: false }, ticks: { color: INK2, font: { weight: '600' } } },
+        },
+      },
+    });
+  }
+})();
