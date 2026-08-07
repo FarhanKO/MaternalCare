@@ -57,3 +57,35 @@
   );
   document.querySelectorAll("[data-count]").forEach((el) => cio.observe(el));
 
+  // Toast helper + auto-toast from data attribute on body
+  window.showToast = (msg, icon = "✅") => {
+    let t = document.querySelector(".toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.className = "toast";
+      document.body.appendChild(t);
+    }
+    t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+    requestAnimationFrame(() => t.classList.add("show"));
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove("show"), 3200);
+  };
+  const auto = document.body.dataset.toast;
+  if (auto) setTimeout(() => window.showToast(auto), 350);
+
+  // Progress bars animate to their target width on reveal
+  document.querySelectorAll(".progress > span[data-w]").forEach((sp) => {
+    const pio = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries)
+          if (e.isIntersecting) {
+            sp.style.width = sp.dataset.w + "%";
+            pio.disconnect();
+          }
+      },
+      { threshold: 0.3 },
+    );
+    sp.style.width = "0%";
+    pio.observe(sp);
+  });
+
