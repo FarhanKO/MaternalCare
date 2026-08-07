@@ -31,3 +31,24 @@
     </div>
   </div>
 
+  <div class="card hoverable col-span-2 reveal reveal-d1">
+    <div class="card-head">
+      <div>
+        <div class="card-title"><span class="ico">🧩</span> Contributing factors</div>
+        <div class="card-sub">How each factor adds to the overall score</div>
+      </div>
+    </div>
+    <div class="chart-box" style="height:200px"><canvas id="factorChart"></canvas></div>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px">
+      <% for (const f of result.factors) { %>
+        <div class="row-item" style="padding:9px 12px">
+          <span class="pill <%= f.points >= 30 ? 'pill-critical' : f.points >= 10 ? 'pill-warning' : 'pill-good' %>" style="min-width:64px; justify-content:center">
+            +<%= f.points %> pts
+          </span>
+          <div><b style="font-size:12.8px"><%= f.name %></b><small><%= f.detail %></small></div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
