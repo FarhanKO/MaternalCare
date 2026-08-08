@@ -7,3 +7,5 @@ const groups = [
   { title: 'Company', links: ['About', 'Careers', 'Privacy', 'Contact'] },
 ];
 
+const ROUTES: Record<string, string> = { About: '/about' };
+
