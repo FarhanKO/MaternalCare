@@ -13,3 +13,55 @@ const WIRES = [
   { id: 'wire-e', d: 'M-20,136 C250,96 440,202 710,130 C970,70 1170,176 1460,110', grad: 'gradE', w: 1.2, o: 0.55 },
 ];
 
+/** Glowing dots that travel along a given wire. */
+const TRAVELLERS = [
+  { path: 'wire-a', color: '#22b8c4', r: 4, dur: 9, begin: 0 },
+  { path: 'wire-c', color: '#7c5cf0', r: 3.5, dur: 11, begin: -3 },
+  { path: 'wire-d', color: '#f5b544', r: 3.5, dur: 13, begin: -6 },
+  { path: 'wire-b', color: '#3f66f0', r: 3, dur: 10, begin: -1.5 },
+];
+
+export function FlowingLines({ className }: FlowingLinesProps) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 1440 240"
+      preserveAspectRatio="none"
+      className={cn('pointer-events-none w-full', className)}
+    >
+      <defs>
+        <linearGradient id="gradA" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#22b8c4" stopOpacity="0" />
+          <stop offset="30%" stopColor="#22b8c4" />
+          <stop offset="70%" stopColor="#3f66f0" />
+          <stop offset="100%" stopColor="#3f66f0" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="gradB" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#3f66f0" stopOpacity="0" />
+          <stop offset="40%" stopColor="#3f66f0" />
+          <stop offset="100%" stopColor="#7c5cf0" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="gradC" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#7c5cf0" stopOpacity="0" />
+          <stop offset="45%" stopColor="#7c5cf0" />
+          <stop offset="100%" stopColor="#22b8c4" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="gradD" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#f5b544" stopOpacity="0" />
+          <stop offset="50%" stopColor="#f5b544" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#ec7fb0" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="gradE" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#a3c0ff" stopOpacity="0" />
+          <stop offset="50%" stopColor="#a3c0ff" />
+          <stop offset="100%" stopColor="#a3c0ff" stopOpacity="0" />
+        </linearGradient>
+        <filter id="dotGlow" x="-200%" y="-200%" width="500%" height="500%">
+          <feGaussianBlur stdDeviation="3" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
