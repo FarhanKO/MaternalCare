@@ -45,3 +45,21 @@ export function Hero() {
                 child’s healthy growth
               </motion.p>
 
+              <motion.div variants={fadeUp} className="mt-9 flex flex-wrap items-center gap-3">
+                <LiquidButton size="lg" onClick={() => navigate('/register')} iconRight={<ArrowRight className="h-[18px] w-[18px]" />}>
+                  Start monitoring
+                </LiquidButton>
+                <LiquidButton variant="glass" size="lg" icon={<Play className="h-[16px] w-[16px] fill-current" />}>
+                  Watch the tour
+                </LiquidButton>
+              </motion.div>
+            </motion.div>
+          </div>
+
+          {/* animated flowing lines woven across the bottom of the image */}
+          <FlowingLines className="absolute inset-x-0 bottom-0 z-10 h-36 opacity-90" />
+        </div>
+      </div>
+    </section>
+  );
+}
