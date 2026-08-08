@@ -15,4 +15,33 @@ export function Hero() {
           {/* rotating photo fills the panel */}
           <HeroImageCarousel />
 
+          {/* copy overlaid on the left */}
+          <div className="relative z-20 flex min-h-[78vh] items-center sm:min-h-[84vh]">
+            <motion.div
+              variants={staggerContainer(0.12)}
+              initial="hidden"
+              animate="visible"
+              className="max-w-2xl px-7 py-24 text-left sm:px-14"
+            >
+              <motion.h1
+                variants={fadeUp}
+                className="text-balance text-[2.2rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-6xl md:text-[3.6rem]"
+              >
+                A{' '}
+                <span
+                  className="bg-clip-text font-serif text-[1.12em] font-medium italic text-transparent"
+                  style={{ backgroundImage: 'linear-gradient(120deg,#8ef0ea 0%,#a8c6ff 45%,#ffffff 100%)' }}
+                >
+                  Healthier Start
+                </span>{' '}
+                for Every Family
+              </motion.h1>
+
+              <motion.p
+                variants={fadeUp}
+                className="mt-5 max-w-xl font-serif text-xl italic leading-relaxed text-white/90 sm:text-2xl"
+              >
+                A platform dedicated to every mother’s journey — from pregnancy care to a
+                child’s healthy growth
+              </motion.p>
 
