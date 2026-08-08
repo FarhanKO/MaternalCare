@@ -29,3 +29,34 @@ export function Footer() {
               </p>
             </div>
 
+            {groups.map((g) => (
+              <div key={g.title}>
+                <div className="text-xs font-semibold uppercase tracking-wider text-ink-faint">{g.title}</div>
+                <ul className="mt-4 space-y-2.5">
+                  {g.links.map((l) => (
+                    <li key={l}>
+                      {ROUTES[l] ? (
+                        <Link to={ROUTES[l]} className="text-sm font-medium text-ink-soft transition-colors hover:text-brand-600">
+                          {l}
+                        </Link>
+                      ) : (
+                        <a href="#" className="text-sm font-medium text-ink-soft transition-colors hover:text-brand-600">
+                          {l}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/50 pt-6 text-sm text-ink-faint sm:flex-row">
+            <span>© {new Date().getFullYear()} MaternalCare+. Crafted with care.</span>
+            <span className="font-medium">Private by design · Clinician-reviewed</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
