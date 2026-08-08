@@ -6,3 +6,12 @@ export interface SeriesConfig {
   label: string;
 }
 
+interface MiniAreaChartProps {
+  data: Array<Record<string, number | string>>;
+  series: SeriesConfig[];
+  xKey: string;
+  height?: number;
+  yUnit?: string;
+  showGrid?: boolean;
+}
+
