@@ -59,4 +59,32 @@ export function MiniAreaChart({
           dy={6}
           interval="preserveStartEnd"
         />
-
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          tick={{ fontSize: 11, fill: '#9aa3ba', fontWeight: 600 }}
+          width={38}
+          hide={!showGrid}
+        />
+        <Tooltip
+          content={<GlassTooltip yUnit={yUnit} />}
+          cursor={{ stroke: 'rgba(63,102,240,0.35)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+        />
+        {series.map((s) => (
+          <Area
+            key={s.key}
+            type="monotone"
+            dataKey={s.key}
+            stroke={s.color}
+            strokeWidth={2.4}
+            fill={`url(#grad-${s.key})`}
+            dot={false}
+            activeDot={{ r: 4.5, strokeWidth: 2, stroke: '#fff' }}
+            animationDuration={1400}
+            animationEasing="ease-out"
+          />
+        ))}
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
