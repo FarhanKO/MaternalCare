@@ -18,3 +18,25 @@ export function HeroImageCarousel() {
     return () => clearInterval(id);
   }, []);
 
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {slides.map((src, i) => (
+        <img
+          key={src}
+          src={src}
+          alt=""
+          loading={i === 0 ? 'eager' : 'lazy'}
+          style={{ willChange: 'opacity' }}
+          className={cn(
+            'absolute inset-0 h-full w-full animate-kenburns object-cover transition-opacity duration-[2000ms] ease-in-out',
+            i === index ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      ))}
+
+      {/* legibility overlays — darker on the left, under the copy */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0a1226]/85 via-[#0a1226]/45 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0a1226]/70 via-transparent to-[#0a1226]/20" />
+    </div>
+  );
+}
