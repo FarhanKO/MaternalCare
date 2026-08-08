@@ -65,3 +65,36 @@ export function FlowingLines({ className }: FlowingLinesProps) {
         </filter>
       </defs>
 
+      {/* the wires — each in its own group with a gentle breathing drift */}
+      {WIRES.map((wire, i) => (
+        <g key={wire.id} style={{ animation: `wireDrift ${16 + i * 3}s ease-in-out ${-i * 2}s infinite alternate` }}>
+          <path
+            id={wire.id}
+            d={wire.d}
+            fill="none"
+            stroke={`url(#${wire.grad})`}
+            strokeWidth={wire.w}
+            strokeLinecap="round"
+            opacity={wire.o}
+          />
+        </g>
+      ))}
+
+      {/* traveling dots */}
+      {TRAVELLERS.map((t, i) => (
+        <circle key={i} r={t.r} fill={t.color} filter="url(#dotGlow)">
+          <animateMotion dur={`${t.dur}s`} begin={`${t.begin}s`} repeatCount="indefinite" rotate="auto">
+            <mpath href={`#${t.path}`} />
+          </animateMotion>
+        </circle>
+      ))}
+
+      <style>{`
+        @keyframes wireDrift {
+          0%   { transform: translateY(0px); }
+          100% { transform: translateY(10px); }
+        }
+      `}</style>
+    </svg>
+  );
+}
