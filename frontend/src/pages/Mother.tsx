@@ -15,6 +15,8 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { SymptomModal } from '@/components/mother/SymptomModal';
 import { AppointmentModal } from '@/components/mother/AppointmentModal';
+import { MotherTabs, type MotherTab } from '@/components/mother/MotherTabs';
+import { CommunitySection } from '@/components/mother/CommunitySection';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { INTENSITY_LABEL, URGENT_LABELS, type Symptom } from '@/data/symptoms';
@@ -475,6 +477,7 @@ export function Mother() {
   const [moodIdx, setMoodIdx] = useState(1); // Calm
   const [logOpen, setLogOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
+  const [tab, setTab] = useState<MotherTab>('dashboard');
 
   // persisted state lives in the Express/SQLite Model layer
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
@@ -523,6 +526,14 @@ export function Mother() {
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-glow">AR</span>
           </div>
         </Reveal>
+
+        {/* section navigation */}
+        <MotherTabs active={tab} onChange={setTab} badges={{ reminders: nextUp.length }} />
+
+        {/* ============================== DASHBOARD ============================== */}
+        {tab === 'dashboard' && (
+        <motion.div key="tab-dashboard" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
         {/* HERO — pink card with the half-circular gauge */}
         <Reveal>
@@ -871,6 +882,14 @@ export function Mother() {
           </Reveal>
         </div>
 
+        </motion.div>
+        )}
+
+        {/* ================================ VITALS ================================ */}
+        {tab === 'vitals' && (
+        <motion.div key="tab-vitals" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+
         {/* CHARTS GRID */}
         <div className="mt-9">
           <Reveal className="mb-4">
@@ -1119,8 +1138,16 @@ export function Mother() {
           </ChartCard>
         </div>
 
+        </motion.div>
+        )}
+
+        {/* ============================== REMINDERS ============================== */}
+        {tab === 'reminders' && (
+        <motion.div key="tab-reminders" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+
         {/* appointments + symptoms */}
-        <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        <div className="mt-9 grid gap-5 lg:grid-cols-3">
           <Reveal className="lg:col-span-2">
             <GlassCard className="h-full p-6">
               <div className="mb-5 flex items-center justify-between">
@@ -1240,6 +1267,17 @@ export function Mother() {
             </GlassCard>
           </Reveal>
         </div>
+
+        </motion.div>
+        )}
+
+        {/* ============================== COMMUNITY ============================== */}
+        {tab === 'community' && (
+        <motion.div key="tab-community" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+          <CommunitySection week={26} />
+        </motion.div>
+        )}
       </main>
       <Footer />
 
