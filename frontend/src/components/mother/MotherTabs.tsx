@@ -24,8 +24,13 @@ interface Props {
  */
 export function MotherTabs({ active, onChange, badges }: Props) {
   return (
-    <div className="sticky top-[86px] z-30 -mx-4 px-4 py-2">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-glass">
+    <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4 sm:bottom-7">
+      <motion.div
+        initial={{ y: 28, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 28, delay: 0.15 }}
+        className="pointer-events-auto flex w-full max-w-xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-glass-lg"
+      >
         {MOTHER_TABS.map((t) => {
           const isActive = active === t.key;
           const count = badges?.[t.key];
@@ -60,7 +65,7 @@ export function MotherTabs({ active, onChange, badges }: Props) {
             </button>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 }

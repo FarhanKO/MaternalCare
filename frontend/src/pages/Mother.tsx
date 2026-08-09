@@ -509,7 +509,10 @@ export function Mother() {
   return (
     <>
       <Navbar />
-      <main className="mx-auto max-w-6xl px-4 pb-24 pt-28 sm:pt-32">
+      {/* floating section dock — sits above everything, bottom-centred */}
+      <MotherTabs active={tab} onChange={setTab} badges={{ reminders: nextUp.length }} />
+
+      <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {/* greeting */}
         <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -526,9 +529,6 @@ export function Mother() {
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-glow">AR</span>
           </div>
         </Reveal>
-
-        {/* section navigation */}
-        <MotherTabs active={tab} onChange={setTab} badges={{ reminders: nextUp.length }} />
 
         {/* ============================== DASHBOARD ============================== */}
         {tab === 'dashboard' && (
