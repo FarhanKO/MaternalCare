@@ -92,3 +92,60 @@ export function BeamsBackground({ className, intensity = 'medium', count = 14 }:
       beam.opacity = 0.16 + Math.random() * 0.12;
     };
 
+    const drawBeam = (beam: Beam) => {
+      ctx.save();
+      ctx.translate(beam.x, beam.y);
+      ctx.rotate((beam.angle * Math.PI) / 180);
+
+      const o = beam.opacity * (0.8 + Math.sin(beam.pulse) * 0.2) * OPACITY[intensity];
+      const g = ctx.createLinearGradient(0, 0, 0, beam.length);
+      const sat = '78%', light = '58%';
+      g.addColorStop(0, `hsla(${beam.hue}, ${sat}, ${light}, 0)`);
+      g.addColorStop(0.1, `hsla(${beam.hue}, ${sat}, ${light}, ${o * 0.5})`);
+      g.addColorStop(0.4, `hsla(${beam.hue}, ${sat}, ${light}, ${o})`);
+      g.addColorStop(0.6, `hsla(${beam.hue}, ${sat}, ${light}, ${o})`);
+      g.addColorStop(0.9, `hsla(${beam.hue}, ${sat}, ${light}, ${o * 0.5})`);
+      g.addColorStop(1, `hsla(${beam.hue}, ${sat}, ${light}, 0)`);
+
+      ctx.fillStyle = g;
+      ctx.fillRect(-beam.width / 2, 0, beam.width, beam.length);
+      ctx.restore();
+    };
+
+    const animate = () => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.filter = 'blur(24px)';
+      beamsRef.current.forEach((beam, i) => {
+        beam.y -= beam.speed;
+        beam.pulse += beam.pulseSpeed;
+        if (beam.y + beam.length < -100) resetBeam(beam, i);
+        drawBeam(beam);
+      });
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    // respect reduced-motion: paint one static frame instead of looping
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      ctx.filter = 'blur(24px)';
+      beamsRef.current.forEach((b) => drawBeam(b));
+    } else {
+      animate();
+    }
+
+    return () => {
+      ro.disconnect();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [intensity, count]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className={cn('pointer-events-none absolute inset-0 h-full w-full', className)}
+      style={{ filter: 'blur(10px)' }}
+    />
+  );
+}
+
+export default BeamsBackground;
