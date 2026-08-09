@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Activity, Bell, Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Clock, Dumbbell,
-  Pill, Plus, Repeat, Stethoscope, TestTube, Trash2, X,
+  Pill, Plus, Repeat, Stethoscope, Syringe, TestTube, Trash2, X,
 } from 'lucide-react';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
@@ -13,7 +13,7 @@ import {
 } from '@/data/reminders';
 
 const KIND_ICON: Record<ReminderKind, any> = {
-  medicine: Pill, doctor: Stethoscope, test: TestTube, exercise: Dumbbell,
+  medicine: Pill, doctor: Stethoscope, test: TestTube, exercise: Dumbbell, vaccination: Syringe,
 };
 
 const uid = () => `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -297,7 +297,7 @@ export function AppointmentModal({ open, onClose, reminders, onChange }: Props) 
                   transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
                   {/* add options on top */}
                   <div className="text-[11px] font-bold uppercase tracking-wider text-ink-faint">Add a reminder</div>
-                  <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-5">
                     {KIND_ORDER.map((k) => {
                       const Icon = KIND_ICON[k];
                       return (

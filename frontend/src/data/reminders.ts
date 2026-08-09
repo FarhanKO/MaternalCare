@@ -1,4 +1,4 @@
-export type ReminderKind = 'medicine' | 'doctor' | 'test' | 'exercise';
+export type ReminderKind = 'medicine' | 'doctor' | 'test' | 'exercise' | 'vaccination';
 
 export interface Reminder {
   id: string;
@@ -15,10 +15,11 @@ export const KIND_LABEL: Record<ReminderKind, string> = {
   doctor: 'Doctor appointment',
   test: 'Test',
   exercise: 'Exercise',
+  vaccination: 'Vaccination',
 };
 
 export const KIND_SHORT: Record<ReminderKind, string> = {
-  medicine: 'Medicine', doctor: 'Doctor', test: 'Test', exercise: 'Exercise',
+  medicine: 'Medicine', doctor: 'Doctor', test: 'Test', exercise: 'Exercise', vaccination: 'Vaccine',
 };
 
 export const KIND_COLOR: Record<ReminderKind, string> = {
@@ -26,9 +27,10 @@ export const KIND_COLOR: Record<ReminderKind, string> = {
   doctor: '#3f66f0',
   test: '#22b8c4',
   exercise: '#2fbf9b',
+  vaccination: '#f6b93b',
 };
 
-export const KIND_ORDER: ReminderKind[] = ['medicine', 'doctor', 'test', 'exercise'];
+export const KIND_ORDER: ReminderKind[] = ['doctor', 'test', 'medicine', 'exercise', 'vaccination'];
 
 /** Suggested titles offered when a kind is chosen. */
 export const KIND_SUGGESTIONS: Record<ReminderKind, string[]> = {
@@ -36,6 +38,7 @@ export const KIND_SUGGESTIONS: Record<ReminderKind, string[]> = {
   doctor: ['Midwife check-up', 'Growth scan', 'Consultant review', 'Anti-D injection'],
   test: ['Glucose screening', 'Blood test', 'Urine sample', 'Ultrasound'],
   exercise: ['Prenatal yoga', 'Walk 20 minutes', 'Pelvic floor exercises', 'Swimming'],
+  vaccination: ['Whooping cough (Tdap)', 'Flu vaccine', 'Anti-D injection', 'COVID booster'],
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -90,5 +93,8 @@ export function seedReminders(now = new Date()): Reminder[] {
     { id: 'r3', kind: 'doctor', title: 'Growth ultrasound', note: 'Dr. Lena Ortiz · Room 204', at: at(3, 10, 15) },
     { id: 'r4', kind: 'test', title: 'Glucose screening', note: 'Fast for 8 hours before', at: at(9, 9, 0) },
     { id: 'r5', kind: 'exercise', title: 'Prenatal yoga', note: 'Community centre', at: at(2, 18, 0), repeat: 'weekly' },
+    { id: 'r6', kind: 'exercise', title: 'Walk 20 minutes', note: 'After dinner', at: at(0, 19, 30), repeat: 'daily' },
+    { id: 'r7', kind: 'vaccination', title: 'Whooping cough (Tdap)', note: 'Protects baby in their first weeks', at: at(12, 11, 0) },
+    { id: 'r8', kind: 'medicine', title: 'Calcium', note: 'With lunch', at: at(0, 13, 0), repeat: 'daily' },
   ];
 }

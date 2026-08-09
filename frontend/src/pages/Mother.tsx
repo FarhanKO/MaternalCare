@@ -17,6 +17,7 @@ import { SymptomModal } from '@/components/mother/SymptomModal';
 import { AppointmentModal } from '@/components/mother/AppointmentModal';
 import { MotherTabs, type MotherTab } from '@/components/mother/MotherTabs';
 import { CommunitySection } from '@/components/mother/CommunitySection';
+import { RemindersSection } from '@/components/mother/RemindersSection';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -1178,41 +1179,15 @@ export function Mother() {
         <motion.div key="tab-reminders" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
-        {/* appointments + symptoms */}
-        <div className="mt-9 grid gap-5 lg:grid-cols-3">
-          <Reveal className="lg:col-span-2">
-            <GlassCard className="h-full p-6">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.brand}1f`, color: C.brand }}>
-                    <CalendarDays className="h-[18px] w-[18px]" />
-                  </span>
-                  <div>
-                    <div className="text-sm font-bold text-ink">Upcoming appointments</div>
-                    <div className="text-xs text-ink-muted">Next 4 weeks</div>
-                  </div>
-                </div>
-                <LiquidButton size="sm" variant="glass">Add</LiquidButton>
-              </div>
-              <div className="space-y-3">
-                {APPTS.map((a) => (
-                  <div key={a.title} className="flex items-center gap-4 rounded-2xl border border-white/50 bg-white/50 p-3.5 transition hover:bg-white/70">
-                    <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-xl text-white" style={{ background: a.tint }}>
-                      <span className="text-[10px] font-bold uppercase leading-none opacity-90">{a.date.split(' ')[0]}</span>
-                      <span className="text-xl font-extrabold leading-tight">{a.date.split(' ')[1]}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-ink">{a.title}</div>
-                      <div className="text-xs text-ink-muted">{a.who}</div>
-                    </div>
-                    <span className="rounded-full bg-ink/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{a.type}</span>
-                    <ChevronRight className="h-5 w-5 flex-none text-ink-faint" />
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          </Reveal>
+        {/* four reminder groups + today's routine timeline */}
+        <RemindersSection
+          reminders={reminders}
+          onAdd={() => setApptOpen(true)}
+          onDelete={(id) => changeReminders(reminders.filter((r) => r.id !== id), reminders)}
+        />
 
+        {/* symptom history */}
+        <div className="mt-5">
           <Reveal>
             <GlassCard className="h-full p-6">
               <div className="flex items-center gap-2.5">

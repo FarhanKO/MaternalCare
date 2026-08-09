@@ -4,7 +4,7 @@
  */
 const db = require('../config/database');
 
-const KINDS = ['medicine', 'doctor', 'test', 'exercise'];
+const KINDS = ['medicine', 'doctor', 'test', 'exercise', 'vaccination'];
 const REPEATS = ['once', 'daily', 'weekly'];
 
 const toDTO = (r) => ({
