@@ -501,8 +501,6 @@ export function CommunitySection({ week }: { week: number }) {
             </GlassCard>
           </Reveal>
 
-          <Reveal delay={0.05}><RulesNote compact /></Reveal>
-
           <Reveal delay={0.1}>
             <GlassCard className="p-5">
               <div className="flex items-center gap-2.5">

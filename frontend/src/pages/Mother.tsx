@@ -17,6 +17,7 @@ import { SymptomModal } from '@/components/mother/SymptomModal';
 import { AppointmentModal } from '@/components/mother/AppointmentModal';
 import { MotherTabs, type MotherTab } from '@/components/mother/MotherTabs';
 import { CommunitySection } from '@/components/mother/CommunitySection';
+import { ProfileModal } from '@/components/mother/ProfileModal';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { INTENSITY_LABEL, URGENT_LABELS, type Symptom } from '@/data/symptoms';
@@ -478,6 +479,7 @@ export function Mother() {
   const [logOpen, setLogOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
   const [tab, setTab] = useState<MotherTab>('dashboard');
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // persisted state lives in the Express/SQLite Model layer
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
@@ -526,7 +528,16 @@ export function Mother() {
             <button className="grid h-11 w-11 place-items-center rounded-2xl glass-strong text-ink-soft transition-colors hover:text-ink">
               <Bell className="h-5 w-5" />
             </button>
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-glow">AR</span>
+            <motion.button
+              onClick={() => setProfileOpen(true)}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+              aria-label="Open your profile"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-glow"
+            >
+              AR
+            </motion.button>
           </div>
         </Reveal>
 
@@ -1293,6 +1304,18 @@ export function Mother() {
         onClose={() => setApptOpen(false)}
         reminders={reminders}
         onChange={(next) => changeReminders(next, reminders)}
+      />
+
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        name="Aisha Rahman"
+        week={26}
+        dueDate="Apr 2"
+        bloodGroup="B+"
+        age={28}
+        score={report.score}
+        band={{ label: report.band.label, tone: TONE_DOT[report.band.tone] }}
       />
     </>
   );
