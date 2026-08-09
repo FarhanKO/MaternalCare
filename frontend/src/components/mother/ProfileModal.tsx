@@ -1,18 +1,18 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Baby, Bell, CalendarDays, ChevronRight, Droplet, HeartPulse, LogOut, Pencil, Ruler,
-  ShieldCheck, Sparkles, Stethoscope, X,
+  Baby, Camera, CalendarDays, Check, ChevronRight, Droplet, LogOut, Pencil, Ruler, ShieldCheck,
+  Sparkles, Stethoscope, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useProfile } from '@/context/ProfileContext';
 
 interface CareMember { name: string; role: string; initials: string; tint: string }
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  name: string;
   week: number;
   dueDate: string;
   bloodGroup: string;
@@ -28,20 +28,30 @@ const CARE_TEAM: CareMember[] = [
 
 const MENU = [
   { icon: Pencil, label: 'Edit profile', hint: 'Name, photo, due date' },
-  { icon: Bell, label: 'Notifications', hint: 'Reminders and alerts' },
   { icon: ShieldCheck, label: 'Privacy & data', hint: 'Who can see your records' },
 ];
 
-export function ProfileModal({
-  open, onClose, name, week, dueDate, bloodGroup, age, score, band,
-}: Props) {
+export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, score, band }: Props) {
+  const { name, avatar, initials, bio, setAvatar, setBio } = useProfile();
+  const [editingBio, setEditingBio] = useState(false);
+  const [draftBio, setDraftBio] = useState(bio);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && open && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const initials = name.split(' ').map((w) => w[0]).slice(0, 2).join('');
+  useEffect(() => { if (open) { setDraftBio(bio); setEditingBio(false); } }, [open]);
+
+  const pickPhoto = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
   const facts = [
     { icon: Baby, label: 'Week', value: `${week}` },
     { icon: CalendarDays, label: 'Due', value: dueDate },
@@ -95,23 +105,101 @@ export function ProfileModal({
               </button>
             </div>
 
-            {/* avatar + identity — outside the scroll area so the overlap isn't clipped */}
+            {/* identity — centred */}
             <div className="flex-none px-6">
-              <div className="-mt-11">
-                <motion.span
+              <div className="-mt-12 flex flex-col items-center text-center">
+                <motion.div
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.1 }}
-                  className="grid h-[76px] w-[76px] flex-none place-items-center rounded-3xl border-[3px] border-white bg-gradient-to-br from-brand-500 to-brand-700 text-xl font-extrabold text-white shadow-glow"
+                  className="relative"
                 >
-                  {initials}
-                </motion.span>
-                <div className="mt-3">
-                  <div className="text-xl font-extrabold leading-tight tracking-tight text-ink">{name}</div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-rose-500/12 px-2 py-0.5 text-[10px] font-bold text-rose-600">Mother</span>
-                    <span className="text-[11px] font-semibold text-ink-muted">Week {week} · second trimester</span>
-                  </div>
+                  {avatar ? (
+                    <img
+                      src={avatar}
+                      alt={name}
+                      className="h-24 w-24 rounded-3xl border-[3px] border-white object-cover shadow-glow"
+                    />
+                  ) : (
+                    <span className="grid h-24 w-24 place-items-center rounded-3xl border-[3px] border-white bg-gradient-to-br from-brand-500 to-brand-700 text-2xl font-extrabold text-white shadow-glow">
+                      {initials}
+                    </span>
+                  )}
+
+                  {/* change photo */}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => pickPhoto(e.target.files?.[0])}
+                  />
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    aria-label="Change profile photo"
+                    className="absolute -bottom-1 -right-1 grid h-9 w-9 place-items-center rounded-xl border-2 border-white bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow transition hover:brightness-110"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                </motion.div>
+
+                {avatar && (
+                  <button
+                    onClick={() => setAvatar(null)}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ink-faint transition hover:text-rose-600"
+                  >
+                    <Trash2 className="h-3 w-3" /> Remove photo
+                  </button>
+                )}
+
+                <div className="mt-3 text-xl font-extrabold leading-tight tracking-tight text-ink">{name}</div>
+                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                  <span className="rounded-full bg-rose-500/12 px-2 py-0.5 text-[10px] font-bold text-rose-600">Mother</span>
+                  <span className="text-[11px] font-semibold text-ink-muted">Week {week} · second trimester</span>
+                </div>
+
+                {/* bio */}
+                <div className="mt-3 w-full">
+                  {editingBio ? (
+                    <div>
+                      <textarea
+                        value={draftBio}
+                        onChange={(e) => setDraftBio(e.target.value)}
+                        rows={3}
+                        maxLength={160}
+                        autoFocus
+                        placeholder="A line about you — how you're feeling, what you're hoping for…"
+                        className="w-full resize-none rounded-2xl border border-white/60 bg-white/70 px-3.5 py-2.5 text-center text-[12px] font-medium text-ink outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+                      />
+                      <div className="mt-1.5 flex items-center justify-center gap-2">
+                        <span className="text-[10px] font-semibold text-ink-faint">{draftBio.length}/160</span>
+                        <button
+                          onClick={() => { setBio(draftBio.trim()); setEditingBio(false); }}
+                          className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 py-1.5 text-[11px] font-bold text-white shadow-glow"
+                        >
+                          <Check className="h-3 w-3" /> Save
+                        </button>
+                        <button
+                          onClick={() => { setDraftBio(bio); setEditingBio(false); }}
+                          className="rounded-xl px-2 py-1.5 text-[11px] font-bold text-ink-muted transition hover:text-ink"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEditingBio(true)}
+                      className={cn(
+                        'w-full rounded-2xl border border-dashed px-3.5 py-2.5 text-[12px] leading-relaxed transition',
+                        bio
+                          ? 'border-transparent bg-white/50 font-medium italic text-ink-soft hover:bg-white/70'
+                          : 'border-ink/15 font-semibold text-ink-faint hover:border-brand-300 hover:text-ink-muted',
+                      )}
+                    >
+                      {bio || '+ Add a short bio'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -200,18 +288,12 @@ export function ProfileModal({
                 ))}
               </div>
 
-              {/* emergency + sign out */}
-              <div className="mt-5 flex items-center gap-2">
-                <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 px-4 py-3 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(225,29,72,0.5)] transition hover:brightness-105">
-                  <HeartPulse className="h-[18px] w-[18px]" /> Emergency SOS
-                </button>
-                <button
-                  onClick={onClose}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-4 py-3 text-sm font-bold text-ink-soft transition hover:bg-white hover:text-ink"
-                >
-                  <LogOut className="h-[18px] w-[18px]" /> Sign out
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-4 py-3 text-sm font-bold text-ink-soft transition hover:bg-white hover:text-ink"
+              >
+                <LogOut className="h-[18px] w-[18px]" /> Sign out
+              </button>
             </div>
           </motion.div>
         </motion.div>

@@ -20,6 +20,7 @@ import { CommunitySection } from '@/components/mother/CommunitySection';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useProfile } from '@/context/ProfileContext';
 import { INTENSITY_LABEL, URGENT_LABELS, type Symptom } from '@/data/symptoms';
 import { countdown, formatTime, KIND_COLOR, upcoming } from '@/data/reminders';
 import {
@@ -480,6 +481,7 @@ export function Mother() {
   const [apptOpen, setApptOpen] = useState(false);
   const [tab, setTab] = useState<MotherTab>('dashboard');
   const [profileOpen, setProfileOpen] = useState(false);
+  const profile = useProfile();
 
   // persisted state lives in the Express/SQLite Model layer
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
@@ -520,23 +522,42 @@ export function Mother() {
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Your pregnancy</span>
             <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
-              {greeting}, <span className="font-serif italic text-brand-600">Aisha</span>
+              {greeting}, <span className="font-serif italic text-brand-600">{profile.name.split(' ')[0]}</span>
             </h1>
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            <button className="grid h-11 w-11 place-items-center rounded-2xl glass-strong text-ink-soft transition-colors hover:text-ink">
+            <button aria-label="Notifications" className="grid h-11 w-11 place-items-center rounded-2xl glass-strong text-ink-soft transition-colors hover:text-ink">
               <Bell className="h-5 w-5" />
             </button>
+
+            {/* emergency SOS — always one tap away */}
+            <motion.button
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+              aria-label="Emergency SOS"
+              title="Emergency SOS"
+              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 px-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(225,29,72,0.55)]"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+              </span>
+              <span className="hidden sm:inline">SOS</span>
+            </motion.button>
+
             <motion.button
               onClick={() => setProfileOpen(true)}
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 22 }}
               aria-label="Open your profile"
-              className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-glow"
+              className="h-11 w-11 flex-none overflow-hidden rounded-2xl shadow-glow"
             >
-              AR
+              {profile.avatar
+                ? <img src={profile.avatar} alt={profile.name} className="h-full w-full object-cover" />
+                : <span className="grid h-full w-full place-items-center bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white">{profile.initials}</span>}
             </motion.button>
           </div>
         </Reveal>
@@ -1309,7 +1330,6 @@ export function Mother() {
       <ProfileModal
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
-        name="Aisha Rahman"
         week={26}
         dueDate="Apr 2"
         bloodGroup="B+"

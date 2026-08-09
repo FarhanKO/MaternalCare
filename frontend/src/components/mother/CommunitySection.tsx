@@ -8,6 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
+import { useProfile } from '@/context/ProfileContext';
 
 const C = { brand: '#3f66f0', rose: '#f2789f', mint: '#2fbf9b', violet: '#8b7bf3', peach: '#fb7534' };
 
@@ -93,11 +94,15 @@ const ROLE_META: Record<Role, { label: string; color: string }> = {
 const uid = () => `x-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 const initials = (n: string) => n.split(' ').map((w) => w[0]).slice(0, 2).join('');
 
-function Avatar({ name, role, size = 9 }: { name: string; role: Role; size?: number }) {
+function Avatar({ name, role, size = 9, photo }: { name: string; role: Role; size?: number; photo?: string | null }) {
+  const box = size === 9 ? 'h-9 w-9' : 'h-7 w-7';
+  if (photo) {
+    return <img src={photo} alt={name} className={cn('flex-none rounded-full object-cover', box)} />;
+  }
   return (
     <span
-      className={cn('grid flex-none place-items-center rounded-full text-[11px] font-bold text-white',
-        size === 9 ? 'h-9 w-9' : 'h-7 w-7 text-[10px]')}
+      className={cn('grid flex-none place-items-center rounded-full font-bold text-white',
+        box, size === 9 ? 'text-[11px]' : 'text-[10px]')}
       style={{ background: ROLE_META[role].color }}
     >
       {initials(name)}
@@ -133,6 +138,7 @@ function RulesNote({ compact }: { compact?: boolean }) {
 }
 
 export function CommunitySection({ week }: { week: number }) {
+  const me = useProfile();
   const [posts, setPosts] = useState<Post[]>(SEED);
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
@@ -170,7 +176,7 @@ export function CommunitySection({ week }: { week: number }) {
   const publish = () => {
     if (!title.trim() && !body.trim()) return;
     setPosts((p) => [{
-      id: uid(), author: 'Aisha R.', role: 'mother', week, topic,
+      id: uid(), author: me.name, role: 'mother', week, topic,
       title: title.trim() || 'Untitled',
       body: body.trim(),
       image: image ?? undefined,
@@ -183,7 +189,7 @@ export function CommunitySection({ week }: { week: number }) {
     const text = (drafts[postId] || '').trim();
     if (!text) return;
     setPosts((all) => all.map((p) => p.id === postId
-      ? { ...p, comments: [...p.comments, { id: uid(), author: 'Aisha R.', role: 'mother', body: text, ago: 'just now' }] }
+      ? { ...p, comments: [...p.comments, { id: uid(), author: me.name, role: 'mother', body: text, ago: 'just now' }] }
       : p));
     setDrafts((d) => ({ ...d, [postId]: '' }));
   };
@@ -250,9 +256,9 @@ export function CommunitySection({ week }: { week: number }) {
                 <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_18rem]">
                   <GlassCard className="p-5">
                     <div className="flex items-center gap-2.5">
-                      <Avatar name="Aisha R." role="mother" />
+                      <Avatar name={me.name} role="mother" photo={me.avatar} />
                       <div>
-                        <div className="text-sm font-bold text-ink">Aisha R.</div>
+                        <div className="text-sm font-bold text-ink">{me.name}</div>
                         <div className="text-[11px] font-semibold text-ink-faint">Week {week} · posting as a mother</div>
                       </div>
                     </div>
@@ -344,7 +350,7 @@ export function CommunitySection({ week }: { week: number }) {
                   >
                     <GlassCard className="p-5">
                       <div className="flex items-center gap-2.5">
-                        <Avatar name={p.author} role={p.role} />
+                        <Avatar name={p.author} role={p.role} photo={p.author === me.name ? me.avatar : undefined} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-x-1.5">
                             <span className="text-sm font-bold text-ink">{p.author}</span>
@@ -415,7 +421,7 @@ export function CommunitySection({ week }: { week: number }) {
                                   initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                                   className="flex gap-2.5 rounded-2xl border border-white/60 bg-white/55 px-3 py-2.5"
                                 >
-                                  <Avatar name={c.author} role={c.role} size={7} />
+                                  <Avatar name={c.author} role={c.role} size={7} photo={c.author === me.name ? me.avatar : undefined} />
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-x-1.5">
                                       <span className="text-[12px] font-bold text-ink">{c.author}</span>
@@ -438,7 +444,7 @@ export function CommunitySection({ week }: { week: number }) {
 
                               {/* add a comment */}
                               <div className="flex items-center gap-2 pt-1">
-                                <Avatar name="Aisha R." role="mother" size={7} />
+                                <Avatar name={me.name} role="mother" size={7} photo={me.avatar} />
                                 <input
                                   value={drafts[p.id] || ''}
                                   onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}

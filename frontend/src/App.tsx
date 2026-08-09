@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Background } from '@/components/landing/Background';
 import { PageLoader } from '@/components/ui/Loader';
+import { ProfileProvider } from '@/context/ProfileContext';
 
 /* Pages are code-split so each route shows the loader while it streams in. */
 const Landing = lazy(() => import('@/pages/Landing').then((m) => ({ default: m.Landing })));
@@ -30,7 +31,8 @@ export default function App() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-clip">
+    <ProfileProvider>
+      <div className="relative min-h-screen overflow-x-clip">
       <Background />
       <Suspense fallback={<PageLoader title={copy.title} subtitle={copy.subtitle} />}>
         <Routes>
@@ -43,6 +45,7 @@ export default function App() {
           <Route path="/doctor" element={<Doctor />} />
         </Routes>
       </Suspense>
-    </div>
+      </div>
+    </ProfileProvider>
   );
 }
