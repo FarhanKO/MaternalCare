@@ -63,7 +63,9 @@ export function Navbar() {
       <nav
         className={cn(
           'flex w-full max-w-6xl items-center gap-6 rounded-2xl px-4 py-2.5 transition-all duration-500',
-          scrolled ? 'glass-strong shadow-glass' : 'border border-transparent bg-white/30 backdrop-blur-md',
+          scrolled
+            ? 'glass-strong shadow-float'
+            : 'border border-white/40 bg-white/45 shadow-soft backdrop-blur-md',
         )}
       >
         {/* brand */}

@@ -60,6 +60,8 @@ export default {
         'glass-lg': '0 1px 1px rgba(255,255,255,0.7) inset, 0 16px 40px -12px rgba(29,54,120,0.22), 0 40px 90px -28px rgba(29,54,120,0.28)',
         soft: '0 2px 8px -2px rgba(29,54,120,0.08), 0 12px 32px -12px rgba(29,54,120,0.16)',
         glow: '0 0 0 1px rgba(91,131,251,0.15), 0 12px 40px -8px rgba(91,131,251,0.45)',
+        // Floating bars (navbar, section dock) — reads clearly against any scrolled content
+        float: '0 1px 1px rgba(255,255,255,0.7) inset, 0 2px 6px -1px rgba(29,54,120,0.16), 0 12px 28px -6px rgba(29,54,120,0.30), 0 28px 60px -18px rgba(29,54,120,0.34)',
         'inner-top': 'inset 0 1px 0 0 rgba(255,255,255,0.65)',
       },
       backdropBlur: {

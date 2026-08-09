@@ -29,7 +29,7 @@ export function MotherTabs({ active, onChange, badges }: Props) {
         initial={{ y: 28, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 28, delay: 0.15 }}
-        className="pointer-events-auto flex w-full max-w-xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-glass-lg"
+        className="pointer-events-auto flex w-full max-w-xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-float"
       >
         {MOTHER_TABS.map((t) => {
           const isActive = active === t.key;
