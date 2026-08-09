@@ -110,3 +110,43 @@ export function GlassDatePicker({ label, value, onChange, icon, accent = 'brand'
                   </div>
                 </div>
 
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-ink-faint">
+                  {WD.map((w) => (
+                    <div key={w} className="py-1">
+                      {w}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {cells.map((d, i) => {
+                    if (d === null) return <div key={i} />;
+                    const dISO = iso(y, m, d);
+                    const isSel = value === dISO;
+                    const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          onChange(dISO);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'grid h-9 w-full place-items-center rounded-lg text-[13px] font-semibold transition-colors',
+                          isSel ? selBg : cn('text-ink-soft hover:bg-white/80', isToday && `ring-1 ring-inset ${ring}`),
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </div>
+  );
+}
