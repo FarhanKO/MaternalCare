@@ -79,4 +79,23 @@ export function Showcase() {
               </GlassCard>
             </Reveal>
 
-
+            <Reveal delay={0.14}>
+              <GlassCard className="flex items-center gap-4 p-6">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-aqua-400 to-brand-500">
+                  <Syringe className="h-5 w-5 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-ink">MR dose 2</div>
+                  <div className="truncate text-xs text-ink-muted">Reminder scheduled · in 19 days</div>
+                </div>
+                <span className="ml-auto grid h-9 w-9 flex-none place-items-center rounded-xl bg-brand-50 text-brand-500">
+                  <Bell className="h-4 w-4" />
+                </span>
+              </GlassCard>
+            </Reveal>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
