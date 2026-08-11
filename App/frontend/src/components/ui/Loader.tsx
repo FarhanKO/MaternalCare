@@ -38,3 +38,87 @@ const RINGS = [
   },
 ];
 
+/**
+ * Animated loading indicator — rotating gradient rings with a breathing title.
+ * Adapted from the KokonutUI loader, re-skinned to the MaternalCare+ palette.
+ */
+export function Loader({
+  title = 'Preparing your care space...',
+  subtitle = 'Just a moment while we gather everything for you',
+  size = 'md',
+  className,
+  ...props
+}: LoaderProps) {
+  const config = sizeConfig[size];
+
+  return (
+    <div className={cn('flex flex-col items-center justify-center gap-8 p-8', className)} {...props}>
+      <motion.div
+        animate={{ scale: [1, 1.02, 1] }}
+        className={cn('relative', config.container)}
+        transition={{ duration: 4, repeat: Infinity, ease: [0.4, 0, 0.6, 1] }}
+      >
+        {RINGS.map((ring, i) => (
+          <motion.div
+            key={i}
+            animate={{ rotate: [0, ring.dir] }}
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: ring.gradient,
+              mask: ring.mask,
+              WebkitMask: ring.mask,
+              opacity: ring.opacity,
+            }}
+            transition={{ duration: ring.duration, repeat: Infinity, ease: ring.ease }}
+          />
+        ))}
+      </motion.div>
+
+      <motion.div
+        animate={{ opacity: 1, y: 0 }}
+        className={cn('text-center', config.spacing, config.maxWidth)}
+        initial={{ opacity: 0, y: 12 }}
+        transition={{ delay: 0.4, duration: 1, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <motion.h1
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(config.titleClass, 'leading-[1.15] tracking-[-0.02em] text-ink antialiased')}
+          initial={{ opacity: 0, y: 12 }}
+          transition={{ delay: 0.6, duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <motion.span
+            animate={{ opacity: [0.9, 0.65, 0.9] }}
+            transition={{ duration: 3, repeat: Infinity, ease: [0.4, 0, 0.6, 1] }}
+          >
+            {title}
+          </motion.span>
+        </motion.h1>
+
+        <motion.p
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(config.subtitleClass, 'font-medium leading-[1.45] tracking-[-0.01em] text-ink-muted antialiased')}
+          initial={{ opacity: 0, y: 8 }}
+          transition={{ delay: 0.8, duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <motion.span
+            animate={{ opacity: [0.75, 0.5, 0.75] }}
+            transition={{ duration: 4, repeat: Infinity, ease: [0.4, 0, 0.6, 1] }}
+          >
+            {subtitle}
+          </motion.span>
+        </motion.p>
+      </motion.div>
+    </div>
+  );
+}
+
+/** Full-screen loader used as the route-level Suspense fallback. */
+export function PageLoader({ title, subtitle }: { title?: string; subtitle?: string }) {
+  return (
+    <div className="grid min-h-screen place-items-center px-4">
+      <Loader size="lg" title={title} subtitle={subtitle} />
+    </div>
+  );
+}
+
+export default Loader;
