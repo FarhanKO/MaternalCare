@@ -33,3 +33,43 @@ function scoreFactors({ age, systolic, diastolic, sugar, temp, week }) {
   return factors;
 }
 
+const RECOMMENDATIONS = {
+  low: [
+    { icon: '🥗', title: 'Nutrition', text: 'Keep a balanced plate: leafy greens, lentils, dairy and one iron-rich meal daily. Stay hydrated (2.5–3 L).' },
+    { icon: '🚶‍♀️', title: 'Activity', text: '30 minutes of gentle walking or prenatal yoga most days. Avoid lying flat on your back for long periods.' },
+    { icon: '😴', title: 'Rest', text: 'Aim for 7–9 hours of sleep, resting on your left side to improve blood flow to the baby.' },
+    { icon: '📋', title: 'Monitoring', text: 'Log vitals twice a week and do daily kick counts after week 28.' },
+  ],
+  medium: [
+    { icon: '🩺', title: 'Medical follow-up', text: 'Book a check-up within the next 7 days and share your vitals trend with your doctor.' },
+    { icon: '🧂', title: 'Nutrition', text: 'Reduce salt and refined sugar. Prefer complex carbs, and split meals into 5–6 smaller portions.' },
+    { icon: '📈', title: 'Monitoring', text: 'Log blood pressure and glucose daily. Set reminders — trends matter more than single readings.' },
+    { icon: '🧘‍♀️', title: 'Stress', text: 'Practice 10 minutes of breathing exercises daily; elevated stress can raise blood pressure.' },
+  ],
+  high: [
+    { icon: '🚨', title: 'Urgent review', text: 'Contact your obstetrician today. Readings in this range need professional evaluation.' },
+    { icon: '🛏️', title: 'Rest', text: 'Avoid strenuous activity until your doctor reviews you. Rest on your left side.' },
+    { icon: '📞', title: 'Emergency plan', text: 'Keep the SOS page ready, confirm your emergency contacts, and know your nearest 24/7 hospital.' },
+    { icon: '📈', title: 'Monitoring', text: 'Check blood pressure twice daily and record symptoms like headache, blurred vision or swelling.' },
+  ],
+};
+
+module.exports = {
+  assess(input) {
+    const factors = scoreFactors(input);
+    const score = Math.min(100, factors.reduce((s, f) => s + f.points, 0));
+    const level = score >= 55 ? 'high' : score >= 25 ? 'medium' : 'low';
+    const label = { low: 'Low Risk', medium: 'Medium Risk', high: 'High Risk' }[level];
+    return { score, level, label, factors, recommendations: RECOMMENDATIONS[level] };
+  },
+
+  /** Assessment built from the user's latest logged vitals */
+  fromLatestVitals(user, pregnancy) {
+    const v = vitalModel.latest(user.id);
+    if (!v || !pregnancy) return null;
+    return this.assess({
+      age: user.age, systolic: v.systolic, diastolic: v.diastolic,
+      sugar: v.sugar, temp: v.temp_c, week: pregnancy.week,
+    });
+  },
+};
