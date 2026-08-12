@@ -20,7 +20,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 interface Envelope<T> { data: T }
 
+export type LifeStage = 'pregnant' | 'new-mother' | 'parent' | 'planning' | 'general';
+
 export const api = {
+  /* the signed-in user */
+  getMe: () => request<Envelope<{ user: { name: string; stage: LifeStage } }>>('/me').then((r) => r.data.user),
+
+  setStage: (stage: LifeStage) =>
+    request<Envelope<{ stage: LifeStage }>>('/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ stage }),
+    }).then((r) => r.data),
+
   /* symptoms */
   getSymptoms: () => request<Envelope<Symptom[]>>('/symptoms').then((r) => r.data),
 

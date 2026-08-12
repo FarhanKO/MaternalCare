@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Activity, ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react';
@@ -6,6 +6,7 @@ import { LiquidButton } from '@/components/ui/LiquidButton';
 import { GlassDatePicker } from '@/components/ui/GlassDatePicker';
 import { cn } from '@/lib/cn';
 import { spring } from '@/lib/motion';
+import { useProfile } from '@/context/ProfileContext';
 import { normalizeStage, stepsFor, STAGE_LABEL, type Field } from '@/data/onboarding';
 
 type Answers = Record<string, string | string[]>;
@@ -107,11 +108,18 @@ export function Onboarding() {
   const stage = normalizeStage(params.get('stage'));
   const steps = useMemo(() => stepsFor(stage), [stage]);
   const navigate = useNavigate();
+  const { setStage } = useProfile();
 
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [done, setDone] = useState(false);
+
+  // the answer to "I am currently" decides which reading, news and
+  // questions the dashboard shows from here on
+  useEffect(() => {
+    if (done && stage !== 'general') setStage(stage);
+  }, [done, stage]);
 
   const total = steps.length;
   const step = steps[index];
@@ -268,7 +276,7 @@ export function Onboarding() {
                   <LiquidButton
                     size="lg"
                     className="mt-7 w-full"
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate('/mother')}
                     iconRight={<ArrowRight className="h-[18px] w-[18px]" />}
                   >
                     Enter MaternalCare+

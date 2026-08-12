@@ -145,6 +145,13 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 `);
 
+/* --------------------------------------------------- lightweight migration */
+// `stage` was added after the first release, so patch existing databases.
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!userCols.includes('stage')) {
+  db.exec("ALTER TABLE users ADD COLUMN stage TEXT NOT NULL DEFAULT 'pregnant'");
+}
+
 /* ------------------------------------------------------------- date utils */
 const DAY = 86400000;
 const iso = (d) => d.toISOString().slice(0, 10);

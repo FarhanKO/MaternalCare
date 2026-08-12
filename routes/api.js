@@ -17,6 +17,16 @@ router.get('/me', (req, res) => {
   res.json({ data: { user, pregnancy } });
 });
 
+/* update the signed-in user's life stage (set at the end of onboarding) */
+router.patch('/me', (req, res) => {
+  const user = userModel.current();
+  try {
+    res.json({ data: userModel.setStage(user.id, req.body?.stage) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 /* symptoms */
 router.get('/symptoms', symptomApi.index);
 router.put('/symptoms', symptomApi.replace);

@@ -497,6 +497,8 @@ export function Mother() {
   }, [urlTab]);
   const [profileOpen, setProfileOpen] = useState(false);
   const profile = useProfile();
+  // 'general' has no reading set of its own — fall back to the pregnancy one
+  const communityStage = profile.stage === 'general' ? 'pregnant' : profile.stage;
 
   // persisted state lives in the Express/SQLite Model layer
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
@@ -1296,7 +1298,7 @@ export function Mother() {
         {tab === 'community' && (
         <motion.div key="tab-community" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-          <CommunitySection week={26} />
+          <CommunitySection week={26} stage={communityStage} />
         </motion.div>
         )}
       </main>
