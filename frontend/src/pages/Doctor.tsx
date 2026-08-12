@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowRight, BellRing, CalendarDays, CheckCircle2, ChevronRight,
   ClipboardList, Clock, Droplet, HeartPulse, LayoutDashboard, Search, ShieldAlert, Stethoscope,
@@ -232,7 +233,16 @@ function PatientDrawer({ patient, onClose }: { patient: Patient | null; onClose:
 
 /* ================================ page ================================ */
 export function Doctor() {
-  const [tab, setTab] = useState<DocTab>('overview');
+  const [params, setParams] = useSearchParams();
+  const urlTab = params.get('tab') as DocTab | null;
+  const valid = (t: string | null): t is DocTab =>
+    !!t && ['overview', 'patients', 'schedule', 'reports'].includes(t);
+  const [tab, setTabState] = useState<DocTab>(valid(urlTab) ? urlTab : 'overview');
+  const setTab = (t: DocTab) => {
+    setTabState(t);
+    setParams(t === 'overview' ? {} : { tab: t }, { replace: true });
+  };
+  useEffect(() => { if (valid(urlTab) && urlTab !== tab) setTabState(urlTab); }, [urlTab]);
   const [query, setQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<'all' | RiskLevel>('all');
   const [selected, setSelected] = useState<Patient | null>(null);

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, Apple, ArrowRight, Baby, Bell, CalendarDays, Check, ChevronLeft, ChevronRight,
   CalendarClock, Clock, Droplet, GlassWater, HeartPulse, Lightbulb, Minus, Moon, Plus, RefreshCw,
@@ -480,7 +480,21 @@ export function Mother() {
   const [moodIdx, setMoodIdx] = useState(1); // Calm
   const [logOpen, setLogOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
-  const [tab, setTab] = useState<MotherTab>('dashboard');
+  const [params, setParams] = useSearchParams();
+  const urlTab = params.get('tab') as MotherTab | null;
+  const [tab, setTabState] = useState<MotherTab>(
+    urlTab && ['dashboard', 'vitals', 'reminders', 'community'].includes(urlTab) ? urlTab : 'dashboard',
+  );
+  // keep the URL in step so sections are linkable and survive a refresh
+  const setTab = (t: MotherTab) => {
+    setTabState(t);
+    setParams(t === 'dashboard' ? {} : { tab: t }, { replace: true });
+  };
+  useEffect(() => {
+    if (urlTab && urlTab !== tab && ['dashboard', 'vitals', 'reminders', 'community'].includes(urlTab)) {
+      setTabState(urlTab);
+    }
+  }, [urlTab]);
   const [profileOpen, setProfileOpen] = useState(false);
   const profile = useProfile();
 
