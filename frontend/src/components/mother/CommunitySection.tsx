@@ -1,14 +1,19 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useRef, useState } from 'react';
 import {
-  BadgeCheck, BookOpen, Heart, ImagePlus, MessageCircle, Plus, Search, Send, ShieldCheck,
-  Users, X,
+  BadgeCheck, BookOpen, ChevronDown, ChevronRight, Heart, ImagePlus, MessageCircle, Newspaper,
+  Plus, Search, Send, ShieldCheck, Users, X,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { useProfile } from '@/context/ProfileContext';
+import { BeamsBackground } from '@/components/ui/BeamsBackground';
+import { ArticleModal } from '@/components/mother/ArticleModal';
+import {
+  KIND_TINT, newsFor, readingFor, type Article, type LifeStage,
+} from '@/data/reading';
 
 const C = { brand: '#3f66f0', rose: '#f2789f', mint: '#2fbf9b', violet: '#8b7bf3', peach: '#fb7534' };
 
@@ -77,6 +82,54 @@ const SEED: Post[] = [
     comments: [],
   },
   {
+    id: 'p5', author: 'Priya S.', role: 'mother', week: 29, topic: 'Symptoms',
+    title: 'Heartburn every single night — what finally helped',
+    body: 'Stopped eating two hours before bed and raised the head of the mattress on books. Not perfect, but I sleep now.',
+    hearts: 24, clinicianAnswered: false, ago: '3d', comments: [],
+  },
+  {
+    id: 'p6', author: 'Dr. Lena Ortiz', role: 'doctor', topic: 'Nutrition',
+    title: 'You do not need to eat for two',
+    body: 'Second trimester needs roughly 340 extra calories a day, third around 450. Quality matters far more than quantity.',
+    hearts: 73, clinicianAnswered: true, ago: '4d', comments: [],
+  },
+  {
+    id: 'p7', author: 'Maria G.', role: 'mother', week: 12, topic: 'Symptoms',
+    title: 'When did morning sickness ease for you?',
+    body: 'Week 12 and still rough. Trying to hear that it does get better.',
+    hearts: 41, clinicianAnswered: false, ago: '4d', comments: [],
+  },
+  {
+    id: 'p8', author: 'Sister Amina', role: 'midwife', topic: 'Second trimester',
+    title: 'Braxton Hicks vs real contractions — how to tell',
+    body: 'Practice contractions are irregular and ease when you change position or drink water. Real ones get longer, stronger and closer together.',
+    hearts: 95, clinicianAnswered: true, ago: '5d', comments: [],
+  },
+  {
+    id: 'p9', author: 'Shirin A.', role: 'mother', week: 31, topic: 'Sleep',
+    title: 'Restless legs at night — anyone else?',
+    body: 'Worse in the last few weeks. My midwife is checking my iron levels.',
+    hearts: 18, clinicianAnswered: false, ago: '6d', comments: [],
+  },
+  {
+    id: 'p10', author: 'Farhana R.', role: 'mother', week: 25, topic: 'Birth prep',
+    title: 'Did antenatal classes actually help you?',
+    body: 'Trying to decide whether to book. Would love honest opinions rather than the brochure version.',
+    hearts: 33, clinicianAnswered: false, ago: '1w', comments: [],
+  },
+  {
+    id: 'p11', author: 'Dr. Lena Ortiz', role: 'doctor', topic: 'Symptoms',
+    title: 'Swelling: when it is normal and when to call',
+    body: 'Gradual ankle swelling by evening is expected. Sudden swelling of face or hands, especially with headache or vision changes, is not.',
+    hearts: 112, clinicianAnswered: true, ago: '1w', comments: [],
+  },
+  {
+    id: 'p12', author: 'Nusrat J.', role: 'mother', week: 27, topic: 'Nutrition',
+    title: 'Cheap and easy iron-rich meals?',
+    body: 'Lentils, spinach and eggs are on repeat here. Share yours — I am running out of ideas.',
+    hearts: 56, clinicianAnswered: false, ago: '1w', comments: [],
+  },
+  {
     id: 'p4', author: 'Sister Amina', role: 'midwife', topic: 'Birth prep',
     title: 'What to actually pack in your hospital bag (week 34 checklist)',
     body: 'Most lists are far too long. You need documents, a phone charger, comfortable clothes and something for baby to go home in. Everything else is optional.',
@@ -90,6 +143,9 @@ const ROLE_META: Record<Role, { label: string; color: string }> = {
   midwife: { label: 'Midwife', color: C.mint },
   doctor: { label: 'Doctor', color: C.brand },
 };
+
+const PAGE = 5;
+const MAX_SHOWN = 10;
 
 const uid = () => `x-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 const initials = (n: string) => n.split(' ').map((w) => w[0]).slice(0, 2).join('');
@@ -137,8 +193,12 @@ function RulesNote({ compact }: { compact?: boolean }) {
   );
 }
 
-export function CommunitySection({ week }: { week: number }) {
+export function CommunitySection({ week, stage = 'pregnant' }: { week: number; stage?: LifeStage }) {
   const me = useProfile();
+  const [shown, setShown] = useState(PAGE);
+  const [article, setArticle] = useState<Article | null>(null);
+  const reading = readingFor(stage, week);
+  const news = newsFor(stage);
   const [posts, setPosts] = useState<Post[]>(SEED);
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
@@ -335,7 +395,7 @@ export function CommunitySection({ week }: { week: number }) {
           {/* posts */}
           <div className="mt-4 space-y-4">
             <AnimatePresence initial={false}>
-              {visible.map((p) => {
+              {visible.slice(0, shown).map((p) => {
                 const role = ROLE_META[p.role];
                 const isLiked = liked[p.id];
                 const threadOpen = openThread === p.id;
@@ -481,6 +541,30 @@ export function CommunitySection({ week }: { week: number }) {
               </div>
             )}
           </div>
+
+          {/* only a page at a time — the feed can run to thousands of posts */}
+          {visible.length > shown && shown < MAX_SHOWN && (
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <button
+                onClick={() => setShown((n) => Math.min(n + PAGE, MAX_SHOWN))}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/60 bg-white/70 px-5 py-3 text-sm font-bold text-ink-soft shadow-soft transition hover:bg-white hover:text-ink"
+              >
+                <ChevronDown className="h-4 w-4" />
+                Load {Math.min(PAGE, visible.length - shown, MAX_SHOWN - shown)} more
+              </button>
+              <span className="text-[11px] font-semibold text-ink-faint">
+                Showing {Math.min(shown, visible.length)} of {visible.length}
+              </span>
+            </div>
+          )}
+
+          {shown >= MAX_SHOWN && visible.length > MAX_SHOWN && (
+            <div className="mt-4 rounded-2xl border border-dashed border-ink/15 px-4 py-4 text-center">
+              <p className="text-[12px] font-semibold text-ink-muted">
+                That’s the most we load at once — search or filter by topic to find something specific.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* sidebar */}
@@ -507,25 +591,86 @@ export function CommunitySection({ week }: { week: number }) {
             </GlassCard>
           </Reveal>
 
+          {/* reading — glossy, stage-aware, each opens a full article */}
           <Reveal delay={0.1}>
-            <GlassCard className="p-5">
-              <div className="flex items-center gap-2.5">
+            <GlassCard className="relative overflow-hidden p-5">
+              <BeamsBackground intensity="medium" count={12} />
+              <div className="relative flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.peach}1f`, color: C.peach }}>
                   <BookOpen className="h-[18px] w-[18px]" />
                 </span>
-                <div className="text-sm font-bold text-ink">Reading for week {week}</div>
+                <div>
+                  <div className="text-sm font-bold text-ink">{reading.heading}</div>
+                  <div className="text-[11px] text-ink-muted">{reading.sub}</div>
+                </div>
               </div>
-              <div className="mt-3 space-y-2">
-                {['Sleeping safely in the third trimester', 'Iron, and why it peaks from here', 'Understanding your glucose screening'].map((a) => (
-                  <button key={a} className="w-full rounded-2xl border border-white/60 bg-white/55 px-3 py-2.5 text-left text-[12px] font-semibold text-ink-soft transition hover:bg-white hover:text-ink">
-                    {a}
+              <div className="relative mt-3 space-y-2">
+                {reading.items.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setArticle(a)}
+                    className="group flex w-full items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-3 py-2.5 text-left backdrop-blur-md transition hover:bg-white"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-bold text-ink-soft group-hover:text-ink">{a.title}</span>
+                      <span className="text-[10px] font-semibold text-ink-faint">{a.readMins} min read</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 flex-none text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
                   </button>
+                ))}
+              </div>
+            </GlassCard>
+          </Reveal>
+
+          {/* trending, matched to her stage */}
+          <Reveal delay={0.15}>
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.brand}1f`, color: C.brand }}>
+                  <Newspaper className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <div className="text-sm font-bold text-ink">Trending for you</div>
+                  <div className="text-[11px] text-ink-muted">News matched to your stage</div>
+                </div>
+              </div>
+
+              <div className="mt-3 divide-y divide-white/60">
+                {news.map((n, i) => (
+                  <motion.button
+                    key={n.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.05, duration: 0.35 }}
+                    className="group flex w-full gap-3 py-3 text-left first:pt-1"
+                  >
+                    <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-lg text-[10px] font-extrabold"
+                      style={{ background: `${KIND_TINT[n.kind]}1f`, color: KIND_TINT[n.kind] }}>
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-x-1.5">
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                          style={{ background: `${KIND_TINT[n.kind]}1f`, color: KIND_TINT[n.kind] }}>
+                          {n.category}
+                        </span>
+                        <span className="text-[10px] font-semibold text-ink-faint">{n.source} · {n.ago}</span>
+                      </span>
+                      <span className="mt-1 block text-[12px] font-bold leading-snug text-ink group-hover:text-brand-700">
+                        {n.title}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-muted">{n.summary}</span>
+                    </span>
+                  </motion.button>
                 ))}
               </div>
             </GlassCard>
           </Reveal>
         </div>
       </div>
+
+      <ArticleModal article={article} onClose={() => setArticle(null)} />
     </div>
   );
 }
