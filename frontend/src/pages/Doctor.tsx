@@ -19,9 +19,10 @@ import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { AssignModal } from '@/components/doctor/AssignModal';
 import { cn } from '@/lib/cn';
 import {
-  ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS, RISK_META, SCREENING, TODAY_SLOTS,
-  TRIMESTER_SPLIT, riskCount, type Patient, type RiskLevel,
+  ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS as FALLBACK_PATIENTS, RISK_META, SCREENING,
+  TODAY_SLOTS, TRIMESTER_SPLIT, type Patient, type RiskLevel,
 } from '@/data/doctor';
+import { api } from '@/lib/api';
 
 const P = { peach: '#fb7534', peachLight: '#ff9159', aqua: '#22b8c4', brand: '#3f66f0', mint: '#2fbf9b', rose: '#e5484d', violet: '#8b7bf3' };
 
@@ -253,6 +254,16 @@ export function Doctor() {
   const [selected, setSelected] = useState<Patient | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [assigning, setAssigning] = useState<Patient | null>(null);
+
+  // the caseload comes from the database — each patient is a real account
+  const [roster, setRoster] = useState<Patient[]>(FALLBACK_PATIENTS);
+  const [live, setLive] = useState(false);
+  const loadRoster = () => api.getPatients()
+    .then((p) => { if (p.length) { setRoster(p); setLive(true); } })
+    .catch(() => setLive(false));
+  useEffect(() => { loadRoster(); }, []);
+
+  const riskCount = (level: RiskLevel) => roster.filter((p) => p.risk === level).length;
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -265,14 +276,14 @@ export function Doctor() {
 
   const patients = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return PATIENTS.filter((p) =>
+    return roster.filter((p) =>
       (riskFilter === 'all' || p.risk === riskFilter) &&
       (!q || p.name.toLowerCase().includes(q) || p.conditions.join(' ').toLowerCase().includes(q)),
     );
-  }, [query, riskFilter]);
+  }, [query, riskFilter, roster]);
 
   const KPIS = [
-    { label: 'Under your care', value: PATIENTS.length, icon: Users, tint: P.peach, note: 'active pregnancies' },
+    { label: 'Under your care', value: roster.length, icon: Users, tint: P.peach, note: 'active pregnancies' },
     { label: 'High risk', value: riskCount('high'), icon: ShieldAlert, tint: P.rose, note: 'need close follow-up' },
     { label: 'Clinic today', value: TODAY_SLOTS.length, icon: CalendarDays, tint: P.aqua, note: `${pending} still to see` },
     { label: 'Open alerts', value: ALERTS.length, icon: BellRing, tint: P.violet, note: `${critical} critical` },
@@ -282,7 +293,7 @@ export function Doctor() {
     <>
       <Navbar />
       <SectionDock items={TABS} active={tab} onChange={setTab} accent="peach"
-        layoutId="doctorTabPill" badges={{ patients: PATIENTS.length, schedule: pending }} />
+        layoutId="doctorTabPill" badges={{ patients: roster.length, schedule: pending }} />
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {/* greeting */}
@@ -358,7 +369,7 @@ export function Doctor() {
                 {ALERTS.map((a, i) => (
                   <Reveal key={a.id} delay={i * 0.04}>
                     <GlassCard interactive
-                      onClick={() => setSelected(PATIENTS.find((p) => p.name === a.patient) ?? null)}
+                      onClick={() => setSelected(roster.find((p) => p.name === a.patient) ?? null)}
                       className="flex items-start gap-3.5 p-4">
                       <span className={cn('grid h-10 w-10 flex-none place-items-center rounded-xl',
                         a.severity === 'critical' ? 'bg-rose-500/12 text-rose-600' : 'bg-amber-500/12 text-amber-600')}>
@@ -581,7 +592,7 @@ export function Doctor() {
                     {(() => {
                       const next = TODAY_SLOTS.find((s) => !s.done);
                       if (!next) return <p className="text-sm text-ink-muted">Clinic complete for today.</p>;
-                      const pt = PATIENTS.find((p) => p.name === next.patient);
+                      const pt = roster.find((p) => p.name === next.patient);
                       return (
                         <button onClick={() => pt && setSelected(pt)} className="w-full text-left">
                           <div className="text-2xl font-extrabold text-ink">{next.time}</div>
@@ -661,7 +672,7 @@ export function Doctor() {
                   <div className="grid gap-3 sm:grid-cols-3">
                     {(['high', 'moderate', 'low'] as RiskLevel[]).map((r) => {
                       const n = riskCount(r);
-                      const pct = Math.round((n / PATIENTS.length) * 100);
+                      const pct = Math.round((n / roster.length) * 100);
                       return (
                         <div key={r} className="rounded-2xl border border-white/60 bg-white/55 p-4">
                           <div className="flex items-center justify-between">

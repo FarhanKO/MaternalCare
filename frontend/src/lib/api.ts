@@ -5,6 +5,7 @@
  */
 import type { Symptom } from '@/data/symptoms';
 import type { Reminder } from '@/data/reminders';
+import type { Patient } from '@/data/doctor';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
@@ -44,6 +45,16 @@ export const api = {
   /** Ends the entry so the next visit asks "still there?" for each symptom. */
   endSymptomEntry: () =>
     request<Envelope<Symptom[]>>('/symptoms/end-entry', { method: 'POST' }).then((r) => r.data),
+
+  /* clinician: the caseload, each patient a real account */
+  getPatients: () => request<Envelope<Patient[]>>('/patients').then((r) => r.data),
+
+  /** Schedule care onto a specific patient's account. */
+  assignToPatient: (patientId: string, item: Omit<Reminder, 'id'> & { assignedBy: string }) =>
+    request<Envelope<Reminder>>(`/patients/${patientId}/reminders`, {
+      method: 'POST',
+      body: JSON.stringify(item),
+    }).then((r) => r.data),
 
   /* reminders */
   getReminders: () => request<Envelope<Reminder[]>>('/reminders').then((r) => r.data),

@@ -158,10 +158,32 @@ if (!reminderCols.includes('assigned_by')) {
   db.exec('ALTER TABLE reminders ADD COLUMN assigned_by TEXT');
 }
 
+// clinical history, stored per patient for the clinician caseload view
+if (!userCols.includes('conditions')) {
+  db.exec("ALTER TABLE users ADD COLUMN conditions TEXT DEFAULT ''");
+}
+if (!userCols.includes('last_visit')) {
+  db.exec("ALTER TABLE users ADD COLUMN last_visit TEXT");
+}
+if (!userCols.includes('next_visit')) {
+  db.exec("ALTER TABLE users ADD COLUMN next_visit TEXT");
+}
+
 /* ------------------------------------------------------------- date utils */
 const DAY = 86400000;
 const iso = (d) => d.toISOString().slice(0, 10);
 const daysFromNow = (n) => iso(new Date(Date.now() + n * DAY));
+
+/* ------------------------------------------------- seed the rest of the caseload */
+// Ayesha is seeded below as the demo mother. These are the other patients on
+// the clinician's list — each a real account with its own pregnancy and vitals.
+const OTHER_PATIENTS = [
+  { name: 'Nusrat Jahan',    age: 33, blood: 'O−',  weeks: 34, conditions: 'Rh negative,Gestational hypertension', last: -4, next: 3,  bp: [124, 128, 133, 138, 142], dia: 93 },
+  { name: 'Farhana Rahim',   age: 25, blood: 'A+',  weeks: 19, conditions: 'Second pregnancy',                     last: -7, next: 20, bp: [108, 109, 111, 110, 110], dia: 70 },
+  { name: 'Priya Sengupta',  age: 30, blood: 'AB+', weeks: 29, conditions: 'Anaemia',                              last: -6, next: 7,  bp: [118, 121, 124, 126, 128], dia: 84 },
+  { name: 'Maria Gomes',     age: 22, blood: 'O+',  weeks: 12, conditions: 'First pregnancy',                      last: -3, next: 25, bp: [110, 112, 111, 113, 112], dia: 72 },
+  { name: 'Shirin Akter',    age: 37, blood: 'B−',  weeks: 31, conditions: 'Gestational diabetes',                 last: -2, next: 4,  bp: [126, 130, 133, 136, 138], dia: 90 },
+];
 
 /* ------------------------------------------------------------------ seed */
 const isEmpty = db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0;
@@ -309,6 +331,42 @@ if (isEmpty) {
   ];
   for (const r of hospitalRows)
     run(`INSERT INTO hospitals (name, distance_km, phone, ambulance, open24) VALUES (?,?,?,?,?)`, ...r);
+}
+
+/* ------------------------------------------- caseload: one account per patient */
+// Runs independently of the main seed so existing databases gain the roster too.
+{
+  const findByName = db.prepare('SELECT id FROM users WHERE name = ?');
+  const insertUser = db.prepare(
+    `INSERT INTO users (name, role, email, age, blood_group, stage, conditions, last_visit, next_visit)
+     VALUES (?, 'mother', ?, ?, ?, 'pregnant', ?, ?, ?)`);
+  const insertPreg = db.prepare(
+    'INSERT INTO pregnancies (user_id, lmp, height_cm, pre_weight_kg) VALUES (?,?,?,?)');
+  const insertVital = db.prepare(
+    `INSERT INTO vitals (user_id, date, systolic, diastolic, sugar, weight_kg, temp_c)
+     VALUES (?,?,?,?,?,?,?)`);
+
+  for (const p of OTHER_PATIENTS) {
+    if (findByName.get(p.name)) continue;          // already seeded
+    const email = p.name.toLowerCase().replace(/[^a-z]+/g, '.') + '@example.com';
+    const info = insertUser.run(p.name, email, p.age, p.blood, p.conditions,
+      daysFromNow(p.last), daysFromNow(p.next));
+    const id = Number(info.lastInsertRowid);
+
+    insertPreg.run(id, daysFromNow(-p.weeks * 7), 160, 56);
+
+    // five fortnightly readings so the caseload sparkline has a real trend
+    p.bp.forEach((sys, i) => {
+      const offset = -(p.bp.length - 1 - i) * 14;
+      insertVital.run(id, daysFromNow(offset), sys, p.dia - (p.bp.length - 1 - i) * 2,
+        95 + i, 60 + i * 0.7, 36.8);
+    });
+  }
+
+  // give the demo mother her own history fields if missing
+  db.prepare(`UPDATE users SET conditions = COALESCE(NULLIF(conditions,''), 'First pregnancy'),
+              last_visit = COALESCE(last_visit, ?), next_visit = COALESCE(next_visit, ?)
+              WHERE id = 1`).run(daysFromNow(-14), daysFromNow(5));
 }
 
 module.exports = db;

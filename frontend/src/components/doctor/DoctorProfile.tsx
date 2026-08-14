@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BellRing, CalendarDays, ChevronRight, ClipboardList, LogOut, ShieldAlert, Users, X,
 } from 'lucide-react';
-import { PATIENTS, TODAY_SLOTS, riskCount } from '@/data/doctor';
+import { TODAY_SLOTS } from '@/data/doctor';
+import { api } from '@/lib/api';
 
 const MENU = [
   { icon: ClipboardList, label: 'Caseload settings', hint: 'Capacity and referral rules' },
@@ -14,6 +15,15 @@ const MENU = [
 
 /** Clinician counterpart to the mother's profile panel — peach themed. */
 export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [counts, setCounts] = useState({ total: 0, high: 0 });
+
+  useEffect(() => {
+    if (!open) return;
+    api.getPatients()
+      .then((p) => setCounts({ total: p.length, high: p.filter((x) => x.risk === 'high').length }))
+      .catch(() => { /* offline — leave the counts at zero */ });
+  }, [open]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && open && onClose();
     window.addEventListener('keydown', onKey);
@@ -21,8 +31,8 @@ export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () =>
   }, [open, onClose]);
 
   const stats = [
-    { l: 'Patients', v: `${PATIENTS.length}`, i: Users },
-    { l: 'High risk', v: `${riskCount('high')}`, i: ShieldAlert },
+    { l: 'Patients', v: `${counts.total}`, i: Users },
+    { l: 'High risk', v: `${counts.high}`, i: ShieldAlert },
     { l: 'Today', v: `${TODAY_SLOTS.length}`, i: CalendarDays },
   ];
 

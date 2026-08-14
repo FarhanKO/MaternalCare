@@ -55,13 +55,17 @@ export function AssignModal({ patient, clinician, onClose }: Props) {
   }, [patient, onClose]);
 
   const send = async () => {
+    if (!patient) return;
     const finalTitle = title.trim() || KINDS.find((k) => k.key === kind)!.label;
     const [y, m, d] = date.split('-').map(Number);
     const [hh, mm] = time.split(':').map(Number);
     const at = new Date(y, m - 1, d, hh, mm).toISOString();
     setState('saving'); setError('');
     try {
-      await api.createReminder({ kind, title: finalTitle, note: note.trim() || undefined, at, repeat, assignedBy: clinician });
+      // writes to this patient's own account, not the current session user
+      await api.assignToPatient(patient.id, {
+        kind, title: finalTitle, note: note.trim() || undefined, at, repeat, assignedBy: clinician,
+      });
       setState('sent');
       setTimeout(onClose, 1400);
     } catch (e: any) {
