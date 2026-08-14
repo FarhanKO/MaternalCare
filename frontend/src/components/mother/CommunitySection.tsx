@@ -314,7 +314,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
                 className="overflow-hidden"
               >
                 <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_18rem]">
-                  <GlassCard className="p-5">
+                  <GlassCard float className="p-5">
                     <div className="flex items-center gap-2.5">
                       <Avatar name={me.name} role="mother" photo={me.avatar} />
                       <div>
@@ -408,7 +408,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                   >
-                    <GlassCard className="p-5">
+                    <GlassCard float className="p-5">
                       <div className="flex items-center gap-2.5">
                         <Avatar name={p.author} role={p.role} photo={p.author === me.name ? me.avatar : undefined} />
                         <div className="min-w-0 flex-1">
@@ -570,7 +570,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
         {/* sidebar */}
         <div className="space-y-5">
           <Reveal>
-            <GlassCard className="p-5">
+            <GlassCard float className="p-5">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.violet}1f`, color: C.violet }}>
                   <Users className="h-[18px] w-[18px]" />
@@ -593,7 +593,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
 
           {/* reading — glossy, stage-aware, each opens a full article */}
           <Reveal delay={0.1}>
-            <GlassCard className="relative overflow-hidden p-5">
+            <GlassCard float className="relative overflow-hidden p-5">
               <BeamsBackground intensity="medium" count={12} />
               <div className="relative flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.peach}1f`, color: C.peach }}>
@@ -624,7 +624,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
 
           {/* trending, matched to her stage */}
           <Reveal delay={0.15}>
-            <GlassCard className="p-5">
+            <GlassCard float className="p-5">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.brand}1f`, color: C.brand }}>
                   <Newspaper className="h-[18px] w-[18px]" />

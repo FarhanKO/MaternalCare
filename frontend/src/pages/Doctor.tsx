@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowRight, BellRing, CalendarDays, CheckCircle2, ChevronRight,
-  ClipboardList, Clock, Droplet, HeartPulse, LayoutDashboard, Search, ShieldAlert, Stethoscope,
+  ClipboardList, ClipboardPlus, Clock, Droplet, HeartPulse, LayoutDashboard, Search, ShieldAlert, Stethoscope,
   TrendingUp, Users, X,
 } from 'lucide-react';
 import {
@@ -16,6 +16,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { SectionDock, type DockItem } from '@/components/ui/SectionDock';
 import { DoctorProfile } from '@/components/doctor/DoctorProfile';
+import { AssignModal } from '@/components/doctor/AssignModal';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS, RISK_META, SCREENING, TODAY_SLOTS,
@@ -99,7 +100,7 @@ function RiskPill({ level }: { level: RiskLevel }) {
 }
 
 /* ---------------- patient detail drawer ---------------- */
-function PatientDrawer({ patient, onClose }: { patient: Patient | null; onClose: () => void }) {
+function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null; onClose: () => void; onAssign: (p: Patient) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && patient && onClose();
     window.addEventListener('keydown', onKey);
@@ -221,8 +222,11 @@ function PatientDrawer({ patient, onClose }: { patient: Patient | null; onClose:
                 </div>
               </div>
 
-              <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)] transition hover:brightness-105">
-                <Stethoscope className="h-[18px] w-[18px]" /> Open full record
+              <button
+                onClick={() => onAssign(patient)}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)] transition hover:brightness-105"
+              >
+                <ClipboardPlus className="h-[18px] w-[18px]" /> Assign test, medicine or appointment
               </button>
             </div>
           </motion.aside>
@@ -248,6 +252,7 @@ export function Doctor() {
   const [riskFilter, setRiskFilter] = useState<'all' | RiskLevel>('all');
   const [selected, setSelected] = useState<Patient | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [assigning, setAssigning] = useState<Patient | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -685,8 +690,10 @@ export function Doctor() {
       </main>
 
       <Footer />
-      <PatientDrawer patient={selected} onClose={() => setSelected(null)} />
+      <PatientDrawer patient={selected} onClose={() => setSelected(null)}
+        onAssign={(p) => { setSelected(null); setAssigning(p); }} />
       <DoctorProfile open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <AssignModal patient={assigning} clinician="Dr. Lena Ortiz" onClose={() => setAssigning(null)} />
     </>
   );
 }

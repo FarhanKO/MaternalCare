@@ -8,6 +8,8 @@ export interface Reminder {
   /** ISO timestamp of when it is due */
   at: string;
   repeat?: 'once' | 'daily' | 'weekly';
+  /** set when a clinician scheduled this for her */
+  assignedBy?: string;
 }
 
 export const KIND_LABEL: Record<ReminderKind, string> = {

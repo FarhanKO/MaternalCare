@@ -55,12 +55,17 @@ function Row({ r, onDelete }: { r: Reminder; onDelete?: (id: string) => void }) 
           )}
         </div>
         {r.note && <div className="truncate text-[11px] text-ink-faint">{r.note}</div>}
+        {r.assignedBy && (
+          <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-peach-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-peach-700">
+            <Stethoscope className="h-2.5 w-2.5" /> from {r.assignedBy}
+          </div>
+        )}
       </div>
       <span className={cn('flex-none rounded-full px-2 py-1 text-[10px] font-bold',
         c.overdue ? 'bg-rose-500/12 text-rose-700' : 'bg-brand-500/10 text-brand-700')}>
         {c.text}
       </span>
-      {onDelete && (
+      {onDelete && !r.assignedBy && (
         <button onClick={() => onDelete(r.id)} aria-label={`Delete ${r.title}`}
           className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600">
           <Trash2 className="h-3.5 w-3.5" />
@@ -184,7 +189,7 @@ export function RemindersSection({ reminders, onAdd, onDelete }: Props) {
           const isDaily = g.id === 'daily';
           return (
             <Reveal key={g.id} delay={gi * 0.05} className={cn(isDaily && 'lg:row-span-2')}>
-              <GlassCard className="flex h-full flex-col p-5 sm:p-6">
+              <GlassCard float className="flex h-full flex-col p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <span className="grid h-9 w-9 flex-none place-items-center rounded-xl"

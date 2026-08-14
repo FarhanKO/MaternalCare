@@ -70,7 +70,8 @@ export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () =>
               </button>
             </div>
 
-            <div className="flex-none px-6">
+            {/* relative + z-10 so the avatar sits above the positioned cover */}
+            <div className="relative z-10 flex-none px-6">
               <div className="-mt-12 flex flex-col items-center text-center">
                 <motion.span
                   initial={{ scale: 0.7, opacity: 0 }}

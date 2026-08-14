@@ -6,6 +6,8 @@ import { spring } from '@/lib/motion';
 interface GlassCardProps extends HTMLMotionProps<'div'> {
   /** Adds pointer-hover elevation + subtle lift. */
   interactive?: boolean;
+  /** Lifts on hover like `interactive`, but without implying the card is clickable. */
+  float?: boolean;
   /** Stronger frost for foreground surfaces. */
   strong?: boolean;
   /** Renders the hairline gradient ring. */
@@ -18,17 +20,18 @@ interface GlassCardProps extends HTMLMotionProps<'div'> {
  * shadow, optional gradient hairline and hover elevation.
  */
 export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
-  ({ className, interactive, strong, ring = true, glow, children, ...props }, ref) => {
+  ({ className, interactive, float, strong, ring = true, glow, children, ...props }, ref) => {
     return (
       <motion.div
         ref={ref}
-        whileHover={interactive ? { y: -6 } : undefined}
+        whileHover={interactive ? { y: -6 } : float ? { y: -4 } : undefined}
         transition={spring}
         className={cn(
           strong ? 'glass-strong' : 'glass',
           ring && 'ring-gradient',
           'rounded-3.5xl',
           interactive && 'cursor-pointer transition-shadow duration-500 hover:shadow-glass-lg',
+          float && 'transition-shadow duration-500 hover:shadow-glass-lg',
           glow && 'shadow-glow',
           className,
         )}

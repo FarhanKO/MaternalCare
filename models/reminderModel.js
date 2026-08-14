@@ -14,6 +14,8 @@ const toDTO = (r) => ({
   note: r.note || undefined,
   at: r.due_at,
   repeat: r.repeat,
+  // set when a clinician scheduled this for the mother
+  assignedBy: r.assigned_by || undefined,
 });
 
 module.exports = {
@@ -41,13 +43,13 @@ module.exports = {
     return row ? toDTO(row) : null;
   },
 
-  create(userId, { kind, title, note, at, repeat = 'once' }) {
+  create(userId, { kind, title, note, at, repeat = 'once', assignedBy = null }) {
     if (!KINDS.includes(kind)) throw new Error(`Unknown reminder kind: ${kind}`);
     if (!REPEATS.includes(repeat)) throw new Error(`Unknown repeat: ${repeat}`);
     if (!title || !at) throw new Error('Reminder needs a title and a due time');
     const info = db
-      .prepare('INSERT INTO reminders (user_id, kind, title, note, due_at, repeat) VALUES (?,?,?,?,?,?)')
-      .run(userId, kind, title, note || null, at, repeat);
+      .prepare('INSERT INTO reminders (user_id, kind, title, note, due_at, repeat, assigned_by) VALUES (?,?,?,?,?,?,?)')
+      .run(userId, kind, title, note || null, at, repeat, assignedBy);
     return this.find(Number(info.lastInsertRowid));
   },
 

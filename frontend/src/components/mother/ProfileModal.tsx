@@ -104,8 +104,8 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
               </button>
             </div>
 
-            {/* identity — centred */}
-            <div className="flex-none px-6">
+            {/* identity — centred; relative + z-10 keeps it above the positioned cover */}
+            <div className="relative z-10 flex-none px-6">
               <div className="-mt-12 flex flex-col items-center text-center">
                 <motion.div
                   initial={{ scale: 0.7, opacity: 0 }}

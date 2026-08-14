@@ -181,7 +181,7 @@ function ChartCard({
 }) {
   return (
     <Reveal className={cn(span === '2' && 'md:col-span-2', span === '3' && 'md:col-span-2 xl:col-span-3')}>
-      <GlassCard className="flex h-full flex-col p-5 sm:p-6">
+      <GlassCard float className="flex h-full flex-col p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="grid h-9 w-9 flex-none place-items-center rounded-xl" style={{ background: `${tint}1f`, color: tint }}>
@@ -239,7 +239,7 @@ function MoodCard({ i, setI }: { i: number; setI: (v: number) => void }) {
   const go = (d: 1 | -1) => { dir.current = d; setI((i + d + MOODS.length) % MOODS.length); };
 
   return (
-    <GlassCard className="flex h-full flex-col p-5">
+    <GlassCard float className="flex h-full flex-col p-5">
       <div className="flex items-center gap-2">
         <span className="grid h-10 w-10 flex-none place-items-center rounded-2xl" style={{ background: `${mood.tint}1f`, color: mood.tint }}>
           <Smile className="h-5 w-5" />
@@ -323,7 +323,7 @@ function CounterCard({
   const msg = message(value);
 
   return (
-    <GlassCard className="flex h-full flex-col p-5">
+    <GlassCard float className="flex h-full flex-col p-5">
       <div className="flex items-center justify-between gap-2">
         <span className="grid h-10 w-10 flex-none place-items-center rounded-2xl" style={{ background: `${tint}1f`, color: tint }}>
           <Icon className="h-5 w-5" />
@@ -795,7 +795,7 @@ export function Mother() {
           <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
             {/* score + factors */}
             <Reveal>
-              <GlassCard className="h-full p-6">
+              <GlassCard float className="h-full p-6">
                 <div className="flex items-center gap-5">
                   <div className="relative grid h-[112px] w-[112px] flex-none place-items-center">
                     <svg width="112" height="112" className="-rotate-90">
@@ -861,7 +861,7 @@ export function Mother() {
             {/* mother + baby effects */}
             <div className="grid gap-5 sm:grid-cols-2">
               <Reveal delay={0.05}>
-                <GlassCard className="h-full p-5">
+                <GlassCard float className="h-full p-5">
                   <div className="flex items-center gap-2.5">
                     <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.rose}1f`, color: C.rose }}>
                       <HeartPulse className="h-[18px] w-[18px]" />
@@ -880,7 +880,7 @@ export function Mother() {
               </Reveal>
 
               <Reveal delay={0.1}>
-                <GlassCard className="h-full p-5">
+                <GlassCard float className="h-full p-5">
                   <div className="flex items-center gap-2.5">
                     <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.mint}1f`, color: C.mint }}>
                       <Baby className="h-[18px] w-[18px]" />
@@ -902,7 +902,7 @@ export function Mother() {
 
           {/* good to know — new guidance for this stage */}
           <Reveal className="mt-5">
-            <GlassCard className="p-6">
+            <GlassCard float className="p-6">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.violet}1f`, color: C.violet }}>
                   <Lightbulb className="h-[18px] w-[18px]" />
@@ -1085,7 +1085,7 @@ export function Mother() {
 
           {/* nutrients */}
           <Reveal>
-            <GlassCard className="h-full p-6">
+            <GlassCard float className="h-full p-6">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.peach}1f`, color: C.peach }}>
                   <Utensils className="h-[18px] w-[18px]" />
@@ -1205,7 +1205,7 @@ export function Mother() {
         {/* symptom history */}
         <div className="mt-5">
           <Reveal>
-            <GlassCard className="h-full p-6">
+            <GlassCard float className="h-full p-6">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.rose}1f`, color: C.rose }}>
                   <Activity className="h-[18px] w-[18px]" />

@@ -48,7 +48,7 @@ export const api = {
   /* reminders */
   getReminders: () => request<Envelope<Reminder[]>>('/reminders').then((r) => r.data),
 
-  createReminder: (reminder: Omit<Reminder, 'id'>) =>
+  createReminder: (reminder: Omit<Reminder, 'id'> & { assignedBy?: string }) =>
     request<Envelope<Reminder>>('/reminders', {
       method: 'POST',
       body: JSON.stringify(reminder),

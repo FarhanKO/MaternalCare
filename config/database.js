@@ -152,6 +152,12 @@ if (!userCols.includes('stage')) {
   db.exec("ALTER TABLE users ADD COLUMN stage TEXT NOT NULL DEFAULT 'pregnant'");
 }
 
+// `assigned_by` records the clinician who created a reminder on the mother's behalf.
+const reminderCols = db.prepare('PRAGMA table_info(reminders)').all().map((c) => c.name);
+if (!reminderCols.includes('assigned_by')) {
+  db.exec('ALTER TABLE reminders ADD COLUMN assigned_by TEXT');
+}
+
 /* ------------------------------------------------------------- date utils */
 const DAY = 86400000;
 const iso = (d) => d.toISOString().slice(0, 10);
