@@ -161,9 +161,9 @@ export function SymptomModal({ open, onClose, initial, onSave }: Props) {
           <motion.div
             className="absolute inset-0 bg-ink/35"
             onClick={onClose}
-            initial={{ backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            animate={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
 
           <motion.div

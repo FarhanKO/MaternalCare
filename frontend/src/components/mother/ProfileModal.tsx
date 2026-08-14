@@ -13,13 +13,11 @@ interface CareMember { name: string; role: string; initials: string; tint: strin
 interface Props {
   open: boolean;
   onClose: () => void;
-  week: number;
-  dueDate: string;
-  bloodGroup: string;
-  age: number;
   score: number;
   band: { label: string; tone: string };
 }
+
+const BLOOD_GROUPS = ['A+', 'A−', 'B+', 'B−', 'O+', 'O−', 'AB+', 'AB−'];
 
 const CARE_TEAM: CareMember[] = [
   { name: 'Dr. Lena Ortiz', role: 'Obstetrician', initials: 'LO', tint: '#3f66f0' },
@@ -31,10 +29,12 @@ const MENU = [
   { icon: ShieldCheck, label: 'Privacy & data', hint: 'Who can see your records' },
 ];
 
-export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, score, band }: Props) {
-  const { name, avatar, initials, bio, setAvatar, setBio } = useProfile();
+export function ProfileModal({ open, onClose, score, band }: Props) {
+  const { name, avatar, initials, bio, details, setAvatar, setBio, setDetail } = useProfile();
+  const { week, dueDate, bloodGroup, age } = details;
   const [editingBio, setEditingBio] = useState(false);
   const [draftBio, setDraftBio] = useState(bio);
+  const [editingFact, setEditingFact] = useState<null | 'week' | 'dueDate' | 'bloodGroup' | 'age'>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,10 +53,10 @@ export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, sc
   };
 
   const facts = [
-    { icon: Baby, label: 'Week', value: `${week}` },
-    { icon: CalendarDays, label: 'Due', value: dueDate },
-    { icon: Droplet, label: 'Blood', value: bloodGroup },
-    { icon: Ruler, label: 'Age', value: `${age}` },
+    { key: 'week' as const, icon: Baby, label: 'Week', value: `${week}`, type: 'number' as const, min: 1, max: 42 },
+    { key: 'dueDate' as const, icon: CalendarDays, label: 'Due', value: dueDate, type: 'text' as const },
+    { key: 'bloodGroup' as const, icon: Droplet, label: 'Blood', value: bloodGroup, type: 'select' as const },
+    { key: 'age' as const, icon: Ruler, label: 'Age', value: `${age}`, type: 'number' as const, min: 12, max: 60 },
   ];
 
   if (typeof document === 'undefined') return null;
@@ -66,17 +66,16 @@ export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, sc
       {open && (
         <motion.div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, pointerEvents: 'none', transition: { duration: 0.2 } }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: 0, pointerEvents: 'none', transition: { duration: 0.22 } }}
         >
           <motion.div
             className="absolute inset-0 bg-ink/35"
             onClick={onClose}
-            initial={{ backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            animate={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
 
           <motion.div
@@ -236,14 +235,48 @@ export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, sc
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.12 + i * 0.05, duration: 0.35 }}
-                    className="rounded-2xl border border-white/60 bg-white/55 py-3 text-center"
+                    className="group relative rounded-2xl border border-white/60 bg-white/55 py-3 text-center transition hover:border-brand-300 hover:bg-white"
                   >
-                    <f.icon className="mx-auto h-3.5 w-3.5 text-ink-faint" />
-                    <div className="mt-1 text-sm font-extrabold leading-none text-ink">{f.value}</div>
-                    <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-ink-faint">{f.label}</div>
+                    {editingFact === f.key ? (
+                      f.type === 'select' ? (
+                        <select
+                          autoFocus
+                          value={bloodGroup}
+                          onChange={(e) => { setDetail('bloodGroup', e.target.value); setEditingFact(null); }}
+                          onBlur={() => setEditingFact(null)}
+                          className="w-full bg-transparent text-center text-sm font-extrabold text-ink outline-none"
+                        >
+                          {BLOOD_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          autoFocus
+                          type={f.type}
+                          min={f.min}
+                          max={f.max}
+                          defaultValue={f.value}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v) setDetail(f.key, (f.type === 'number' ? Number(v) : v) as never);
+                            setEditingFact(null);
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                          className="w-full bg-transparent text-center text-sm font-extrabold text-ink outline-none"
+                        />
+                      )
+                    ) : (
+                      <button onClick={() => setEditingFact(f.key)} className="w-full" aria-label={`Edit ${f.label}`}>
+                        <f.icon className="mx-auto h-3.5 w-3.5 text-ink-faint" />
+                        <span className="mt-1 block text-sm font-extrabold leading-none text-ink">{f.value}</span>
+                        <span className="mt-1 block text-[9px] font-bold uppercase tracking-wider text-ink-faint">{f.label}</span>
+                        <Pencil className="absolute right-1.5 top-1.5 h-2.5 w-2.5 text-ink-faint opacity-0 transition group-hover:opacity-100" />
+                      </button>
+                    )}
                   </motion.div>
                 ))}
               </div>
+
+              <p className="mt-2 text-center text-[10px] font-semibold text-ink-faint">Tap any value to edit it</p>
 
               {/* care team */}
               <div className="mt-5">
@@ -290,7 +323,7 @@ export function ProfileModal({ open, onClose, week, dueDate, bloodGroup, age, sc
 
               <button
                 onClick={onClose}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-4 py-3 text-sm font-bold text-ink-soft transition hover:bg-white hover:text-ink"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700"
               >
                 <LogOut className="h-[18px] w-[18px]" /> Sign out
               </button>

@@ -248,17 +248,16 @@ export function AppointmentModal({ open, onClose, reminders, onChange }: Props) 
       {open && (
         <motion.div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, pointerEvents: 'none', transition: { duration: 0.2 } }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: 0, pointerEvents: 'none', transition: { duration: 0.22 } }}
         >
           <motion.div
             className="absolute inset-0 bg-ink/35"
             onClick={onClose}
-            initial={{ backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            animate={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
 
           <motion.div

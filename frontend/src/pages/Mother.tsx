@@ -1321,10 +1321,6 @@ export function Mother() {
       <ProfileModal
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
-        week={26}
-        dueDate="Apr 2"
-        bloodGroup="B+"
-        age={28}
         score={report.score}
         band={{ label: report.band.label, tone: TONE_DOT[report.band.tone] }}
       />

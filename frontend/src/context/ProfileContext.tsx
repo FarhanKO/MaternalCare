@@ -8,6 +8,8 @@ export interface Profile {
   bio: string;
   /** drives which reading, news and questions the app shows */
   stage: LifeStage;
+  /** editable clinical basics shown on the profile panel */
+  details: { week: number; dueDate: string; bloodGroup: string; age: number };
 }
 
 interface ProfileValue extends Profile {
@@ -17,6 +19,7 @@ interface ProfileValue extends Profile {
   setName: (name: string) => void;
   /** persists to the server so the choice survives a reload */
   setStage: (stage: LifeStage) => void;
+  setDetail: <K extends keyof Profile['details']>(key: K, value: Profile['details'][K]) => void;
 }
 
 const DEFAULT: Profile = {
@@ -24,6 +27,7 @@ const DEFAULT: Profile = {
   avatar: null,
   bio: '',
   stage: 'pregnant',
+  details: { week: 26, dueDate: 'Apr 2', bloodGroup: 'B+', age: 28 },
 };
 
 const Ctx = createContext<ProfileValue | null>(null);
@@ -50,6 +54,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setAvatar: (avatar) => setProfile((p) => ({ ...p, avatar })),
     setBio: (bio) => setProfile((p) => ({ ...p, bio })),
     setName: (name) => setProfile((p) => ({ ...p, name })),
+    setDetail: (key, value) =>
+      setProfile((p) => ({ ...p, details: { ...p.details, [key]: value } })),
     setStage: (stage) => {
       setProfile((p) => ({ ...p, stage }));
       api.setStage(stage).catch(() => { /* offline — stage still applies this session */ });

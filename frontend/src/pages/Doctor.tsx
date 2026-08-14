@@ -15,6 +15,7 @@ import { Footer } from '@/components/landing/Footer';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { SectionDock, type DockItem } from '@/components/ui/SectionDock';
+import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS, RISK_META, SCREENING, TODAY_SLOTS,
@@ -117,9 +118,9 @@ function PatientDrawer({ patient, onClose }: { patient: Patient | null; onClose:
           <motion.div
             className="absolute inset-0 bg-ink/35"
             onClick={onClose}
-            initial={{ backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
-            animate={{ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, backdropFilter: 'blur(0px)', WebkitBackdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
           <motion.aside
             role="dialog" aria-modal="true" aria-label={`${patient.name} record`}
@@ -246,6 +247,7 @@ export function Doctor() {
   const [query, setQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<'all' | RiskLevel>('all');
   const [selected, setSelected] = useState<Patient | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -299,7 +301,16 @@ export function Doctor() {
                 </span>
               )}
             </button>
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)]">LO</span>
+            <motion.button
+              onClick={() => setProfileOpen(true)}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+              aria-label="Open your profile"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)]"
+            >
+              LO
+            </motion.button>
           </div>
         </Reveal>
 
@@ -675,6 +686,7 @@ export function Doctor() {
 
       <Footer />
       <PatientDrawer patient={selected} onClose={() => setSelected(null)} />
+      <DoctorProfile open={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
   );
 }
