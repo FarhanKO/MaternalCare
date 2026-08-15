@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays, ChevronDown, FileText, Image as ImageIcon, Pill, Stethoscope, TestTube,
+  CalendarDays, Check, ChevronDown, FileText, Image as ImageIcon, Pill, Stethoscope,
+  TestTube, Wand2, X,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -9,6 +10,7 @@ import { FileUpload } from '@/components/ui/FileUpload';
 import { DocumentViewer } from '@/components/mother/DocumentViewer';
 import { cn } from '@/lib/cn';
 import { api, fileUrl } from '@/lib/api';
+import { detectDate, todayISO, type DetectedDate } from '@/lib/fileDate';
 import {
   DOC_META, groupByDate, prettySize, type CareDocument, type DocumentKind,
 } from '@/data/care';
@@ -16,11 +18,29 @@ import {
 const KIND_ICON = { prescription: Pill, report: TestTube };
 const KIND_TINT = { prescription: '#8b7bf3', report: '#22b8c4' };
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+interface Staged { file: File; dataUrl: string; detected: DetectedDate }
+
+/**
+ * A readable first guess at the title, from the file name. The date is shown
+ * in its own field, so strip it out rather than repeating it in the label.
+ */
+function titleFromName(name: string) {
+  // \b is no use here: `_` counts as a word character, so it never fires
+  // against `report_2026-03-15`. Guard on digits instead.
+  const base = name
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/(?<!\d)20\d{2}[-_.]\d{1,2}[-_.]\d{1,2}(?!\d)/g, ' ')     // 2026-03-15
+    .replace(/(?<!\d)\d{1,2}[-_.\/]\d{1,2}[-_.\/]20\d{2}(?!\d)/g, ' ') // 15-03-2026
+    .replace(/(?<!\d)20\d{6}(?!\d)/g, ' ')                             // 20260315
+    .replace(/(?<!\d)\d{6}(?!\d)/g, ' ')                               // a bare time stamp
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // camera names like "IMG 20260315 101500" say nothing worth showing
+  if (!base || /^(img|dsc|photo|scan|document)\b/i.test(base) || /^[\d\s]+$/.test(base)) return '';
+  return base.slice(0, 60);
+}
 
 /* --------------------------------------------------------------- timeline */
 
@@ -135,20 +155,51 @@ function KindPanel({
 }) {
   const [title, setTitle] = useState('');
   const [takenOn, setTakenOn] = useState(todayISO());
+  const [pending, setPending] = useState<Staged | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const Icon = KIND_ICON[kind];
   const meta = DOC_META[kind];
 
-  const upload = async (file: File, dataUrl: string) => {
-    await api.uploadDocument({
-      kind,
-      title: title.trim() || meta.label,
-      dataUrl,
-      originalName: file.name,
-      takenOn,
-    });
+  /**
+   * A picked file waits here rather than uploading straight away, so she can
+   * see the date we worked out and correct it before it is filed.
+   */
+  const stage = async (file: File, dataUrl: string) => {
+    const detected = await detectDate(file);
+    setPending({ file, dataUrl, detected });
+    setTakenOn(detected.date);
+    setTitle((t) => t || titleFromName(file.name));
+  };
+
+  const confirm = async () => {
+    if (!pending) return;
+    setSaving(true);
+    setError('');
+    try {
+      await api.uploadDocument({
+        kind,
+        title: title.trim() || meta.label,
+        dataUrl: pending.dataUrl,
+        originalName: pending.file.name,
+        takenOn,
+      });
+      setPending(null);
+      setTitle('');
+      setTakenOn(todayISO());
+      onUploaded();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const discard = () => {
+    setPending(null);
     setTitle('');
+    setError('');
     setTakenOn(todayISO());
-    onUploaded();
   };
 
   return (
@@ -167,34 +218,95 @@ function KindPanel({
         </span>
       </div>
 
-      {/* label it before it goes in — untitled scans are unfindable later */}
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={kind === 'prescription' ? 'e.g. Iron tablets — Dr. Ortiz' : 'e.g. Full blood count'}
-          className="h-10 w-full rounded-2xl border border-white/60 bg-white/70 px-3.5 text-[12px] font-medium text-ink outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-        />
-        <label className="flex items-center gap-1.5 rounded-2xl border border-white/60 bg-white/70 px-3">
-          <CalendarDays className="h-3.5 w-3.5 flex-none text-ink-faint" />
-          <input
-            type="date"
-            value={takenOn}
-            max={todayISO()}
-            onChange={(e) => setTakenOn(e.target.value)}
-            aria-label={`Date on the ${meta.label.toLowerCase()}`}
-            className="h-10 bg-transparent text-[12px] font-semibold text-ink outline-none"
-          />
-        </label>
-      </div>
+      <div className="mt-3">
+        <AnimatePresence mode="wait">
+          {pending ? (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+              className="rounded-3xl border border-brand-500/25 bg-brand-500/[0.06] p-3"
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-xl bg-white/70">
+                  {pending.file.type.startsWith('image/')
+                    ? <img src={pending.dataUrl} alt="" className="h-full w-full object-cover" />
+                    : <FileText className="h-5 w-5 text-ink-faint" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12px] font-bold text-ink">{pending.file.name}</div>
+                  <div className="text-[10px] font-semibold text-ink-faint">
+                    {prettySize(pending.file.size)}
+                  </div>
+                </div>
+                <button onClick={discard} aria-label="Discard this file"
+                  className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
 
-      <div className="mt-2.5">
-        <FileUpload
-          onFile={upload}
-          accent="brand"
-          label={`Add a ${meta.label.toLowerCase()}`}
-          hint={kind === 'prescription' ? 'Photograph the paper slip' : 'Photo or PDF of the result'}
-        />
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={kind === 'prescription' ? 'e.g. Iron tablets — Dr. Ortiz' : 'e.g. Full blood count'}
+                aria-label={`What this ${meta.label.toLowerCase()} is`}
+                className="mt-2.5 h-10 w-full rounded-2xl border border-white/60 bg-white/80 px-3.5 text-[12px] font-medium text-ink outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+              />
+
+              {/* the detected date, always correctable — we never read the
+                  printed date off the paper, so this is a suggestion */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1.5 rounded-2xl border border-white/60 bg-white/80 px-3">
+                  <CalendarDays className="h-3.5 w-3.5 flex-none text-ink-faint" />
+                  <input
+                    type="date"
+                    value={takenOn}
+                    max={todayISO()}
+                    onChange={(e) => setTakenOn(e.target.value)}
+                    aria-label={`Date on the ${meta.label.toLowerCase()}`}
+                    className="h-9 bg-transparent text-[12px] font-semibold text-ink outline-none"
+                  />
+                </label>
+                <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold',
+                  takenOn === pending.detected.date ? 'text-brand-700' : 'text-ink-faint')}>
+                  {takenOn === pending.detected.date ? (
+                    <><Wand2 className="h-3 w-3" /> Dated {pending.detected.label}</>
+                  ) : 'Date set by you'}
+                </span>
+              </div>
+
+              {error && (
+                <div className="mt-2 rounded-xl bg-rose-500/12 px-3 py-2 text-[11px] font-bold text-rose-700 ring-1 ring-rose-500/25">
+                  {error}
+                </div>
+              )}
+
+              <div className="mt-2.5 flex items-center justify-end gap-2">
+                <button onClick={discard}
+                  className="rounded-xl px-3 py-2 text-[12px] font-bold text-ink-muted transition hover:text-ink">
+                  Cancel
+                </button>
+                <button
+                  onClick={confirm}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-3.5 py-2 text-[12px] font-bold text-white transition hover:bg-brand-600 disabled:opacity-60"
+                >
+                  <Check className="h-3.5 w-3.5" /> {saving ? 'Adding…' : 'Add to record'}
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.12 } }}>
+              <FileUpload
+                onFile={stage}
+                accent="brand"
+                label={`Add a ${meta.label.toLowerCase()}`}
+                hint={kind === 'prescription' ? 'Photograph the paper slip' : 'Photo or PDF of the result'}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="mt-4">
@@ -202,7 +314,10 @@ function KindPanel({
           <div className="rounded-2xl border border-dashed border-ink/15 px-3 py-5 text-center">
             <ImageIcon className="mx-auto h-5 w-5 text-ink-faint" />
             <p className="mt-1.5 text-[11px] font-semibold text-ink-muted">
-              Nothing here yet. What you add is grouped by date, so your history stays readable.
+              No {meta.plural.toLowerCase()} added yet.
+            </p>
+            <p className="mt-0.5 text-[10px] font-medium text-ink-faint">
+              Anything you add is filed by its own date.
             </p>
           </div>
         ) : (

@@ -60,21 +60,24 @@ export function PatientFiles({ patientId }: { patientId: string }) {
         <span className="text-[11px] font-semibold text-ink-muted">{docs.length}</span>
       </div>
 
-      <div className="mt-2 flex gap-1.5">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={cn('flex-1 rounded-xl px-2 py-1.5 text-[11px] font-bold ring-1 transition',
-              tab === t.key
-                ? 'bg-peach-500/15 text-peach-700 ring-peach-500/25'
-                : 'bg-white/60 text-ink-muted ring-transparent hover:text-ink')}
-          >
-            {t.label}
-            <span className="ml-1 font-semibold opacity-70">{counts[t.key]}</span>
-          </button>
-        ))}
-      </div>
+      {/* filters only earn their space once there is something to filter */}
+      {state === 'ready' && docs.length > 0 && (
+        <div className="mt-2 flex gap-1.5">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={cn('flex-1 rounded-xl px-2 py-1.5 text-[11px] font-bold ring-1 transition',
+                tab === t.key
+                  ? 'bg-peach-500/15 text-peach-700 ring-peach-500/25'
+                  : 'bg-white/60 text-ink-muted ring-transparent hover:text-ink')}
+            >
+              {t.label}
+              <span className="ml-1 font-semibold opacity-70">{counts[t.key]}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {state === 'loading' && (
         <div className="mt-3 py-4 text-center text-[11px] font-semibold text-ink-faint">Loading files…</div>
@@ -84,13 +87,17 @@ export function PatientFiles({ patientId }: { patientId: string }) {
           Could not load this patient's files.
         </div>
       )}
-      {state === 'ready' && shown.length === 0 && (
-        <div className="mt-3 rounded-2xl border border-dashed border-ink/15 px-3 py-5 text-center">
-          <FileText className="mx-auto h-5 w-5 text-ink-faint" />
-          <p className="mt-1.5 text-[11px] font-semibold text-ink-muted">
-            She has not uploaded anything in this category yet.
-          </p>
-        </div>
+
+      {state === 'ready' && docs.length === 0 && (
+        <p className="mt-2 text-[11px] font-semibold text-ink-muted">
+          No prescriptions or reports added yet.
+        </p>
+      )}
+
+      {state === 'ready' && docs.length > 0 && shown.length === 0 && (
+        <p className="mt-3 text-[11px] font-semibold text-ink-muted">
+          No {tab === 'prescription' ? 'prescriptions' : 'reports'} added yet.
+        </p>
       )}
 
       <div className="mt-3 space-y-3">
