@@ -11,6 +11,7 @@ const patientApi = require('../controllers/api/patientApiController');
 const careApi = require('../controllers/api/careApiController');
 const messageApi = require('../controllers/api/messageApiController');
 const documentApi = require('../controllers/api/documentApiController');
+const sosApi = require('../controllers/api/sosApiController');
 const userModel = require('../models/userModel');
 const pregnancyModel = require('../models/pregnancyModel');
 
@@ -49,6 +50,15 @@ router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
+
+/* emergency SOS */
+router.get('/sos', sosApi.state);
+router.post('/sos', sosApi.trigger);
+router.post('/sos/:id/close', sosApi.close);
+router.get('/guardians', sosApi.contacts);
+router.post('/guardians', sosApi.addContact);
+router.delete('/guardians/:id', sosApi.removeContact);
+router.get('/doctors/:id/sos', sosApi.forDoctor);
 
 /* prescriptions & reports */
 router.get('/documents', documentApi.index);

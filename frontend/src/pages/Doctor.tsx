@@ -20,6 +20,7 @@ import { AssignModal } from '@/components/doctor/AssignModal';
 import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { MessageThreads } from '@/components/doctor/MessageThreads';
 import { PatientFiles } from '@/components/doctor/PatientFiles';
+import { SosBanner } from '@/components/doctor/SosBanner';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS as FALLBACK_PATIENTS, RISK_META, SCREENING,
@@ -317,6 +318,7 @@ export function Doctor() {
         badges={{ patients: roster.length, schedule: pending, requests: requestCount + messageUnread }} />
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
+        {meId && <SosBanner doctorId={meId} />}
         {/* greeting */}
         <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>

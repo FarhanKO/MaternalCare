@@ -133,6 +133,30 @@ CREATE TABLE IF NOT EXISTS symptoms (
   from_voice INTEGER NOT NULL DEFAULT 0,
   logged_at TEXT NOT NULL
 );
+-- Sprint 3: emergency alerts. One row per time the mother raised SOS, with
+-- where she was, plus a row per person the alert was fanned out to.
+CREATE TABLE IF NOT EXISTS sos_alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  triggered_at TEXT NOT NULL,
+  lat REAL,
+  lng REAL,
+  accuracy REAL,
+  -- why there is no fix: 'denied' | 'unavailable' | 'timeout'
+  location_note TEXT,
+  status TEXT NOT NULL DEFAULT 'active',   -- active | safe | cancelled
+  closed_at TEXT,
+  closed_by TEXT
+);
+CREATE TABLE IF NOT EXISTS sos_notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id INTEGER NOT NULL REFERENCES sos_alerts(id),
+  recipient TEXT NOT NULL,
+  relation TEXT,
+  channel TEXT NOT NULL,                   -- in-app | guardian-app | sms
+  state TEXT NOT NULL,                     -- alerted | pending
+  detail TEXT
+);
 -- Sprint 3: prescriptions and reports a mother photographs or uploads.
 -- The bytes live on disk under data/uploads; only metadata is stored here.
 CREATE TABLE IF NOT EXISTS documents (
@@ -193,6 +217,12 @@ if (!userCols.includes('last_visit')) {
 }
 if (!userCols.includes('next_visit')) {
   db.exec("ALTER TABLE users ADD COLUMN next_visit TEXT");
+}
+
+// Sprint 3: a guardian who has installed the companion app can be force-alarmed
+const contactCols = db.prepare('PRAGMA table_info(emergency_contacts)').all().map((c) => c.name);
+if (!contactCols.includes('app_linked')) {
+  db.exec('ALTER TABLE emergency_contacts ADD COLUMN app_linked INTEGER NOT NULL DEFAULT 0');
 }
 
 // Sprint 3: doctors gained the fields a mother actually chooses on — what they
@@ -432,6 +462,9 @@ if (isEmpty) {
   // the original seed named a doctor after one of the patients, which reads as
   // a data error once both appear on screen
   db.prepare("UPDATE doctors SET name = 'Dr. Nusrat Kabir' WHERE name = 'Dr. Nusrat Jahan'").run();
+  // the seeded emergency contact pointed at the same doctor under the old name
+  db.prepare(`UPDATE emergency_contacts SET name = 'Dr. Nusrat Kabir'
+              WHERE name = 'Dr. Nusrat Jahan'`).run();
 
   const CLINICIANS = [
     { name: 'Dr. Lena Ortiz', specialty: 'Obstetrics & Maternal Medicine', hospital: 'MaternalCare+ Clinic · Room 204',

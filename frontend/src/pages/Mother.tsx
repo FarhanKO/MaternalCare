@@ -20,6 +20,7 @@ import { CommunitySection } from '@/components/mother/CommunitySection';
 import { FindDoctorSection } from '@/components/mother/FindDoctorSection';
 import { RemindersSection } from '@/components/mother/RemindersSection';
 import { ProfileModal } from '@/components/mother/ProfileModal';
+import { SosModal } from '@/components/mother/SosModal';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useProfile } from '@/context/ProfileContext';
@@ -34,6 +35,8 @@ import { ProgressRing } from '@/components/ui/ProgressRing';
 import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
+import type { SosAlert } from '@/data/sos';
 
 /* ---------------- palette for charts ---------------- */
 const C = {
@@ -496,7 +499,14 @@ export function Mother() {
     if (urlTab && urlTab !== tab && TABS.includes(urlTab)) setTabState(urlTab);
   }, [urlTab]);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sosOpen, setSosOpen] = useState(false);
+  const [liveAlert, setLiveAlert] = useState<SosAlert | null>(null);
   const profile = useProfile();
+
+  // an alert raised in a previous visit should still show as live on return
+  useEffect(() => {
+    api.getSosState().then((s) => setLiveAlert(s.active)).catch(() => setLiveAlert(null));
+  }, []);
   // 'general' has no reading set of its own — fall back to the pregnancy one
   const communityStage = profile.stage === 'general' ? 'pregnant' : profile.stage;
 
@@ -550,18 +560,24 @@ export function Mother() {
 
             {/* emergency SOS — always one tap away */}
             <motion.button
+              onClick={() => setSosOpen(true)}
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-              aria-label="Emergency SOS"
-              title="Emergency SOS"
-              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 px-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(225,29,72,0.55)]"
+              aria-label={liveAlert ? 'Emergency alert is active' : 'Emergency SOS'}
+              title={liveAlert ? 'An alert is active — tap to stand down' : 'Emergency SOS'}
+              className={cn(
+                'inline-flex h-11 items-center gap-2 rounded-2xl px-3.5 text-sm font-bold text-white',
+                liveAlert
+                  ? 'bg-gradient-to-br from-rose-600 to-rose-700 shadow-[0_10px_30px_-6px_rgba(190,18,60,0.75)] ring-2 ring-rose-300'
+                  : 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-[0_10px_30px_-8px_rgba(225,29,72,0.55)]',
+              )}
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
               </span>
-              <span className="hidden sm:inline">SOS</span>
+              <span className="hidden sm:inline">{liveAlert ? 'Alert active' : 'SOS'}</span>
             </motion.button>
 
             <motion.button
@@ -1330,6 +1346,8 @@ export function Mother() {
         reminders={reminders}
         onChange={(next) => changeReminders(next, reminders)}
       />
+
+      <SosModal open={sosOpen} onClose={() => setSosOpen(false)} onAlertChange={setLiveAlert} />
 
       <ProfileModal
         open={profileOpen}

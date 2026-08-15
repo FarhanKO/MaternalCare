@@ -11,6 +11,7 @@ import {
   type DocumentKind, type DoctorThread, type Message, type MotherThread,
   type RankedDoctor, type SlotOffer,
 } from '@/data/care';
+import type { Guardian, SosAlert } from '@/data/sos';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
@@ -125,6 +126,38 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status, note }),
     }).then((r) => r.data),
+
+  /* --------------------------------------------------- emergency SOS */
+
+  getSosState: () =>
+    request<Envelope<{ active: SosAlert | null; contacts: Guardian[]; history: SosAlert[] }>>('/sos')
+      .then((r) => r.data),
+
+  raiseSos: (body: { lat?: number; lng?: number; accuracy?: number; locationNote?: string }) =>
+    request<Envelope<SosAlert>>('/sos', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  closeSos: (id: string, status: 'safe' | 'cancelled') =>
+    request<Envelope<SosAlert>>(`/sos/${id}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }).then((r) => r.data),
+
+  getGuardians: () => request<Envelope<Guardian[]>>('/guardians').then((r) => r.data),
+
+  addGuardian: (body: { name: string; relation?: string; phone?: string }) =>
+    request<Envelope<Guardian>>('/guardians', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  removeGuardian: (id: string) => request<void>(`/guardians/${id}`, { method: 'DELETE' }),
+
+  /** Open alerts across the clinician's caseload. */
+  getDoctorSos: (doctorId: string) =>
+    request<Envelope<SosAlert[]>>(`/doctors/${doctorId}/sos`).then((r) => r.data),
 
   /* --------------------------------------- prescriptions & reports */
 
