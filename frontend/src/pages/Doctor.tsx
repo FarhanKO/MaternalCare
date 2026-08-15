@@ -139,7 +139,8 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
               </button>
             </div>
 
-            <div className="flex-none px-6">
+            {/* relative + z-10 so the avatar sits above the positioned cover */}
+            <div className="relative z-10 flex-none px-6">
               <div className="-mt-10">
                 <span className="grid h-[68px] w-[68px] place-items-center rounded-3xl border-[3px] border-white text-lg font-extrabold text-white shadow-glow"
                   style={{ background: RISK_META[patient.risk].color }}>
