@@ -7,11 +7,15 @@ import type { Symptom } from '@/data/symptoms';
 import type { Reminder } from '@/data/reminders';
 import type { Patient } from '@/data/doctor';
 import {
-  RequestRefused, type Appointment, type CareTeamMember, type DoctorThread,
-  type Message, type MotherThread, type RankedDoctor, type SlotOffer,
+  RequestRefused, type Appointment, type CareDocument, type CareTeamMember,
+  type DocumentKind, type DoctorThread, type Message, type MotherThread,
+  type RankedDoctor, type SlotOffer,
 } from '@/data/care';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+
+/** Absolute URL for a document's bytes — the API host is a different origin in dev. */
+export const fileUrl = (path: string) => `${BASE.replace(/\/api$/, '')}${path}`;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -121,6 +125,30 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status, note }),
     }).then((r) => r.data),
+
+  /* --------------------------------------- prescriptions & reports */
+
+  getDocuments: (kind?: DocumentKind) =>
+    request<Envelope<CareDocument[]> & { meta: Record<DocumentKind, number> }>(
+      `/documents${kind ? `?kind=${kind}` : ''}`,
+    ).then((r) => ({ documents: r.data, counts: r.meta })),
+
+  /** `dataUrl` is the base64 payload produced by FileUpload. */
+  uploadDocument: (body: {
+    kind: DocumentKind; title: string; note?: string;
+    dataUrl: string; originalName?: string; takenOn?: string;
+  }) => request<Envelope<CareDocument>>('/documents', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then((r) => r.data),
+
+  deleteDocument: (id: string) => request<void>(`/documents/${id}`, { method: 'DELETE' }),
+
+  /** A clinician reading a patient's filed prescriptions and reports. */
+  getPatientDocuments: (patientId: string) =>
+    request<Envelope<CareDocument[]> & { meta: Record<DocumentKind, number> }>(
+      `/patients/${patientId}/documents`,
+    ).then((r) => ({ documents: r.data, counts: r.meta })),
 
   /* ------------------------------------------------------- messaging */
 

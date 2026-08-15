@@ -10,6 +10,7 @@ const reminderApi = require('../controllers/api/reminderApiController');
 const patientApi = require('../controllers/api/patientApiController');
 const careApi = require('../controllers/api/careApiController');
 const messageApi = require('../controllers/api/messageApiController');
+const documentApi = require('../controllers/api/documentApiController');
 const userModel = require('../models/userModel');
 const pregnancyModel = require('../models/pregnancyModel');
 
@@ -48,6 +49,14 @@ router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
+
+/* prescriptions & reports */
+router.get('/documents', documentApi.index);
+router.post('/documents', documentApi.create);
+router.get('/documents/:id/file', documentApi.file);
+router.delete('/documents/:id', documentApi.destroy);
+router.get('/patients/:id/documents', documentApi.forPatient);
+router.post('/patients/:id/documents', documentApi.createForPatient);
 
 /* messages — the mother/doctor conversation */
 router.get('/care-team', messageApi.careTeam);

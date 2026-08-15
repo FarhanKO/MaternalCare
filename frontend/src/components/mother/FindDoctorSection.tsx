@@ -10,6 +10,7 @@ import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import { DoctorChat, shortName } from '@/components/mother/DoctorChat';
+import { DocumentsSection } from '@/components/mother/DocumentsSection';
 import {
   APPT_META, prettyDate, prettyTime, RequestRefused, STATUS_META,
   type Appointment, type RankedDoctor, type SlotOffer,
@@ -402,6 +403,8 @@ export function FindDoctorSection({ stage }: Props) {
       </Reveal>
 
       <DoctorChat />
+
+      <DocumentsSection />
 
       {/* what she has already asked for */}
       {live.length > 0 && (

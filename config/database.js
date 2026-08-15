@@ -133,6 +133,22 @@ CREATE TABLE IF NOT EXISTS symptoms (
   from_voice INTEGER NOT NULL DEFAULT 0,
   logged_at TEXT NOT NULL
 );
+-- Sprint 3: prescriptions and reports a mother photographs or uploads.
+-- The bytes live on disk under data/uploads; only metadata is stored here.
+CREATE TABLE IF NOT EXISTS documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL,                 -- 'prescription' | 'report'
+  title TEXT NOT NULL,
+  note TEXT,
+  file_name TEXT NOT NULL,            -- name on disk
+  original_name TEXT,
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  taken_on TEXT NOT NULL,             -- the date the document is about (YYYY-MM-DD)
+  uploaded_at TEXT NOT NULL,
+  uploaded_by TEXT                    -- 'mother', or the clinician's name
+);
 -- Sprint 3: direct messages between a mother and a doctor
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

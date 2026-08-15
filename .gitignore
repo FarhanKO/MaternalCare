@@ -12,6 +12,9 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 
+# uploaded prescriptions and reports — patient data, never committed
+data/uploads/
+
 # environment
 .env
 .env.local

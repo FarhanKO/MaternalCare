@@ -99,6 +99,94 @@ export interface DoctorThread {
   unread: number;
 }
 
+/* --------------------------------------------- prescriptions & reports */
+
+export type DocumentKind = 'prescription' | 'report';
+
+export interface CareDocument {
+  id: string;
+  patientId: string;
+  kind: DocumentKind;
+  title: string;
+  note?: string;
+  originalName?: string;
+  mime: string;
+  size: number;
+  /** the date the document is about, not when it was uploaded */
+  takenOn: string;
+  uploadedAt: string;
+  uploadedBy: string;
+  /** path on the API host where the bytes live */
+  url: string;
+}
+
+export const DOC_META: Record<DocumentKind, { label: string; plural: string; hint: string }> = {
+  prescription: {
+    label: 'Prescription', plural: 'Prescriptions',
+    hint: 'What you were prescribed and when',
+  },
+  report: {
+    label: 'Report', plural: 'Reports',
+    hint: 'Blood work, scans and test results',
+  },
+};
+
+export interface DayGroup { day: string; label: string; items: CareDocument[] }
+export interface MonthGroup { key: string; label: string; days: DayGroup[]; count: number }
+export interface YearGroup { year: string; months: MonthGroup[]; count: number }
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Group documents into year → month → day, newest first at every level.
+ * This is how a paper file reads, and it is the only way a long history
+ * stays navigable.
+ */
+export function groupByDate(docs: CareDocument[]): YearGroup[] {
+  const years = new Map<string, Map<string, Map<string, CareDocument[]>>>();
+
+  for (const d of [...docs].sort((a, b) => b.takenOn.localeCompare(a.takenOn))) {
+    const [y, m] = d.takenOn.split('-');
+    if (!years.has(y)) years.set(y, new Map());
+    const months = years.get(y)!;
+    if (!months.has(m)) months.set(m, new Map());
+    const days = months.get(m)!;
+    if (!days.has(d.takenOn)) days.set(d.takenOn, []);
+    days.get(d.takenOn)!.push(d);
+  }
+
+  return [...years.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([year, months]) => {
+      const monthGroups: MonthGroup[] = [...months.entries()]
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .map(([m, days]) => {
+          const dayGroups: DayGroup[] = [...days.entries()]
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([day, items]) => ({ day, label: prettyDate(day), items }));
+          return {
+            key: `${year}-${m}`,
+            label: `${MONTHS[Number(m) - 1]} ${year}`,
+            days: dayGroups,
+            count: dayGroups.reduce((n, g) => n + g.items.length, 0),
+          };
+        });
+      return {
+        year,
+        months: monthGroups,
+        count: monthGroups.reduce((n, g) => n + g.count, 0),
+      };
+    });
+}
+
+const SIZE_UNITS = ['bytes', 'KB', 'MB'] as const;
+export function prettySize(bytes: number) {
+  if (!bytes) return '0 bytes';
+  const i = Math.min(SIZE_UNITS.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  return `${Number.parseFloat((bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1))} ${SIZE_UNITS[i]}`;
+}
+
 /** "09:14" today, "Tue 09:14" this week, "12 Aug" beyond that. */
 export function messageStamp(isoTs: string) {
   const d = new Date(isoTs);

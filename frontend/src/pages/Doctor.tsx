@@ -19,6 +19,7 @@ import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { AssignModal } from '@/components/doctor/AssignModal';
 import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { MessageThreads } from '@/components/doctor/MessageThreads';
+import { PatientFiles } from '@/components/doctor/PatientFiles';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS as FALLBACK_PATIENTS, RISK_META, SCREENING,
@@ -229,6 +230,8 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
                   <div className="text-[13px] font-bold text-ink">{patient.nextVisit}</div>
                 </div>
               </div>
+
+              <PatientFiles patientId={patient.id} />
 
               <button
                 onClick={() => onAssign(patient)}
