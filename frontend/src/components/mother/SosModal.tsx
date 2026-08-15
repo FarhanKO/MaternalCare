@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
-import { audioSupported, confirmTone, startAlarm, stopAlarm } from '@/lib/alarm';
+import { audioSupported, confirmTone, stopAlarm, tick as tickSound } from '@/lib/alarm';
 import {
   CHANNEL_META, COUNTDOWN_SECONDS, formatCoords, mapLink, RELATIONS, sinceLabel,
   type Guardian, type SosAlert,
@@ -44,7 +44,7 @@ function locate(): Promise<{ lat?: number; lng?: number; accuracy?: number; loca
 
 /** Set expectations before she presses it, not during. */
 const STEPS = [
-  { icon: Clock, text: `${COUNTDOWN_SECONDS} seconds pass, with an alarm — cancel any time` },
+  { icon: Clock, text: `${COUNTDOWN_SECONDS} seconds count down — cancel any time` },
   { icon: Crosshair, text: 'Your location is found and attached' },
   { icon: BellRing, text: 'Your guardians and your doctor are alerted at once' },
   { icon: ShieldCheck, text: 'You can mark yourself safe afterwards' },
@@ -107,6 +107,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
   const [phone, setPhone] = useState('');
 
   const tick = useRef<number | null>(null);
+  const remaining = useRef(COUNTDOWN_SECONDS);
   const locating = useRef<Promise<Awaited<ReturnType<typeof locate>>> | null>(null);
 
   const load = useCallback(async () => {
@@ -160,17 +161,26 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
     setError('');
     setLeft(COUNTDOWN_SECONDS);
     setPhase('counting');
-    startAlarm(0);
     locating.current = locate();       // fetch the fix while she can still cancel
+
+    // The count lives in a ref, and every side effect happens in the interval
+    // body. A state updater must stay pure: StrictMode double-invokes it, which
+    // played two ticks a second and would have fired send() twice.
+    remaining.current = COUNTDOWN_SECONDS;
+    let beat = 0;
+    tickSound(beat);
 
     clearTick();
     tick.current = window.setInterval(() => {
-      setLeft((n) => {
-        const next = n - 1;
-        if (next <= 0) { void send(); return 0; }
-        startAlarm(1 - next / COUNTDOWN_SECONDS);   // tighten as it runs out
-        return next;
-      });
+      remaining.current -= 1;
+      if (remaining.current <= 0) {
+        setLeft(0);
+        void send();
+        return;
+      }
+      beat += 1;
+      tickSound(beat);            // one per second, in step with the digit
+      setLeft(remaining.current);
     }, 1000);
   };
 
@@ -536,7 +546,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                         </ol>
                         {!audioSupported() && (
                           <p className="mt-2 text-[10px] font-semibold text-amber-700">
-                            This browser cannot play the alarm sound.
+                            This browser cannot play the countdown sound.
                           </p>
                         )}
                       </div>
