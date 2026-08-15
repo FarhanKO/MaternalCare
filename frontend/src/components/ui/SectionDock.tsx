@@ -43,7 +43,9 @@ export function SectionDock<T extends string>({
         initial={{ y: 28, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 28, delay: 0.15 }}
-        className="pointer-events-auto flex w-full max-w-xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-float"
+        // wide enough for five tabs; the buttons below shrink rather than
+        // spill out of the pill if a dock ever grows past that
+        className="pointer-events-auto flex w-full max-w-2xl items-center gap-1 rounded-2xl glass-strong p-1.5 shadow-float"
       >
         {items.map((t) => {
           const isActive = active === t.key;
@@ -55,7 +57,9 @@ export function SectionDock<T extends string>({
               aria-current={isActive ? 'page' : undefined}
               title={t.hint}
               className={cn(
-                'relative flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200',
+                // min-w-0 lets flex-1 actually shrink — without it the buttons
+                // keep their content width and overflow the rounded container
+                'relative flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-colors duration-200',
                 isActive ? 'text-white' : 'text-ink-soft hover:text-ink',
               )}
             >
@@ -67,7 +71,7 @@ export function SectionDock<T extends string>({
                 />
               )}
               <t.icon className="h-4 w-4 flex-none" />
-              <span className="hidden sm:inline">{t.label}</span>
+              <span className="hidden truncate sm:inline">{t.label}</span>
               {count != null && count > 0 && (
                 <span className={cn(
                   'ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',

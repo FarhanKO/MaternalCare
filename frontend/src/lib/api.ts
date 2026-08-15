@@ -7,7 +7,8 @@ import type { Symptom } from '@/data/symptoms';
 import type { Reminder } from '@/data/reminders';
 import type { Patient } from '@/data/doctor';
 import {
-  RequestRefused, type Appointment, type RankedDoctor, type SlotOffer,
+  RequestRefused, type Appointment, type CareTeamMember, type DoctorThread,
+  type Message, type MotherThread, type RankedDoctor, type SlotOffer,
 } from '@/data/care';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -119,6 +120,39 @@ export const api = {
     request<Envelope<Appointment>>(`/appointments/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status, note }),
+    }).then((r) => r.data),
+
+  /* ------------------------------------------------------- messaging */
+
+  /** Doctors this mother is entitled to write to. */
+  getCareTeam: () => request<Envelope<CareTeamMember[]>>('/care-team').then((r) => r.data),
+
+  getThreads: () =>
+    request<Envelope<MotherThread[]> & { meta: { unread: number } }>('/messages')
+      .then((r) => ({ threads: r.data, unread: r.meta.unread })),
+
+  /** Fetching a thread also marks the other side's lines as read. */
+  getThread: (doctorId: string) =>
+    request<Envelope<Message[]>>(`/messages/${doctorId}`).then((r) => r.data),
+
+  sendMessage: (doctorId: string, body: string) =>
+    request<Envelope<Message>>('/messages', {
+      method: 'POST',
+      body: JSON.stringify({ doctorId, body }),
+    }).then((r) => r.data),
+
+  /* clinician side of the same conversation */
+  getDoctorThreads: (doctorId: string) =>
+    request<Envelope<DoctorThread[]> & { meta: { unread: number } }>(`/doctors/${doctorId}/threads`)
+      .then((r) => ({ threads: r.data, unread: r.meta.unread })),
+
+  getDoctorThread: (doctorId: string, patientId: string) =>
+    request<Envelope<Message[]>>(`/doctors/${doctorId}/threads/${patientId}`).then((r) => r.data),
+
+  sendAsDoctor: (doctorId: string, patientId: string, body: string) =>
+    request<Envelope<Message>>(`/doctors/${doctorId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ patientId, body }),
     }).then((r) => r.data),
 };
 

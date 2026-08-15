@@ -18,6 +18,7 @@ import { SectionDock, type DockItem } from '@/components/ui/SectionDock';
 import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { AssignModal } from '@/components/doctor/AssignModal';
 import { RequestInbox } from '@/components/doctor/RequestInbox';
+import { MessageThreads } from '@/components/doctor/MessageThreads';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS as FALLBACK_PATIENTS, RISK_META, SCREENING,
@@ -272,6 +273,7 @@ export function Doctor() {
   // resolve our own doctors row so the request inbox reads the right diary
   const [meId, setMeId] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState(0);
+  const [messageUnread, setMessageUnread] = useState(0);
   useEffect(() => {
     api.getDoctors()
       .then((list) => setMeId(list.find((d) => d.name === ME_NAME)?.id ?? null))
@@ -309,7 +311,7 @@ export function Doctor() {
       <Navbar />
       <SectionDock items={TABS} active={tab} onChange={setTab} accent="peach"
         layoutId="doctorTabPill"
-        badges={{ patients: roster.length, schedule: pending, requests: requestCount }} />
+        badges={{ patients: roster.length, schedule: pending, requests: requestCount + messageUnread }} />
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {/* greeting */}
@@ -633,13 +635,16 @@ export function Doctor() {
         {/* ============================== REQUESTS ============================== */}
         {tab === 'requests' && (
           <motion.div key="rq" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-            {meId
-              ? <RequestInbox doctorId={meId} onChange={setRequestCount} />
-              : (
-                <GlassCard className="p-10 text-center text-sm font-semibold text-ink-muted">
-                  Cannot reach the clinic server, so requests are unavailable.
-                </GlassCard>
-              )}
+            {meId ? (
+              <div className="space-y-6">
+                <RequestInbox doctorId={meId} onChange={setRequestCount} />
+                <MessageThreads doctorId={meId} roster={roster} onChange={setMessageUnread} />
+              </div>
+            ) : (
+              <GlassCard className="p-10 text-center text-sm font-semibold text-ink-muted">
+                Cannot reach the clinic server, so requests are unavailable.
+              </GlassCard>
+            )}
           </motion.div>
         )}
 

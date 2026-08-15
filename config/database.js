@@ -133,6 +133,16 @@ CREATE TABLE IF NOT EXISTS symptoms (
   from_voice INTEGER NOT NULL DEFAULT 0,
   logged_at TEXT NOT NULL
 );
+-- Sprint 3: direct messages between a mother and a doctor
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),      -- the mother the thread belongs to
+  doctor_id INTEGER NOT NULL REFERENCES doctors(id),
+  sender TEXT NOT NULL,                                -- 'mother' | 'doctor'
+  body TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  read_at TEXT
+);
 -- Sprint 2: reminders & appointments created by the mother
 CREATE TABLE IF NOT EXISTS reminders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

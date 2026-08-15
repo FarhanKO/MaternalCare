@@ -7,7 +7,7 @@ export const MOTHER_TABS: DockItem<MotherTab>[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hint: 'Today at a glance' },
   { key: 'vitals', label: 'Vitals', icon: Activity, hint: 'Trends & measurements' },
   { key: 'reminders', label: 'Reminders', icon: CalendarClock, hint: 'Appointments & symptoms' },
-  { key: 'care', label: 'Find care', icon: Stethoscope, hint: 'Request a doctor' },
+  { key: 'care', label: 'Doctor', icon: Stethoscope, hint: 'Request and message a doctor' },
   { key: 'community', label: 'Community', icon: Users, hint: 'Mothers & doctors' },
 ];
 

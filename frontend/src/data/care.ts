@@ -58,6 +58,57 @@ export interface Appointment {
 
 export interface SlotOffer { date: string; time: string }
 
+/* ------------------------------------------------------------- messaging */
+
+export interface Message {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  sender: 'mother' | 'doctor';
+  body: string;
+  sentAt: string;
+  /** true once the other side has opened the thread */
+  read: boolean;
+}
+
+/** A doctor the mother is entitled to write to. */
+export interface CareTeamMember {
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  hospital: string;
+  qualification: string;
+  unread: number;
+}
+
+export interface MotherThread {
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  hospital: string;
+  lastMessage: Message | null;
+  total: number;
+  unread: number;
+}
+
+export interface DoctorThread {
+  patientId: string;
+  patientName: string;
+  lastMessage: Message | null;
+  total: number;
+  unread: number;
+}
+
+/** "09:14" today, "Tue 09:14" this week, "12 Aug" beyond that. */
+export function messageStamp(isoTs: string) {
+  const d = new Date(isoTs);
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const ageDays = (Date.now() - d.getTime()) / 86400000;
+  if (d.toDateString() === new Date().toDateString()) return time;
+  if (ageDays < 7) return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
 /** Thrown by the client when the server refuses a request it can explain. */
 export class RequestRefused extends Error {
   code: 'SLOT_TAKEN' | 'NOT_BOOKABLE';

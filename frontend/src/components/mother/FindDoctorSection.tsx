@@ -9,6 +9,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
+import { DoctorChat, shortName } from '@/components/mother/DoctorChat';
 import {
   APPT_META, prettyDate, prettyTime, RequestRefused, STATUS_META,
   type Appointment, type RankedDoctor, type SlotOffer,
@@ -261,7 +262,7 @@ function RequestPanel({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold text-ink-faint">
-          {doctor.name.split(' ').slice(-1)} still has to accept this.
+          {shortName(doctor.name)} still has to accept this.
         </span>
         <LiquidButton onClick={send} icon={<Send className="h-4 w-4" />}>
           {sending ? 'Sending…' : 'Send request'}
@@ -391,14 +392,16 @@ export function FindDoctorSection({ stage }: Props) {
     <div className="space-y-6">
       <Reveal>
         <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Find care</h2>
+          <h2 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Your doctor</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Request an appointment with a doctor yourself. Clinicians are ordered by what they are
-            qualified in and how much room is left on their list — the ones who can see you soonest
-            come first.
+            Message the doctors looking after you, and request an appointment yourself. Clinicians
+            are ordered by what they are qualified in and how much room is left on their list — the
+            ones who can see you soonest come first.
           </p>
         </div>
       </Reveal>
+
+      <DoctorChat />
 
       {/* what she has already asked for */}
       {live.length > 0 && (
