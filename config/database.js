@@ -169,6 +169,35 @@ if (!userCols.includes('next_visit')) {
   db.exec("ALTER TABLE users ADD COLUMN next_visit TEXT");
 }
 
+// Sprint 3: doctors gained the fields a mother actually chooses on — what they
+// are qualified in, and how much room is left on their list.
+const doctorCols = db.prepare('PRAGMA table_info(doctors)').all().map((c) => c.name);
+if (!doctorCols.includes('qualification')) {
+  db.exec("ALTER TABLE doctors ADD COLUMN qualification TEXT DEFAULT ''");
+}
+if (!doctorCols.includes('years')) {
+  db.exec('ALTER TABLE doctors ADD COLUMN years INTEGER DEFAULT 0');
+}
+if (!doctorCols.includes('capacity')) {
+  db.exec('ALTER TABLE doctors ADD COLUMN capacity INTEGER DEFAULT 30');
+}
+
+// Sprint 3: appointments became a request/response conversation rather than a
+// row the clinic writes unilaterally.
+const apptCols = db.prepare('PRAGMA table_info(appointments)').all().map((c) => c.name);
+if (!apptCols.includes('requested_at')) {
+  db.exec('ALTER TABLE appointments ADD COLUMN requested_at TEXT');
+}
+if (!apptCols.includes('responded_at')) {
+  db.exec('ALTER TABLE appointments ADD COLUMN responded_at TEXT');
+}
+if (!apptCols.includes('note')) {
+  db.exec('ALTER TABLE appointments ADD COLUMN note TEXT');
+}
+// 'upcoming' predates the request flow; it means the clinic had already agreed it
+db.exec("UPDATE appointments SET status = 'accepted' WHERE status = 'upcoming'");
+db.exec("UPDATE appointments SET requested_at = date WHERE requested_at IS NULL");
+
 /* ------------------------------------------------------------- date utils */
 const DAY = 86400000;
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -367,6 +396,52 @@ if (isEmpty) {
   db.prepare(`UPDATE users SET conditions = COALESCE(NULLIF(conditions,''), 'First pregnancy'),
               last_visit = COALESCE(last_visit, ?), next_visit = COALESCE(next_visit, ?)
               WHERE id = 1`).run(daysFromNow(-14), daysFromNow(5));
+}
+
+/* ------------------------------------------- the clinicians a mother can book */
+// `patients` is the doctor's current panel and `capacity` the size their clinic
+// will carry. The gap between them is what the recommendation ranks on, so the
+// roster deliberately spans a full list, a quiet list and a doctor on leave.
+{
+  // the original seed named a doctor after one of the patients, which reads as
+  // a data error once both appear on screen
+  db.prepare("UPDATE doctors SET name = 'Dr. Nusrat Kabir' WHERE name = 'Dr. Nusrat Jahan'").run();
+
+  const CLINICIANS = [
+    { name: 'Dr. Lena Ortiz', specialty: 'Obstetrics & Maternal Medicine', hospital: 'MaternalCare+ Clinic · Room 204',
+      qualification: 'MBBS, MRCOG, MD (Maternal Medicine)', years: 15, rating: 4.9, km: 0.8, capacity: 30, patients: 22, available: 1 },
+    { name: 'Dr. Nusrat Kabir', specialty: 'Obstetrics & Gynaecology', hospital: 'City Maternity Hospital',
+      qualification: 'MBBS, FCPS (Obs & Gynae)', years: 12, rating: 4.9, km: 1.2, capacity: 28, patients: 26, available: 1 },
+    { name: 'Dr. Farzana Karim', specialty: 'Obstetrics & Gynaecology', hospital: 'Popular Diagnostic Centre',
+      qualification: 'MBBS, DGO', years: 7, rating: 4.5, km: 4.2, capacity: 35, patients: 14, available: 1 },
+    { name: 'Dr. Sara Ahmed', specialty: 'Maternal-Fetal Medicine', hospital: 'Square Hospital',
+      qualification: 'MBBS, FCPS, MD (Fetal Medicine)', years: 18, rating: 4.7, km: 3.1, capacity: 24, patients: 24, available: 1 },
+    { name: 'Dr. Kamal Hossain', specialty: 'Paediatrics', hospital: 'Green Life Children Clinic',
+      qualification: 'MBBS, MRCPCH, DCH', years: 11, rating: 4.8, km: 2.4, capacity: 32, patients: 19, available: 1 },
+    { name: 'Dr. Rafiq Islam', specialty: 'Nutrition & Dietetics', hospital: 'Wellness Care Center',
+      qualification: 'MBBS, MPH (Nutrition)', years: 6, rating: 4.6, km: 1.8, capacity: 40, patients: 12, available: 1 },
+    { name: 'Dr. Tanvir Alam', specialty: 'Paediatric Neurology', hospital: 'National Children Hospital',
+      qualification: 'MBBS, MD (Paediatric Neurology)', years: 14, rating: 4.8, km: 5.0, capacity: 20, patients: 8, available: 0 },
+  ];
+
+  const findDoc = db.prepare('SELECT id FROM doctors WHERE name = ?');
+  const insertDoc = db.prepare(
+    `INSERT INTO doctors (name, specialty, hospital, rating, distance_km, available, patients, qualification, years, capacity)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`);
+  const updateDoc = db.prepare(
+    `UPDATE doctors SET specialty = ?, hospital = ?, rating = ?, distance_km = ?, available = ?,
+     patients = ?, qualification = ?, years = ?, capacity = ? WHERE id = ?`);
+
+  for (const c of CLINICIANS) {
+    const existing = findDoc.get(c.name);
+    if (existing) {
+      updateDoc.run(c.specialty, c.hospital, c.rating, c.km, c.available,
+        c.patients, c.qualification, c.years, c.capacity, existing.id);
+    } else {
+      insertDoc.run(c.name, c.specialty, c.hospital, c.rating, c.km, c.available,
+        c.patients, c.qualification, c.years, c.capacity);
+    }
+  }
 }
 
 module.exports = db;

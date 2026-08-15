@@ -93,7 +93,7 @@
             <td><%= fmt(a.date) %> · <%= a.time %></td>
             <td><b style="color:var(--ink)"><%= a.doctor_name %></b> <small style="color:var(--ink-3)">· <%= a.specialty %></small></td>
             <td><%= a.reason %></td>
-            <td><span class="pill <%= a.status === 'upcoming' ? 'pill-info' : 'pill-good' %>"><%= a.status === 'upcoming' ? '🗓️ Upcoming' : '✓ Completed' %></span></td>
+            <td><span class="pill <%= a.status === 'requested' ? 'pill-warning' : a.status === 'accepted' ? 'pill-info' : 'pill-good' %>"><%= a.status === 'requested' ? '⏳ Awaiting reply' : a.status === 'accepted' ? '🗓️ Upcoming' : '✓ Completed' %></span></td>
           </tr>
         <% } %>
       </tbody>

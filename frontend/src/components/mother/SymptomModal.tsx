@@ -469,7 +469,7 @@ export function SymptomModal({ open, onClose, initial, onSave }: Props) {
 
                   <p className="pt-1 text-[11px] leading-relaxed text-ink-faint">
                     General pregnancy guidance based on what you logged — not a diagnosis. If something feels wrong,
-                    contact your midwife or doctor.
+                    contact your doctor.
                   </p>
                 </motion.div>
               )}

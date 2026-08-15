@@ -6,6 +6,9 @@
 import type { Symptom } from '@/data/symptoms';
 import type { Reminder } from '@/data/reminders';
 import type { Patient } from '@/data/doctor';
+import {
+  RequestRefused, type Appointment, type RankedDoctor, type SlotOffer,
+} from '@/data/care';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
@@ -67,6 +70,56 @@ export const api = {
 
   deleteReminder: (id: string) =>
     request<void>(`/reminders/${id}`, { method: 'DELETE' }),
+
+  /* ------------------------------------------------ finding a doctor */
+
+  getDoctors: () => request<Envelope<RankedDoctor[]>>('/doctors').then((r) => r.data),
+
+  /** Clinicians ranked for this mother's stage; `bookable` counts who can take her. */
+  getRecommendedDoctors: (stage?: string) =>
+    request<Envelope<RankedDoctor[]> & { meta: { stage: string; bookable: number } }>(
+      `/doctors/recommended${stage ? `?stage=${stage}` : ''}`,
+    ).then((r) => ({ doctors: r.data, bookable: r.meta.bookable })),
+
+  getSlots: (doctorId: string, date: string) =>
+    request<Envelope<{ date: string; times: string[] }>>(`/doctors/${doctorId}/slots?date=${date}`)
+      .then((r) => r.data),
+
+  getAppointments: () =>
+    request<Envelope<Appointment[]>>('/appointments').then((r) => r.data),
+
+  /**
+   * Ask a doctor for a slot. Throws {@link RequestRefused} when the server can
+   * explain the refusal, so the UI can offer the alternatives it sent back
+   * instead of showing a dead end.
+   */
+  async requestAppointment(body: { doctorId: string; date: string; time: string; reason?: string }) {
+    const res = await fetch(`${BASE}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 409) {
+      throw new RequestRefused(json.error ?? 'That request could not be sent', json.code ?? 'NOT_BOOKABLE',
+        (json.alternatives ?? []) as SlotOffer[]);
+    }
+    if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+    return json.data as Appointment;
+  },
+
+  cancelAppointment: (id: string) =>
+    request<Envelope<Appointment>>(`/appointments/${id}`, { method: 'DELETE' }).then((r) => r.data),
+
+  /* clinician side of the same conversation */
+  getDoctorRequests: (doctorId: string) =>
+    request<Envelope<Appointment[]>>(`/doctors/${doctorId}/appointments`).then((r) => r.data),
+
+  respondToRequest: (id: string, status: 'accepted' | 'declined', note?: string) =>
+    request<Envelope<Appointment>>(`/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, note }),
+    }).then((r) => r.data),
 };
 
 export type ApiStatus = 'loading' | 'online' | 'offline';

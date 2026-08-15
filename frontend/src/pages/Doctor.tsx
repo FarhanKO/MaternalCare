@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowRight, BellRing, CalendarDays, CheckCircle2, ChevronRight,
-  ClipboardList, ClipboardPlus, Clock, Droplet, HeartPulse, LayoutDashboard, Search, ShieldAlert, Stethoscope,
-  TrendingUp, Users, X,
+  ClipboardList, ClipboardPlus, Clock, Droplet, HeartPulse, Inbox, LayoutDashboard, Search, ShieldAlert,
+  Stethoscope, TrendingUp, Users, X,
 } from 'lucide-react';
 import {
   Area, AreaChart, Bar, BarChart, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer,
@@ -17,6 +17,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { SectionDock, type DockItem } from '@/components/ui/SectionDock';
 import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { AssignModal } from '@/components/doctor/AssignModal';
+import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { cn } from '@/lib/cn';
 import {
   ALERTS, CLINIC_WEEK, KIND_META, OUTCOMES, PATIENTS as FALLBACK_PATIENTS, RISK_META, SCREENING,
@@ -26,14 +27,18 @@ import { api } from '@/lib/api';
 
 const P = { peach: '#fb7534', peachLight: '#ff9159', aqua: '#22b8c4', brand: '#3f66f0', mint: '#2fbf9b', rose: '#e5484d', violet: '#8b7bf3' };
 
-type DocTab = 'overview' | 'patients' | 'schedule' | 'reports';
+type DocTab = 'overview' | 'patients' | 'schedule' | 'requests' | 'reports';
 
 const TABS: DockItem<DocTab>[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard, hint: 'Clinic at a glance' },
   { key: 'patients', label: 'Patients', icon: Users, hint: 'Your caseload' },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays, hint: 'Today’s clinic' },
+  { key: 'requests', label: 'Requests', icon: Inbox, hint: 'Mothers asking to be seen' },
   { key: 'reports', label: 'Reports', icon: ClipboardList, hint: 'Practice analytics' },
 ];
+
+/** The clinician this portal is signed in as; the id is resolved from the API. */
+const ME_NAME = 'Dr. Lena Ortiz';
 
 const axisTick = { fontSize: 11, fill: '#9aa3ba', fontWeight: 600 };
 
@@ -243,7 +248,7 @@ export function Doctor() {
   const [params, setParams] = useSearchParams();
   const urlTab = params.get('tab') as DocTab | null;
   const valid = (t: string | null): t is DocTab =>
-    !!t && ['overview', 'patients', 'schedule', 'reports'].includes(t);
+    !!t && ['overview', 'patients', 'schedule', 'requests', 'reports'].includes(t);
   const [tab, setTabState] = useState<DocTab>(valid(urlTab) ? urlTab : 'overview');
   const setTab = (t: DocTab) => {
     setTabState(t);
@@ -263,6 +268,15 @@ export function Doctor() {
     .then((p) => { if (p.length) { setRoster(p); setLive(true); } })
     .catch(() => setLive(false));
   useEffect(() => { loadRoster(); }, []);
+
+  // resolve our own doctors row so the request inbox reads the right diary
+  const [meId, setMeId] = useState<string | null>(null);
+  const [requestCount, setRequestCount] = useState(0);
+  useEffect(() => {
+    api.getDoctors()
+      .then((list) => setMeId(list.find((d) => d.name === ME_NAME)?.id ?? null))
+      .catch(() => setMeId(null));
+  }, []);
 
   const riskCount = (level: RiskLevel) => roster.filter((p) => p.risk === level).length;
   const [now, setNow] = useState(() => new Date());
@@ -294,7 +308,8 @@ export function Doctor() {
     <>
       <Navbar />
       <SectionDock items={TABS} active={tab} onChange={setTab} accent="peach"
-        layoutId="doctorTabPill" badges={{ patients: roster.length, schedule: pending }} />
+        layoutId="doctorTabPill"
+        badges={{ patients: roster.length, schedule: pending, requests: requestCount }} />
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {/* greeting */}
@@ -612,6 +627,19 @@ export function Doctor() {
                 </Reveal>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* ============================== REQUESTS ============================== */}
+        {tab === 'requests' && (
+          <motion.div key="rq" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+            {meId
+              ? <RequestInbox doctorId={meId} onChange={setRequestCount} />
+              : (
+                <GlassCard className="p-10 text-center text-sm font-semibold text-ink-muted">
+                  Cannot reach the clinic server, so requests are unavailable.
+                </GlassCard>
+              )}
           </motion.div>
         )}
 

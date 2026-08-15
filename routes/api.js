@@ -8,6 +8,7 @@ const router = express.Router();
 const symptomApi = require('../controllers/api/symptomApiController');
 const reminderApi = require('../controllers/api/reminderApiController');
 const patientApi = require('../controllers/api/patientApiController');
+const careApi = require('../controllers/api/careApiController');
 const userModel = require('../models/userModel');
 const pregnancyModel = require('../models/pregnancyModel');
 
@@ -34,6 +35,18 @@ router.get('/patients/:id', patientApi.show);
 router.get('/patients/:id/reminders', patientApi.reminders);
 router.get('/patients/:id/symptoms', patientApi.symptoms);
 router.post('/patients/:id/reminders', patientApi.assign);
+
+/* finding a doctor */
+router.get('/doctors', careApi.doctors);
+router.get('/doctors/recommended', careApi.recommended);
+router.get('/doctors/:id/slots', careApi.slots);
+router.get('/doctors/:id/appointments', careApi.doctorAppointments);
+
+/* appointment requests — the mother asks, the doctor answers */
+router.get('/appointments', careApi.myAppointments);
+router.post('/appointments', careApi.requestAppointment);
+router.patch('/appointments/:id', careApi.respond);
+router.delete('/appointments/:id', careApi.cancel);
 
 /* symptoms */
 router.get('/symptoms', symptomApi.index);

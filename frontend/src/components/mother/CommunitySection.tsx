@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useRef, useState } from 'react';
 import {
-  BadgeCheck, BookOpen, ChevronDown, ChevronRight, Heart, ImagePlus, MessageCircle, Newspaper,
-  Plus, Search, Send, ShieldCheck, Users, X,
+  BadgeCheck, BookOpen, ChevronDown, ChevronRight, ExternalLink, Heart, ImagePlus, MessageCircle,
+  Newspaper, Plus, Search, Send, ShieldCheck, Sparkles, Users, X,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -11,13 +11,14 @@ import { cn } from '@/lib/cn';
 import { useProfile } from '@/context/ProfileContext';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { ArticleModal } from '@/components/mother/ArticleModal';
+import { NewsThumb } from '@/components/mother/NewsThumb';
 import {
   KIND_TINT, newsFor, readingFor, type Article, type LifeStage,
 } from '@/data/reading';
 
 const C = { brand: '#3f66f0', rose: '#f2789f', mint: '#2fbf9b', violet: '#8b7bf3', peach: '#fb7534' };
 
-type Role = 'mother' | 'midwife' | 'doctor';
+type Role = 'mother' | 'doctor';
 
 interface Comment {
   id: string;
@@ -61,7 +62,7 @@ const SEED: Post[] = [
     body: 'I fall asleep fine but wake around 3am and can’t settle again. Side-lying with a pillow helps a little. What worked for you?',
     hearts: 32, clinicianAnswered: true, ago: '2h',
     comments: [
-      { id: 'c1', author: 'Sister Amina', role: 'midwife', body: 'Very common in the third trimester. Keep the room dark and avoid checking the time — it raises alertness. If you are awake past 30 minutes, get up briefly rather than lying there.', ago: '1h' },
+      { id: 'c1', author: 'Dr. Priya Nair', role: 'doctor', body: 'Very common in the third trimester. Keep the room dark and avoid checking the time — it raises alertness. If you are awake past 30 minutes, get up briefly rather than lying there.', ago: '1h' },
       { id: 'c2', author: 'Priya S.', role: 'mother', body: 'A pillow under the bump as well as between the knees was what finally worked for me.', ago: '40m' },
     ],
   },
@@ -77,7 +78,7 @@ const SEED: Post[] = [
   {
     id: 'p3', author: 'Farhana R.', role: 'mother', week: 25, topic: 'Nutrition',
     title: 'Iron tablets making me nauseous — alternatives?',
-    body: 'Taking them on an empty stomach was a mistake. My midwife suggested taking them with orange juice at night instead. Sharing in case it helps someone.',
+    body: 'Taking them on an empty stomach was a mistake. My doctor suggested taking them with orange juice at night instead. Sharing in case it helps someone.',
     hearts: 47, clinicianAnswered: false, ago: '1d',
     comments: [],
   },
@@ -100,7 +101,7 @@ const SEED: Post[] = [
     hearts: 41, clinicianAnswered: false, ago: '4d', comments: [],
   },
   {
-    id: 'p8', author: 'Sister Amina', role: 'midwife', topic: 'Second trimester',
+    id: 'p8', author: 'Dr. Priya Nair', role: 'doctor', topic: 'Second trimester',
     title: 'Braxton Hicks vs real contractions — how to tell',
     body: 'Practice contractions are irregular and ease when you change position or drink water. Real ones get longer, stronger and closer together.',
     hearts: 95, clinicianAnswered: true, ago: '5d', comments: [],
@@ -108,7 +109,7 @@ const SEED: Post[] = [
   {
     id: 'p9', author: 'Shirin A.', role: 'mother', week: 31, topic: 'Sleep',
     title: 'Restless legs at night — anyone else?',
-    body: 'Worse in the last few weeks. My midwife is checking my iron levels.',
+    body: 'Worse in the last few weeks. My doctor is checking my iron levels.',
     hearts: 18, clinicianAnswered: false, ago: '6d', comments: [],
   },
   {
@@ -130,7 +131,7 @@ const SEED: Post[] = [
     hearts: 56, clinicianAnswered: false, ago: '1w', comments: [],
   },
   {
-    id: 'p4', author: 'Sister Amina', role: 'midwife', topic: 'Birth prep',
+    id: 'p4', author: 'Dr. Priya Nair', role: 'doctor', topic: 'Birth prep',
     title: 'What to actually pack in your hospital bag (week 34 checklist)',
     body: 'Most lists are far too long. You need documents, a phone charger, comfortable clothes and something for baby to go home in. Everything else is optional.',
     hearts: 88, clinicianAnswered: true, ago: '2d',
@@ -140,12 +141,13 @@ const SEED: Post[] = [
 
 const ROLE_META: Record<Role, { label: string; color: string }> = {
   mother: { label: 'Mother', color: C.rose },
-  midwife: { label: 'Midwife', color: C.mint },
   doctor: { label: 'Doctor', color: C.brand },
 };
 
 const PAGE = 5;
 const MAX_SHOWN = 10;
+/** news stories revealed per "load more" */
+const NEWS_PAGE = 4;
 
 const uid = () => `x-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 const initials = (n: string) => n.split(' ').map((w) => w[0]).slice(0, 2).join('');
@@ -187,18 +189,38 @@ function RulesNote({ compact }: { compact?: boolean }) {
         ))}
       </ul>
       <p className="mt-3 text-[10px] font-medium leading-relaxed text-ink-faint">
-        Posts are moderated. Clinical answers are reviewed by a registered midwife or doctor.
+        Posts are moderated. Clinical answers are reviewed by a registered doctor.
       </p>
     </motion.div>
   );
 }
 
-export function CommunitySection({ week, stage = 'pregnant' }: { week: number; stage?: LifeStage }) {
+interface CommunityProps {
+  week: number;
+  stage?: LifeStage;
+  /** symptom labels from her journal — used to rank the news feed */
+  symptoms?: string[];
+  /** true when today's water intake is below target */
+  lowHydration?: boolean;
+}
+
+export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowHydration }: CommunityProps) {
   const me = useProfile();
   const [shown, setShown] = useState(PAGE);
+  const [newsShown, setNewsShown] = useState(NEWS_PAGE);
   const [article, setArticle] = useState<Article | null>(null);
   const reading = readingFor(stage, week);
-  const news = newsFor(stage);
+
+  // joined so the memo re-runs when the journal changes, not on every render
+  const symptomKey = symptoms.join('|');
+  const news = useMemo(
+    () => newsFor(stage, {
+      symptoms, week, lowHydration,
+      age: me.details.age, bloodGroup: me.details.bloodGroup,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stage, symptomKey, week, lowHydration, me.details.age, me.details.bloodGroup],
+  );
   const [posts, setPosts] = useState<Post[]>(SEED);
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
@@ -622,7 +644,7 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
             </GlassCard>
           </Reveal>
 
-          {/* trending, matched to her stage */}
+          {/* trending, ranked against her own logged symptoms and history */}
           <Reveal delay={0.15}>
             <GlassCard float className="p-5">
               <div className="flex items-center gap-2.5">
@@ -630,25 +652,25 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
                   <Newspaper className="h-[18px] w-[18px]" />
                 </span>
                 <div>
-                  <div className="text-sm font-bold text-ink">Trending for you</div>
-                  <div className="text-[11px] text-ink-muted">News matched to your stage</div>
+                  <div className="text-sm font-bold text-ink">Trending news for you</div>
+                  <div className="text-[11px] text-ink-muted">Matched to your week, symptoms and history</div>
                 </div>
               </div>
 
               <div className="mt-3 divide-y divide-white/60">
-                {news.map((n, i) => (
-                  <motion.button
+                {news.slice(0, newsShown).map((n, i) => (
+                  <motion.a
                     key={n.id}
+                    href={n.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 8 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.05, duration: 0.35 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(i % NEWS_PAGE, 4) * 0.05, duration: 0.35 }}
                     className="group flex w-full gap-3 py-3 text-left first:pt-1"
                   >
-                    <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-lg text-[10px] font-extrabold"
-                      style={{ background: `${KIND_TINT[n.kind]}1f`, color: KIND_TINT[n.kind] }}>
-                      {i + 1}
-                    </span>
+                    <NewsThumb image={n.image} className="h-[74px] w-[86px] flex-none transition group-hover:brightness-110" />
+
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-x-1.5">
                         <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
@@ -657,14 +679,39 @@ export function CommunitySection({ week, stage = 'pregnant' }: { week: number; s
                         </span>
                         <span className="text-[10px] font-semibold text-ink-faint">{n.source} · {n.ago}</span>
                       </span>
-                      <span className="mt-1 block text-[12px] font-bold leading-snug text-ink group-hover:text-brand-700">
-                        {n.title}
+
+                      <span className="mt-1 flex items-start gap-1">
+                        <span className="min-w-0 flex-1 text-[12px] font-bold leading-snug text-ink group-hover:text-brand-700">
+                          {n.title}
+                        </span>
+                        <ExternalLink className="mt-[3px] h-3 w-3 flex-none text-ink-faint opacity-0 transition group-hover:opacity-100" />
                       </span>
-                      <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-muted">{n.summary}</span>
+
+                      <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-ink-muted">{n.summary}</span>
+
+                      {n.reason && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-1.5 py-0.5 text-[9px] font-bold text-brand-700">
+                          <Sparkles className="h-2.5 w-2.5" /> {n.reason}
+                        </span>
+                      )}
                     </span>
-                  </motion.button>
+                  </motion.a>
                 ))}
               </div>
+
+              {newsShown < news.length ? (
+                <button
+                  onClick={() => setNewsShown((n) => n + NEWS_PAGE)}
+                  className="mt-3 w-full rounded-2xl border border-white/70 bg-white/60 py-2.5 text-[12px] font-bold text-ink-soft transition hover:bg-white hover:text-ink"
+                >
+                  Load more news{' '}
+                  <span className="font-semibold text-ink-faint">({news.length - newsShown} more)</span>
+                </button>
+              ) : (
+                <p className="mt-3 text-center text-[11px] font-semibold text-ink-faint">
+                  That’s everything for your stage this week.
+                </p>
+              )}
             </GlassCard>
           </Reveal>
         </div>

@@ -52,7 +52,7 @@ export const SYMPTOM_LEXICON: LexiconEntry[] = [
     label: 'Headache', keywords: ['headache', 'head ache', 'migraine', 'head hurts'],
     effect: 'Often dehydration or fatigue — persistent ones need review.',
     causes: ['Dehydration', 'Poor sleep or skipped meals', 'Caffeine change', 'Tension in neck and shoulders'],
-    relief: ['Drink 500 ml of water now', 'Rest in a dark, quiet room', 'Cool compress on the forehead', 'Paracetamol is generally considered safe — confirm with your midwife'],
+    relief: ['Drink 500 ml of water now', 'Rest in a dark, quiet room', 'Cool compress on the forehead', 'Paracetamol is generally considered safe — confirm with your doctor'],
   },
   {
     label: 'Dizziness', keywords: ['dizzy', 'dizziness', 'light headed', 'lightheaded', 'faint'],
@@ -106,7 +106,7 @@ export const SYMPTOM_LEXICON: LexiconEntry[] = [
     label: 'Blurred vision', keywords: ['blurred vision', 'blurry vision', 'seeing spots', 'vision changes', 'flashing lights'], urgent: true,
     effect: 'A recognised pre-eclampsia warning sign.',
     causes: ['Raised blood pressure / pre-eclampsia', 'Fluid changes affecting the eye', 'Low blood sugar'],
-    relief: ['Have your blood pressure checked today', 'Do not drive while vision is affected', 'Contact your midwife or maternity unit now'],
+    relief: ['Have your blood pressure checked today', 'Do not drive while vision is affected', 'Contact your doctor or maternity unit now'],
   },
   {
     label: 'Severe headache', keywords: ['severe headache', 'worst headache', 'terrible headache', 'pounding headache'], urgent: true,
@@ -148,13 +148,13 @@ export const SYMPTOM_LEXICON: LexiconEntry[] = [
     label: 'Anxiety', keywords: ['anxious', 'anxiety', 'worried', 'panic', 'stressed', 'stress'],
     effect: 'Maternal stress affects sleep, blood pressure and appetite.',
     causes: ['Normal worry about birth and baby', 'Sleep deprivation', 'Hormonal shifts', 'Life or financial pressure'],
-    relief: ['Slow breathing: 4 in, 6 out, for 2 minutes', 'Name it to someone you trust today', 'Gentle movement outdoors', 'Ask your midwife about perinatal mental health support'],
+    relief: ['Slow breathing: 4 in, 6 out, for 2 minutes', 'Name it to someone you trust today', 'Gentle movement outdoors', 'Ask your doctor about perinatal mental health support'],
   },
   {
     label: 'Low mood', keywords: ['sad', 'low mood', 'depressed', 'crying', 'tearful', 'down'],
-    effect: 'Persistent low mood deserves support — please tell your midwife.',
+    effect: 'Persistent low mood deserves support — please tell your doctor.',
     causes: ['Hormonal changes', 'Exhaustion', 'Isolation or lack of support', 'Antenatal depression — common and treatable'],
-    relief: ['Tell your midwife — this is a routine, supported conversation', 'Daylight and gentle activity each day', 'Stay connected; do not carry it alone'],
+    relief: ['Tell your doctor — this is a routine, supported conversation', 'Daylight and gentle activity each day', 'Stay connected; do not carry it alone'],
   },
 ];
 

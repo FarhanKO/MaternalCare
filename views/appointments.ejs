@@ -76,12 +76,15 @@
             <td><b style="color:var(--ink)"><%= a.doctor_name %></b><br><small style="color:var(--ink-3)"><%= a.specialty %></small></td>
             <td><%= a.reason %></td>
             <td>
-              <span class="pill <%= a.status === 'upcoming' ? 'pill-info' : a.status === 'completed' ? 'pill-good' : 'pill-neutral' %>">
-                <%= a.status === 'upcoming' ? '🗓️ Upcoming' : a.status === 'completed' ? '✓ Completed' : '✕ Cancelled' %>
+              <span class="pill <%= a.status === 'requested' ? 'pill-warning' : a.status === 'accepted' ? 'pill-info' : a.status === 'completed' ? 'pill-good' : 'pill-neutral' %>">
+                <%= a.status === 'requested' ? '⏳ Awaiting reply'
+                  : a.status === 'accepted' ? '🗓️ Upcoming'
+                  : a.status === 'completed' ? '✓ Completed'
+                  : a.status === 'declined' ? '✕ Declined' : '✕ Cancelled' %>
               </span>
             </td>
             <td style="text-align:right">
-              <% if (a.status === 'upcoming') { %>
+              <% if (a.status === 'accepted' || a.status === 'requested') { %>
                 <form method="POST" action="/appointments/<%= a.id %>/cancel" style="display:inline">
                   <button class="btn btn-ghost btn-sm">Cancel</button>
                 </form>

@@ -53,8 +53,13 @@ module.exports = {
     return this.find(Number(info.lastInsertRowid));
   },
 
-  remove(id) {
-    db.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+  /** Scoped to the owner so one account cannot delete another's reminders. */
+  remove(id, userId) {
+    if (userId === undefined) {
+      db.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+      return;
+    }
+    db.prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?').run(id, userId);
   },
 
   /** The single next thing due — surfaced on the dashboard card. */

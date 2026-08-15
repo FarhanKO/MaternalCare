@@ -351,10 +351,13 @@ export function AppointmentModal({ open, onClose, reminders, onChange }: Props) 
                               c.overdue ? 'bg-rose-500/12 text-rose-700' : 'bg-brand-500/10 text-brand-700')}>
                               {c.text}
                             </span>
-                            <button onClick={() => remove(r.id)} aria-label={`Delete ${r.title}`}
-                              className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            {/* care a clinician scheduled is theirs to withdraw, not hers */}
+                            {!r.assignedBy && (
+                              <button onClick={() => remove(r.id)} aria-label={`Delete ${r.title}`}
+                                className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </motion.div>
                         );
                       })}

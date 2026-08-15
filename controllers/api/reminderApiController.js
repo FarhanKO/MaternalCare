@@ -23,7 +23,18 @@ exports.create = (req, res) => {
   }
 };
 
+/**
+ * A mother can clear her own reminders, but not care a clinician scheduled for
+ * her — the assign screen promises exactly that, so it is enforced here rather
+ * than only hidden in the UI.
+ */
 exports.destroy = (req, res) => {
-  reminderModel.remove(req.params.id);
+  const user = userModel.current();
+  const reminder = reminderModel.find(req.params.id);
+  if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
+  if (reminder.assignedBy) {
+    return res.status(403).json({ error: `Only ${reminder.assignedBy} can remove this` });
+  }
+  reminderModel.remove(req.params.id, user.id);
   res.status(204).end();
 };

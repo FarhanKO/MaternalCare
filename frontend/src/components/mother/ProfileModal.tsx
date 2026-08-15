@@ -21,7 +21,7 @@ const BLOOD_GROUPS = ['A+', 'A−', 'B+', 'B−', 'O+', 'O−', 'AB+', 'AB−'];
 
 const CARE_TEAM: CareMember[] = [
   { name: 'Dr. Lena Ortiz', role: 'Obstetrician', initials: 'LO', tint: '#3f66f0' },
-  { name: 'Sister Amina', role: 'Midwife', initials: 'SA', tint: '#2fbf9b' },
+  { name: 'Dr. Priya Nair', role: 'Obstetrician', initials: 'PN', tint: '#2fbf9b' },
 ];
 
 const MENU = [

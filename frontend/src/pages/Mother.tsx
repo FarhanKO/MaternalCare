@@ -17,6 +17,7 @@ import { SymptomModal } from '@/components/mother/SymptomModal';
 import { AppointmentModal } from '@/components/mother/AppointmentModal';
 import { MotherTabs, type MotherTab } from '@/components/mother/MotherTabs';
 import { CommunitySection } from '@/components/mother/CommunitySection';
+import { FindDoctorSection } from '@/components/mother/FindDoctorSection';
 import { RemindersSection } from '@/components/mother/RemindersSection';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
@@ -69,7 +70,7 @@ const MOODS = [
   { name: 'Tired', face: '😴', note: 'Rest when you can — week 26 fatigue is normal.', tint: '#22b8c4' },
   { name: 'Anxiety', face: '😰', note: 'Try slow breathing. Your care team is one tap away.', tint: '#fb7534' },
   { name: 'Sad', face: '😢', note: 'Be gentle with yourself. Talk to someone you trust.', tint: '#5b83fb' },
-  { name: 'Stress', face: '😣', note: 'Pause and stretch. Tell your midwife if it persists.', tint: '#e5484d' },
+  { name: 'Stress', face: '😣', note: 'Pause and stretch. Tell your doctor if it persists.', tint: '#e5484d' },
 ];
 
 /** Greeting for the viewer's own local time. */
@@ -482,8 +483,9 @@ export function Mother() {
   const [apptOpen, setApptOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const urlTab = params.get('tab') as MotherTab | null;
+  const TABS: MotherTab[] = ['dashboard', 'vitals', 'reminders', 'care', 'community'];
   const [tab, setTabState] = useState<MotherTab>(
-    urlTab && ['dashboard', 'vitals', 'reminders', 'community'].includes(urlTab) ? urlTab : 'dashboard',
+    urlTab && TABS.includes(urlTab) ? urlTab : 'dashboard',
   );
   // keep the URL in step so sections are linkable and survive a refresh
   const setTab = (t: MotherTab) => {
@@ -491,9 +493,7 @@ export function Mother() {
     setParams(t === 'dashboard' ? {} : { tab: t }, { replace: true });
   };
   useEffect(() => {
-    if (urlTab && urlTab !== tab && ['dashboard', 'vitals', 'reminders', 'community'].includes(urlTab)) {
-      setTabState(urlTab);
-    }
+    if (urlTab && urlTab !== tab && TABS.includes(urlTab)) setTabState(urlTab);
   }, [urlTab]);
   const [profileOpen, setProfileOpen] = useState(false);
   const profile = useProfile();
@@ -1294,11 +1294,24 @@ export function Mother() {
         </motion.div>
         )}
 
+        {/* ============================== FIND CARE ============================== */}
+        {tab === 'care' && (
+        <motion.div key="tab-care" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+          <FindDoctorSection stage={communityStage} />
+        </motion.div>
+        )}
+
         {/* ============================== COMMUNITY ============================== */}
         {tab === 'community' && (
         <motion.div key="tab-community" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-          <CommunitySection week={26} stage={communityStage} />
+          <CommunitySection
+            week={26}
+            stage={communityStage}
+            symptoms={symptoms.map((s) => s.name)}
+            lowHydration={water < WATER_GOAL}
+          />
         </motion.div>
         )}
       </main>

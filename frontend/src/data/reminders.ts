@@ -37,7 +37,7 @@ export const KIND_ORDER: ReminderKind[] = ['doctor', 'test', 'medicine', 'exerci
 /** Suggested titles offered when a kind is chosen. */
 export const KIND_SUGGESTIONS: Record<ReminderKind, string[]> = {
   medicine: ['Prenatal vitamin', 'Iron tablet', 'Folic acid', 'Calcium'],
-  doctor: ['Midwife check-up', 'Growth scan', 'Consultant review', 'Anti-D injection'],
+  doctor: ['Doctor check-up', 'Growth scan', 'Consultant review', 'Anti-D injection'],
   test: ['Glucose screening', 'Blood test', 'Urine sample', 'Ultrasound'],
   exercise: ['Prenatal yoga', 'Walk 20 minutes', 'Pelvic floor exercises', 'Swimming'],
   vaccination: ['Whooping cough (Tdap)', 'Flu vaccine', 'Anti-D injection', 'COVID booster'],
