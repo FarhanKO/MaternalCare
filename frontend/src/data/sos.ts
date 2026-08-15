@@ -29,6 +29,8 @@ export interface SosAlert {
   notifications: SosNotification[];
   /** how many were genuinely reached */
   reached: number;
+  /** her configured emergency line, so responders dial the right one */
+  emergencyNumber?: string;
 }
 
 export interface Guardian {
@@ -52,6 +54,9 @@ export const RELATIONS = [
 
 /** How long the mother has to change her mind before the alert goes out. */
 export const COUNTDOWN_SECONDS = 5;
+
+/** Shown until her own number loads; the emergency line differs by country. */
+export const DEFAULT_EMERGENCY = '999';
 
 /** A map link that needs no API key and opens anywhere. */
 export const mapLink = (l: SosLocation) =>

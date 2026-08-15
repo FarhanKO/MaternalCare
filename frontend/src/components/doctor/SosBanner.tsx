@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crosshair, MapPin, Phone, Siren } from 'lucide-react';
 import { api } from '@/lib/api';
 import { startAlarm, stopAlarm } from '@/lib/alarm';
-import { formatCoords, mapLink, sinceLabel, type SosAlert } from '@/data/sos';
+import { DEFAULT_EMERGENCY, formatCoords, mapLink, sinceLabel, type SosAlert } from '@/data/sos';
 
 const POLL_MS = 15000;
 
@@ -98,10 +98,10 @@ export function SosBanner({ doctorId }: { doctorId: string }) {
                 </a>
               )}
               <a
-                href="tel:999"
+                href={`tel:${a.emergencyNumber ?? DEFAULT_EMERGENCY}`}
                 className="inline-flex items-center gap-1.5 rounded-2xl border border-white/40 bg-white/15 px-3.5 py-2.5 text-[12px] font-extrabold text-white transition hover:bg-white/25"
               >
-                <Phone className="h-3.5 w-3.5" /> Call
+                <Phone className="h-3.5 w-3.5" /> Call {a.emergencyNumber ?? DEFAULT_EMERGENCY}
               </a>
             </div>
           </div>

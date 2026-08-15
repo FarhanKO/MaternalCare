@@ -23,7 +23,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
-  if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} failed (${res.status})`);
+  if (!res.ok) {
+    // the server explains itself ("That is not a dialable number"); showing
+    // "PATCH /sos/emergency-number failed (400)" instead helps nobody
+    let message = `${init?.method ?? 'GET'} ${path} failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* not JSON — keep the generic message */
+    }
+    throw new Error(message);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -130,8 +141,15 @@ export const api = {
   /* --------------------------------------------------- emergency SOS */
 
   getSosState: () =>
-    request<Envelope<{ active: SosAlert | null; contacts: Guardian[]; history: SosAlert[] }>>('/sos')
-      .then((r) => r.data),
+    request<Envelope<{
+      active: SosAlert | null; contacts: Guardian[]; history: SosAlert[]; emergencyNumber: string;
+    }>>('/sos').then((r) => r.data),
+
+  setEmergencyNumber: (number: string) =>
+    request<Envelope<{ emergencyNumber: string }>>('/sos/emergency-number', {
+      method: 'PATCH',
+      body: JSON.stringify({ number }),
+    }).then((r) => r.data.emergencyNumber),
 
   raiseSos: (body: { lat?: number; lng?: number; accuracy?: number; locationNote?: string }) =>
     request<Envelope<SosAlert>>('/sos', {

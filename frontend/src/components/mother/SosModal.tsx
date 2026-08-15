@@ -2,14 +2,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BellRing, Check, Clock, Crosshair, Download, Hospital, MapPin, Phone, Plus,
+  BellRing, Check, Clock, Crosshair, Download, Hospital, MapPin, Pencil, Phone, Plus,
   ShieldCheck, Smartphone, Trash2, TriangleAlert, UserPlus, X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import { audioSupported, confirmTone, stopAlarm, tick as tickSound } from '@/lib/alarm';
 import {
-  CHANNEL_META, COUNTDOWN_SECONDS, formatCoords, mapLink, RELATIONS, sinceLabel,
+  CHANNEL_META, COUNTDOWN_SECONDS, DEFAULT_EMERGENCY, formatCoords, mapLink, RELATIONS, sinceLabel,
   type Guardian, type SosAlert,
 } from '@/data/sos';
 
@@ -106,6 +106,10 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
   const [relation, setRelation] = useState(RELATIONS[0]);
   const [phone, setPhone] = useState('');
 
+  const [emergencyNumber, setEmergencyNumber] = useState(DEFAULT_EMERGENCY);
+  const [editingNumber, setEditingNumber] = useState(false);
+  const [numberDraft, setNumberDraft] = useState(DEFAULT_EMERGENCY);
+
   const tick = useRef<number | null>(null);
   const remaining = useRef(COUNTDOWN_SECONDS);
   const locating = useRef<Promise<Awaited<ReturnType<typeof locate>>> | null>(null);
@@ -114,6 +118,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
     try {
       const s = await api.getSosState();
       setGuardians(s.contacts);
+      setEmergencyNumber(s.emergencyNumber);
       if (s.active) {
         setAlert(s.active);
         setPhase('sent');
@@ -201,6 +206,22 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
     } catch (e) {
       setError((e as Error).message);
     }
+  };
+
+  const saveNumber = async () => {
+    setError('');
+    try {
+      setEmergencyNumber(await api.setEmergencyNumber(numberDraft));
+      setEditingNumber(false);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const cancelNumber = () => {
+    setNumberDraft(emergencyNumber);
+    setEditingNumber(false);
+    setError('');
   };
 
   const addGuardian = async () => {
@@ -305,11 +326,13 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                         : phase === 'guardians' ? 'Your guardians'
                         : 'Emergency SOS'}
                     </h2>
-                    <p className="mt-1 text-sm text-ink-muted">
-                      {phase === 'sent' ? 'Everyone below has your location.'
-                        : phase === 'guardians' ? 'They are alerted the moment you press SOS.'
-                        : `Hold nothing — one press starts a ${COUNTDOWN_SECONDS}-second countdown.`}
-                    </p>
+                    {phase !== 'ready' && (
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {phase === 'sent'
+                          ? 'Everyone below has your location.'
+                          : 'They are alerted the moment you press SOS.'}
+                      </p>
+                    )}
                   </div>
                   <button onClick={onClose} aria-label="Close"
                     className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-white/70 text-ink-soft transition hover:text-ink">
@@ -412,10 +435,10 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                       </div>
 
                       <a
-                        href="tel:999"
+                        href={`tel:${emergencyNumber}`}
                         className="flex items-center justify-center gap-2 rounded-3xl bg-gradient-to-br from-rose-500 to-rose-600 py-3.5 text-sm font-extrabold text-white shadow-[0_10px_30px_-8px_rgba(225,29,72,0.5)]"
                       >
-                        <Phone className="h-[18px] w-[18px]" /> Call emergency services
+                        <Phone className="h-[18px] w-[18px]" /> Call {emergencyNumber}
                       </a>
                     </div>
                   )}
@@ -517,18 +540,61 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                             </span>
                           </span>
                         </button>
-                        <a
-                          href="tel:999"
-                          className="flex items-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-3 py-2.5 transition hover:bg-white"
-                        >
-                          <Hospital className="h-4 w-4 flex-none text-rose-600" />
-                          <span className="min-w-0">
-                            <span className="block text-[12px] font-bold text-ink">Call 999</span>
-                            <span className="block text-[10px] font-semibold text-ink-faint">
-                              Ambulance
-                            </span>
-                          </span>
-                        </a>
+                        {editingNumber ? (
+                          <div className="rounded-2xl border border-rose-300/70 bg-white/80 px-2.5 py-2">
+                            <label className="block text-[9px] font-bold uppercase tracking-wider text-ink-faint">
+                              Emergency number
+                            </label>
+                            <input
+                              value={numberDraft}
+                              onChange={(e) => setNumberDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveNumber();
+                                if (e.key === 'Escape') cancelNumber();
+                              }}
+                              inputMode="tel"
+                              autoFocus
+                              aria-label="Emergency number"
+                              className="mt-0.5 h-7 w-full bg-transparent text-[13px] font-bold text-ink outline-none"
+                            />
+                            <div className="mt-1 flex gap-1">
+                              <button onClick={saveNumber}
+                                className="flex-1 rounded-lg bg-rose-600 py-1 text-[10px] font-bold text-white transition hover:bg-rose-700">
+                                Save
+                              </button>
+                              <button onClick={cancelNumber}
+                                className="rounded-lg px-2 py-1 text-[10px] font-bold text-ink-muted transition hover:text-ink">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-stretch gap-1">
+                            <a
+                              href={`tel:${emergencyNumber}`}
+                              className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-3 py-2.5 transition hover:bg-white"
+                            >
+                              <Hospital className="h-4 w-4 flex-none text-rose-600" />
+                              <span className="min-w-0">
+                                <span className="block truncate text-[12px] font-bold text-ink">
+                                  Call {emergencyNumber}
+                                </span>
+                                <span className="block text-[10px] font-semibold text-ink-faint">
+                                  Ambulance
+                                </span>
+                              </span>
+                            </a>
+                            {/* a button cannot live inside the anchor, so it sits beside it */}
+                            <button
+                              onClick={() => { setNumberDraft(emergencyNumber); setEditingNumber(true); }}
+                              aria-label="Change the emergency number"
+                              title="Change the emergency number"
+                              className="grid w-9 flex-none place-items-center rounded-2xl border border-white/60 bg-white/60 text-ink-faint transition hover:bg-white hover:text-ink"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* what actually happens — no surprises mid-emergency */}

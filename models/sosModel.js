@@ -16,6 +16,8 @@ const db = require('../config/database');
 const messageModel = require('./messageModel');
 
 const OPEN = 'active';
+/** Bangladesh's national emergency line; overridable per account. */
+const DEFAULT_EMERGENCY = '999';
 
 const toContact = (c) => ({
   id: String(c.id),
@@ -73,6 +75,33 @@ function cliniciansFor(userId) {
 }
 
 module.exports = {
+  /* -------------------------------------------------- emergency line */
+
+  emergencyNumber(userId) {
+    const row = db.prepare('SELECT emergency_number FROM users WHERE id = ?').get(userId);
+    return (row && row.emergency_number) || DEFAULT_EMERGENCY;
+  },
+
+  /**
+   * Digits and the usual dialling punctuation only — this ends up in a tel:
+   * link, so anything else could smuggle in a different scheme. Brackets are
+   * allowed because "(02) 5566 7788" is how people write an area code.
+   */
+  setEmergencyNumber(userId, value) {
+    const cleaned = String(value ?? '').trim();
+    if (!cleaned) throw new Error('An emergency number is required');
+
+    const digits = (cleaned.match(/\d/g) || []).length;
+    const shaped = /^[+(]?[0-9\s\-()]*$/.test(cleaned);
+    // short lines like 999 and 112 are valid; 2 digits is the realistic floor
+    if (!shaped || digits < 2 || cleaned.length > 20) {
+      throw new Error('That is not a dialable number');
+    }
+
+    db.prepare('UPDATE users SET emergency_number = ? WHERE id = ?').run(cleaned, userId);
+    return cleaned;
+  },
+
   /* --------------------------------------------------------- guardians */
 
   contacts(userId) {
@@ -129,8 +158,13 @@ module.exports = {
       )
       ORDER BY s.id DESC
     `).all(doctorId).map((row) => {
-      const patient = db.prepare('SELECT name FROM users WHERE id = ?').get(row.user_id);
-      return { ...toAlert(row), patientName: patient ? patient.name : 'Unknown patient' };
+      const patient = db.prepare('SELECT name, emergency_number FROM users WHERE id = ?').get(row.user_id);
+      return {
+        ...toAlert(row),
+        patientName: patient ? patient.name : 'Unknown patient',
+        // her line, not a hardcoded one — the clinic may be in another country
+        emergencyNumber: (patient && patient.emergency_number) || DEFAULT_EMERGENCY,
+      };
     });
   },
 

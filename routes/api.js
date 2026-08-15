@@ -55,6 +55,7 @@ router.delete('/appointments/:id', careApi.cancel);
 router.get('/sos', sosApi.state);
 router.post('/sos', sosApi.trigger);
 router.post('/sos/:id/close', sosApi.close);
+router.patch('/sos/emergency-number', sosApi.setEmergencyNumber);
 router.get('/guardians', sosApi.contacts);
 router.post('/guardians', sosApi.addContact);
 router.delete('/guardians/:id', sosApi.removeContact);

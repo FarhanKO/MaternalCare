@@ -219,6 +219,11 @@ if (!userCols.includes('next_visit')) {
   db.exec("ALTER TABLE users ADD COLUMN next_visit TEXT");
 }
 
+// Sprint 3: the emergency line differs by country, so it is hers to set
+if (!userCols.includes('emergency_number')) {
+  db.exec("ALTER TABLE users ADD COLUMN emergency_number TEXT NOT NULL DEFAULT '999'");
+}
+
 // Sprint 3: a guardian who has installed the companion app can be force-alarmed
 const contactCols = db.prepare('PRAGMA table_info(emergency_contacts)').all().map((c) => c.name);
 if (!contactCols.includes('app_linked')) {

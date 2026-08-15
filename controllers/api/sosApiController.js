@@ -14,8 +14,18 @@ exports.state = (req, res) => {
       active: sosModel.active(user.id),
       contacts: sosModel.contacts(user.id),
       history: sosModel.history(user.id),
+      emergencyNumber: sosModel.emergencyNumber(user.id),
     },
   });
+};
+
+exports.setEmergencyNumber = (req, res) => {
+  const user = userModel.current();
+  try {
+    res.json({ data: { emergencyNumber: sosModel.setEmergencyNumber(user.id, req.body?.number) } });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };
 
 exports.trigger = (req, res) => {
