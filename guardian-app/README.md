@@ -32,6 +32,34 @@ The token is a 24-character random string stored on that guardian's row in
 address bar. It is a credential — anyone holding it can read her wellbeing
 summary, so it is shown in the mother's app with that warning attached.
 
+## The server address is not compiled in
+
+Inside the APK, `localhost` means the phone. A baked-in address would
+guarantee the app could never reach the server, so the address travels in
+the pairing link instead:
+
+```
+http://<guardian-host>/?t=<token>&api=<http://host:3000/api>
+```
+
+It is stored next to the token, and falls back to the host the page was
+served from. One APK therefore works against a laptop on the wifi, a
+college server or a real deployment with no rebuild. If a link carries an
+address the phone cannot see, the app's error screen has a field to
+correct it.
+
+## Testing on a real phone
+
+Start the mother's frontend with the machine's wifi address, so the links
+it generates point somewhere the phone can actually reach:
+
+```bash
+cd frontend && VITE_API_URL=http://192.168.0.249:3000/api npm run dev
+```
+
+Substitute your own address. The backend already accepts private-network
+origins in development.
+
 ## Running it
 
 ```bash

@@ -216,7 +216,9 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
    * falls back to the clipboard on a desktop.
    */
   const shareLink = async (g: Guardian) => {
-    const url = `${GUARDIAN_APP_URL}/?t=${g.token}`;
+    // the server address travels with the link: inside the APK "localhost"
+    // is the phone, so it can never be compiled into the app
+    const url = `${GUARDIAN_APP_URL}/?t=${g.token}&api=${encodeURIComponent(`${API_ORIGIN}/api`)}`;
     const text = `Here is your Guardian app link. Open it on your phone and add it to your home screen — you will be alerted the moment I need help.`;
     try {
       if (navigator.share) {

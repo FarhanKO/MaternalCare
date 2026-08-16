@@ -4,7 +4,37 @@
  * server's Model layer (models/guardianModel.js). This file just carries it.
  */
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+/**
+ * Where the server is.
+ *
+ * This cannot be compiled in. Inside the APK "localhost" is the phone
+ * itself, so a baked-in address means the app can never reach the server.
+ * The pairing link carries it instead, and it is stored alongside the token
+ * — so the same APK works against a laptop on the wifi, a college server or
+ * a real deployment with no rebuild.
+ */
+const API_KEY = 'guardian.api';
+
+const readApiBase = () => {
+  const fromUrl = new URLSearchParams(window.location.search).get('api');
+  if (fromUrl) {
+    localStorage.setItem(API_KEY, fromUrl);
+    return fromUrl;
+  }
+  return localStorage.getItem(API_KEY)
+    ?? import.meta.env.VITE_API_URL
+    ?? `${window.location.protocol}//${window.location.hostname}:3000/api`;
+};
+
+let BASE = readApiBase();
+
+export const apiBase = () => BASE;
+
+/** Lets a guardian point the app at the right server if the link was stale. */
+export const setApiBase = (url: string) => {
+  BASE = url.replace(/\/+$/, '');
+  localStorage.setItem(API_KEY, BASE);
+};
 
 export interface Overview {
   motherName: string;
@@ -66,7 +96,7 @@ export interface VitalPoint {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${apiBase()}${path}`);
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
@@ -86,7 +116,7 @@ export const api = {
 
   /** "I'm on my way" — shows on her screen as who is actually coming. */
   acknowledge: async (token: string) => {
-    const res = await fetch(`${BASE}/guardian/${token}/ack`, { method: 'POST' });
+    const res = await fetch(`${apiBase()}/guardian/${token}/ack`, { method: 'POST' });
     if (!res.ok) throw new Error('Could not send that');
     return (await res.json()).data as SosAlert;
   },
@@ -99,7 +129,8 @@ export const savedToken = () => {
   const fromUrl = new URLSearchParams(window.location.search).get('t');
   if (fromUrl) {
     localStorage.setItem(KEY, fromUrl);
-    // keep it out of the address bar and out of any screenshot she shares
+    // readApiBase() has already taken the api param by this point
+    // keep both out of the address bar and out of any screenshot they share
     window.history.replaceState({}, '', window.location.pathname);
     return fromUrl;
   }

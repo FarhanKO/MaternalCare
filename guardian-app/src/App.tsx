@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { HeartHandshake, Link2, RefreshCw } from 'lucide-react';
 import { Dashboard } from '@/components/Dashboard';
 import { SosScreen } from '@/components/SosScreen';
-import { api, savedToken, type Dashboard as Data, type SosAlert } from '@/lib/api';
+import {
+  api, apiBase, savedToken, setApiBase, type Dashboard as Data, type SosAlert,
+} from '@/lib/api';
 import { notify, startEmergency, stopEmergency, releaseScreen, unlockAudio } from '@/lib/alert';
 import { isNative, nativeAlarmOff, nativeAlarmOn, startNativeWatch } from '@/lib/native';
 
@@ -51,11 +53,8 @@ export function App() {
   // hand the pairing to the native watcher so it survives the app being closed
   useEffect(() => {
     if (!token || !data || !isNative()) return;
-    void startNativeWatch(
-      token,
-      import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api',
-      data.overview.motherName,
-    );
+    // the native watcher must poll the same server the web layer paired with
+    void startNativeWatch(token, apiBase(), data.overview.motherName);
   }, [token, data]);
 
   // the alert is polled on its own, faster and far smaller than the dashboard
@@ -138,8 +137,27 @@ export function App() {
         <div className="glass w-full max-w-sm rounded-4xl p-7 text-center">
           <h1 className="text-lg font-extrabold text-ink">Cannot reach her account</h1>
           <p className="mt-1.5 text-[12.5px] font-medium text-ink-muted">{error}</p>
+
+          {/* the link may carry an address this phone cannot see — say so
+              and let it be corrected here rather than needing a new build */}
+          <div className="mt-4 rounded-2xl border border-white/60 bg-white/60 p-3 text-left">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+              Server address
+            </label>
+            <input
+              defaultValue={apiBase()}
+              onBlur={(e) => setApiBase(e.target.value)}
+              aria-label="Server address"
+              className="mt-1 h-9 w-full rounded-xl border border-white/60 bg-white/80 px-2.5 text-[11px] font-semibold text-ink outline-none focus:border-brand-400"
+            />
+            <p className="mt-1 text-[10px] font-medium leading-relaxed text-ink-faint">
+              On a phone this cannot be “localhost” — use the computer’s address
+              on your wifi, like http://192.168.0.12:3000/api
+            </p>
+          </div>
+
           <button onClick={load}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-2xl bg-brand-500 px-4 py-2.5 text-[12px] font-bold text-white">
+            className="mt-3 inline-flex items-center gap-1.5 rounded-2xl bg-brand-500 px-4 py-2.5 text-[12px] font-bold text-white">
             <RefreshCw className="h-3.5 w-3.5" /> Try again
           </button>
         </div>
