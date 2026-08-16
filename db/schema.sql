@@ -20,9 +20,9 @@
 BEGIN;
 
 DROP TABLE IF EXISTS sos_notifications, sos_alerts, documents, messages,
-  reminders, symptoms, emergency_contacts, appointments, vitals,
+  reminders, symptoms, daily_logs, emergency_contacts, appointments, vitals,
   growth_records, milestones, children, pregnancies, vaccinations,
-  hospitals, posts, articles, doctors, users CASCADE;
+  hospitals, post_comments, posts, articles, doctors, users CASCADE;
 
 /* ------------------------------------------------------------- people */
 
@@ -40,7 +40,10 @@ CREATE TABLE users (
   conditions       TEXT    DEFAULT '',
   last_visit       DATE,
   next_visit       DATE,
-  emergency_number TEXT    NOT NULL DEFAULT '999'
+  emergency_number TEXT    NOT NULL DEFAULT '999',
+  -- profile photo, stored on disk like documents are; the row keeps the name
+  avatar_file      TEXT,
+  bio              TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE doctors (
@@ -253,15 +256,51 @@ CREATE TABLE articles (
   excerpt  TEXT
 );
 
+-- Rebuilt for the React community, which the old EJS shape could not hold:
+-- it had no role, no topic, no image and counted replies in an integer
+-- instead of storing them.
 CREATE TABLE posts (
-  id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  author    TEXT,
-  tag       TEXT,
-  title     TEXT NOT NULL,
-  body      TEXT,
-  replies   INTEGER NOT NULL DEFAULT 0,
-  likes     INTEGER NOT NULL DEFAULT 0,
-  time_ago  TEXT
+  id                INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- null for the seeded community voices, set for anything a real user writes
+  user_id           INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  author            TEXT    NOT NULL,
+  role              TEXT    NOT NULL DEFAULT 'mother'
+                              CHECK (role IN ('mother', 'doctor')),
+  -- pregnancy week at the time of writing, so "week 27" stays true later
+  week              INTEGER,
+  topic             TEXT,
+  title             TEXT    NOT NULL,
+  body              TEXT,
+  -- bytes on disk under data/uploads, same as documents
+  image_file        TEXT,
+  hearts            INTEGER NOT NULL DEFAULT 0,
+  clinician_answered BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX posts_recent_idx ON posts (created_at DESC);
+
+CREATE TABLE post_comments (
+  id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  author     TEXT    NOT NULL,
+  role       TEXT    NOT NULL DEFAULT 'mother' CHECK (role IN ('mother', 'doctor')),
+  body       TEXT    NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX post_comments_post_idx ON post_comments (post_id, created_at);
+
+-- What she reports about herself each day. One row per day, so the dashboard
+-- can chart a trend instead of forgetting the moment the tab closes.
+CREATE TABLE daily_logs (
+  id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  date         DATE    NOT NULL,
+  mood         TEXT    CHECK (mood IS NULL OR mood IN ('Happy', 'Calm', 'Loved',
+                              'Neutral', 'Tired', 'Anxiety', 'Sad', 'Stress')),
+  kicks        INTEGER CHECK (kicks IS NULL OR kicks >= 0),
+  water_litres REAL    CHECK (water_litres IS NULL OR water_litres >= 0),
+  UNIQUE (user_id, date)
 );
 
 CREATE TABLE hospitals (

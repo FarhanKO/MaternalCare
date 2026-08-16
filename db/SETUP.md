@@ -60,10 +60,10 @@ npm run db:reset
 ## 5. Check it worked
 
 In pgAdmin, expand **maternalcare → Schemas → public → Tables**. You should
-see 19 tables: `users`, `doctors`, `pregnancies`, `vitals`, `children`,
+see 21 tables: `users`, `doctors`, `pregnancies`, `vitals`, `children`,
 `growth_records`, `milestones`, `vaccinations`, `appointments`, `symptoms`,
 `reminders`, `documents`, `messages`, `emergency_contacts`, `sos_alerts`,
-`sos_notifications`, `articles`, `posts`, `hospitals`.
+`sos_notifications`, `articles`, `posts`, `post_comments`, `daily_logs`, `hospitals`.
 
 ---
 
