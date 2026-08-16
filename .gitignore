@@ -29,3 +29,10 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# built guardian APK — a build artifact, rebuilt with `npm run apk`
+public/downloads/*.apk
+guardian-app/android/app/build/
+guardian-app/android/.gradle/
+guardian-app/android/local.properties
+guardian-app/dist/

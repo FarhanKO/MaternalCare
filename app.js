@@ -15,8 +15,22 @@ const apiRoutes = require('./routes/api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// Vite dev server origin — the React client during development
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// Vite dev origins: the mother/clinician client (5173) and the guardian
+// companion app (5174). Override with a comma-separated CLIENT_ORIGIN.
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN
+  || 'http://localhost:5173,http://localhost:5174').split(',').map((s) => s.trim());
+
+// The guardian app has to be opened on a real phone to test install,
+// vibration and audio, so in development a private-network origin on either
+// dev port is allowed too. Set CLIENT_ORIGIN in production to switch this off.
+const LAN_DEV = /^http:\/\/(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)[\d.]+:(5173|5174)$/;
+
+function allowedOrigin(origin) {
+  if (!origin) return null;
+  if (CLIENT_ORIGINS.includes(origin)) return origin;
+  if (!process.env.CLIENT_ORIGIN && LAN_DEV.test(origin)) return origin;
+  return null;
+}
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -29,7 +43,11 @@ app.use('/vendor/chartjs', express.static(path.join(__dirname, 'node_modules', '
 
 // Allow the Vite dev server to call the API during development
 app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', CLIENT_ORIGIN);
+  const origin = allowedOrigin(req.headers.origin);
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);

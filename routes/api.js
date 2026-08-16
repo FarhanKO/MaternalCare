@@ -12,6 +12,7 @@ const careApi = require('../controllers/api/careApiController');
 const messageApi = require('../controllers/api/messageApiController');
 const documentApi = require('../controllers/api/documentApiController');
 const sosApi = require('../controllers/api/sosApiController');
+const guardianApi = require('../controllers/api/guardianApiController');
 const userModel = require('../models/userModel');
 const pregnancyModel = require('../models/pregnancyModel');
 
@@ -50,6 +51,12 @@ router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
+
+/* the guardian companion app — scoped by link token, read-only */
+router.get('/guardian/:token', guardianApi.dashboard);
+router.get('/guardian/:token/vitals', guardianApi.vitals);
+router.get('/guardian/:token/alert', guardianApi.alert);
+router.post('/guardian/:token/ack', guardianApi.acknowledge);
 
 /* emergency SOS */
 router.get('/sos', sosApi.state);

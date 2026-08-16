@@ -229,6 +229,17 @@ const contactCols = db.prepare('PRAGMA table_info(emergency_contacts)').all().ma
 if (!contactCols.includes('app_linked')) {
   db.exec('ALTER TABLE emergency_contacts ADD COLUMN app_linked INTEGER NOT NULL DEFAULT 0');
 }
+// the guardian app is opened from a per-person link; the token is the only
+// credential, so it is long and random rather than guessable
+if (!contactCols.includes('access_token')) {
+  db.exec('ALTER TABLE emergency_contacts ADD COLUMN access_token TEXT');
+}
+{
+  const crypto = require('crypto');
+  const missing = db.prepare('SELECT id FROM emergency_contacts WHERE access_token IS NULL').all();
+  const setToken = db.prepare('UPDATE emergency_contacts SET access_token = ? WHERE id = ?');
+  for (const row of missing) setToken.run(crypto.randomBytes(18).toString('base64url'), row.id);
+}
 
 // Sprint 3: doctors gained the fields a mother actually chooses on — what they
 // are qualified in, and how much room is left on their list.

@@ -26,6 +26,8 @@ const toContact = (c) => ({
   phone: c.phone,
   /** true once the guardian has the companion app paired */
   appLinked: Boolean(c.app_linked),
+  /** their personal link into the guardian app — treat as a credential */
+  token: c.access_token,
 });
 
 const toNotification = (n) => ({
@@ -115,8 +117,10 @@ module.exports = {
     const label = String(name || '').trim();
     if (!label) throw new Error('A guardian needs a name');
     const info = db
-      .prepare('INSERT INTO emergency_contacts (user_id, name, relation, phone) VALUES (?,?,?,?)')
-      .run(userId, label, (relation || '').trim() || null, (phone || '').trim() || null);
+      .prepare(`INSERT INTO emergency_contacts (user_id, name, relation, phone, access_token)
+                VALUES (?,?,?,?,?)`)
+      .run(userId, label, (relation || '').trim() || null, (phone || '').trim() || null,
+        require('crypto').randomBytes(18).toString('base64url'));
     return toContact(db.prepare('SELECT * FROM emergency_contacts WHERE id = ?')
       .get(Number(info.lastInsertRowid)));
   },

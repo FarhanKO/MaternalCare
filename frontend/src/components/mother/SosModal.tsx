@@ -9,7 +9,9 @@ import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import { audioSupported, confirmTone, stopAlarm, tick as tickSound } from '@/lib/alarm';
 import {
-  CHANNEL_META, COUNTDOWN_SECONDS, DEFAULT_EMERGENCY, formatCoords, mapLink, RELATIONS, sinceLabel,
+  API_ORIGIN, CHANNEL_META, COUNTDOWN_SECONDS, DEFAULT_EMERGENCY, formatCoords,
+  GUARDIAN_APP_URL, mapLink,
+  RELATIONS, sinceLabel,
   type Guardian, type SosAlert,
 } from '@/data/sos';
 
@@ -106,6 +108,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
   const [relation, setRelation] = useState(RELATIONS[0]);
   const [phone, setPhone] = useState('');
 
+  const [copied, setCopied] = useState<string | null>(null);
   const [emergencyNumber, setEmergencyNumber] = useState(DEFAULT_EMERGENCY);
   const [editingNumber, setEditingNumber] = useState(false);
   const [numberDraft, setNumberDraft] = useState(DEFAULT_EMERGENCY);
@@ -205,6 +208,26 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
       setPhase('ready');
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+
+  /**
+   * Hand a guardian their link. Uses the native share sheet on a phone, and
+   * falls back to the clipboard on a desktop.
+   */
+  const shareLink = async (g: Guardian) => {
+    const url = `${GUARDIAN_APP_URL}/?t=${g.token}`;
+    const text = `Here is your Guardian app link. Open it on your phone and add it to your home screen — you will be alerted the moment I need help.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'MaternalCare+ Guardian', text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(g.id);
+      setTimeout(() => setCopied(null), 2500);
+    } catch {
+      // share sheet dismissed, or the clipboard is blocked — neither is an error
     }
   };
 
@@ -458,16 +481,29 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                               {[g.relation, g.phone].filter(Boolean).join(' · ') || 'No number saved'}
                             </div>
                           </div>
-                          <span className={cn('flex-none rounded-full px-2 py-0.5 text-[9px] font-bold uppercase',
-                            g.appLinked ? 'bg-emerald-500/15 text-emerald-700' : 'bg-ink/8 text-ink-muted')}>
-                            {g.appLinked ? 'App linked' : 'No app'}
-                          </span>
+                          <button
+                            onClick={() => shareLink(g)}
+                            aria-label={`Send ${g.name} their app link`}
+                            className={cn('flex-none rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wide transition',
+                              copied === g.id
+                                ? 'bg-emerald-500/15 text-emerald-700'
+                                : 'bg-rose-500/12 text-rose-700 hover:bg-rose-500/20')}
+                          >
+                            {copied === g.id ? 'Copied' : 'Send app'}
+                          </button>
                           <button onClick={() => removeGuardian(g.id)} aria-label={`Remove ${g.name}`}
                             className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
+
+                      {guardians.length > 0 && (
+                        <p className="px-1 text-[10px] font-medium leading-relaxed text-ink-faint">
+                          “Send app” copies that guardian’s private link. It is a key to your
+                          wellbeing summary — send it only to them.
+                        </p>
+                      )}
 
                       {guardians.length === 0 && (
                         <div className="rounded-2xl border border-dashed border-ink/15 px-3 py-5 text-center text-[11px] font-semibold text-ink-muted">
@@ -626,27 +662,37 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-[13px] font-extrabold text-ink">Guardian app</span>
-                              <span className="rounded-full bg-ink/8 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-ink-muted">
-                                Not released yet
+                              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">
+                                Android ready
                               </span>
                             </div>
                             <p className="mt-1 text-[11px] font-medium leading-relaxed text-ink-soft">
                               A small app for the people you trust. When you raise an SOS it takes
-                              over their screen and sounds a full-volume alarm, even on silent, with
-                              your location and a route to you.
+                              over their screen and sounds a full-volume alarm — even on silent,
+                              even locked — with your location and a route to you.
                             </p>
                           </div>
                         </div>
 
-                        <button
-                          disabled
-                          title="The guardian app has not been released yet"
-                          className="mt-2.5 inline-flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-2xl bg-ink/8 py-2.5 text-[12px] font-bold text-ink-faint"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Send guardians the app
-                        </button>
-                        <p className="mt-1.5 text-center text-[10px] font-semibold text-ink-faint">
-                          Until it ships, guardians are recorded but not automatically alarmed.
+                        <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                          <a
+                            href={`${API_ORIGIN}/downloads/guardian.apk`}
+                            download="guardian.apk"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-rose-600 py-2.5 text-[12px] font-bold text-white transition hover:bg-rose-700"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Android app
+                          </a>
+                          <button
+                            onClick={() => setPhase('guardians')}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-rose-300/70 bg-white/70 py-2.5 text-[12px] font-bold text-rose-700 transition hover:bg-white"
+                          >
+                            <Smartphone className="h-3.5 w-3.5" /> Send links
+                          </button>
+                        </div>
+                        <p className="mt-1.5 text-[10px] font-medium leading-relaxed text-ink-faint">
+                          Each guardian needs their own link to pair the app. On iPhone they open
+                          the link and add it to the Home Screen — Apple does not allow a web app
+                          to ring through silent mode, so only Android gets the forced alarm.
                         </p>
                       </div>
                     </div>

@@ -39,6 +39,8 @@ export interface Guardian {
   relation?: string;
   phone?: string;
   appLinked: boolean;
+  /** their private link into the guardian app — treat as a credential */
+  token: string;
 }
 
 export const CHANNEL_META: Record<Channel, { label: string; note: string }> = {
@@ -57,6 +59,14 @@ export const COUNTDOWN_SECONDS = 5;
 
 /** Shown until her own number loads; the emergency line differs by country. */
 export const DEFAULT_EMERGENCY = '999';
+
+/** The API host, used for the APK download link. */
+export const API_ORIGIN =
+  (import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api').replace(/\/api$/, '');
+
+/** Where the guardian companion app is served from. */
+export const GUARDIAN_APP_URL =
+  import.meta.env.VITE_GUARDIAN_URL ?? 'http://localhost:5174';
 
 /** A map link that needs no API key and opens anywhere. */
 export const mapLink = (l: SosLocation) =>
