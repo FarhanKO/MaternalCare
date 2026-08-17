@@ -6,6 +6,7 @@
 const fs = require('fs');
 const userModel = require('../../models/userModel');
 const dailyLogModel = require('../../models/dailyLogModel');
+const pregnancyModel = require('../../models/pregnancyModel');
 
 exports.show = (req, res) => {
   res.json({ data: userModel.profile(userModel.current().id) });
@@ -27,6 +28,14 @@ exports.update = (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+};
+
+/**
+ * Weight gain against the range recommended for her starting BMI — the
+ * reason pre-pregnancy weight and height are recorded at booking.
+ */
+exports.weightGain = (req, res) => {
+  res.json({ data: pregnancyModel.weightGain(userModel.current().id) });
 };
 
 exports.avatar = (req, res) => {

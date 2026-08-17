@@ -134,3 +134,22 @@ export interface VaccinationStats {
   total: number;
   pct: number;
 }
+
+/* -------------------------------------------------------- weight gain */
+
+/** Why booking records a pre-pregnancy weight and a height. */
+export interface WeightGain {
+  preWeightKg: number;
+  currentWeightKg: number;
+  measuredOn: string;
+  gainedKg: number;
+  bmi: number;
+  category: 'underweight' | 'healthy' | 'overweight' | 'obese';
+  week: number;
+  /** what is expected by this week, not by term */
+  expected: { low: number; high: number };
+  /** the whole-pregnancy range for her BMI category */
+  totalRange: { low: number; high: number };
+  status: 'below' | 'on-track' | 'above';
+  note: string;
+}

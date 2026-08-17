@@ -21,6 +21,7 @@ import { FindDoctorSection } from '@/components/mother/FindDoctorSection';
 import { RemindersSection } from '@/components/mother/RemindersSection';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
+import { WeightGainCard } from '@/components/mother/WeightGainCard';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useProfile } from '@/context/ProfileContext';
@@ -995,8 +996,13 @@ export function Mother() {
         <motion.div key="tab-vitals" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
+        {/* how her gain compares with the range for her starting BMI */}
+        <Reveal className="mt-9">
+          <WeightGainCard />
+        </Reveal>
+
         {/* CHARTS GRID */}
-        <div className="mt-9">
+        <div className="mt-5">
           <Reveal className="mb-4">
             <h2 className="text-lg font-extrabold tracking-tight text-ink">Health &amp; growth trends</h2>
             <p className="text-sm text-ink-muted">A closer look at you and your baby, week by week.</p>

@@ -14,7 +14,7 @@ import {
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
   ChildState, DailyLogState, Milestone, ServerPost, ServerProfile,
-  Vaccination, VaccinationStats,
+  Vaccination, VaccinationStats, WeightGain,
 } from '@/data/records';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -154,6 +154,9 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(patch),
   }).then((r) => r.data),
+
+  /** Weight gain against the range recommended for her starting BMI. */
+  getWeightGain: () => request<Envelope<WeightGain | null>>('/weight-gain').then((r) => r.data),
 
   /* ------------------------------ mood, kicks, hydration by day */
 

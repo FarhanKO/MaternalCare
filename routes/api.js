@@ -60,6 +60,9 @@ router.get('/profile', profileApi.show);
 router.patch('/profile', profileApi.update);
 router.get('/profile/avatar/:file', profileApi.avatar);
 
+/* weight gain vs the range recommended for her starting BMI */
+router.get('/weight-gain', profileApi.weightGain);
+
 /* mood, kicks and hydration she reports each day */
 router.get('/daily-log', profileApi.dailyLog);
 router.put('/daily-log', profileApi.saveDailyLog);

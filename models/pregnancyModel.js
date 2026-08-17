@@ -51,6 +51,81 @@ module.exports = {
     };
   },
 
+  /**
+   * Weight gain so far, against the range recommended for her starting BMI.
+   *
+   * This is what `pre_weight_kg` and `height_cm` were recorded for: a number
+   * on the scales means little on its own, because the healthy range depends
+   * entirely on where she started. Ranges are the Institute of Medicine's
+   * 2009 guidance for a single baby, which is what antenatal clinics use.
+   *
+   * Guidance, not a verdict — the copy says so, and it defers to her doctor.
+   */
+  weightGain(userId) {
+    const p = db.prepare('SELECT * FROM pregnancies WHERE user_id = ?').get(userId);
+    if (!p || !p.pre_weight_kg || !p.height_cm) return null;
+
+    const latest = db.prepare(
+      'SELECT date, weight_kg FROM vitals WHERE user_id = ? AND weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1',
+    ).get(userId);
+    if (!latest) return null;
+
+    const metres = p.height_cm / 100;
+    const bmi = p.pre_weight_kg / (metres * metres);
+
+    const category = bmi < 18.5 ? 'underweight'
+      : bmi < 25 ? 'healthy'
+      : bmi < 30 ? 'overweight'
+      : 'obese';
+
+    // total gain expected across the whole pregnancy, in kg
+    const TOTAL = {
+      underweight: [12.5, 18],
+      healthy: [11.5, 16],
+      overweight: [7, 11.5],
+      obese: [5, 9],
+    }[category];
+
+    const { week } = this.forUser(userId);
+    const gained = Math.round((latest.weight_kg - p.pre_weight_kg) * 10) / 10;
+
+    /*
+     * Expected gain by *this* week, not by term. Roughly 2 kg over the first
+     * trimester whatever the category, then a steady weekly rate for the
+     * remaining 27 weeks — which is how the IOM tables are built.
+     */
+    const first = 2;
+    const weeksAfter = Math.max(0, Math.min(week, 40) - 13);
+    const expectedFor = (total) => (week <= 13
+      ? (first * Math.min(week, 13)) / 13
+      : first + ((total - first) * weeksAfter) / 27);
+
+    const low = Math.round(expectedFor(TOTAL[0]) * 10) / 10;
+    const high = Math.round(expectedFor(TOTAL[1]) * 10) / 10;
+
+    const status = gained < low ? 'below' : gained > high ? 'above' : 'on-track';
+
+    const NOTE = {
+      below: 'A little under the usual range for this week. Worth mentioning at your next visit — it is often nothing.',
+      'on-track': 'Within the usual range for this week.',
+      above: 'A little over the usual range for this week. Your doctor can tell you whether it matters for you.',
+    };
+
+    return {
+      preWeightKg: p.pre_weight_kg,
+      currentWeightKg: latest.weight_kg,
+      measuredOn: latest.date,
+      gainedKg: gained,
+      bmi: Math.round(bmi * 10) / 10,
+      category,
+      week,
+      expected: { low, high },
+      totalRange: { low: TOTAL[0], high: TOTAL[1] },
+      status,
+      note: NOTE[status],
+    };
+  },
+
   /** Per-week journey timeline entries around the current week */
   timeline(week) {
     const items = [
