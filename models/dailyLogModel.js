@@ -1,12 +1,11 @@
 /**
  * Daily Log Model — mood, kicks and hydration, as reported by the mother.
  *
- * These were `useState` on the dashboard, so every value reset on refresh and
- * nothing could be charted. One row per day per mother, upserted, because a
- * day is the natural grain: she adjusts the same day's figures repeatedly and
- * should end up with one record, not twenty.
+ * One row per day per mother, upserted, because a day is the natural grain:
+ * she adjusts the same day's figures repeatedly and should end up with one
+ * record, not twenty.
  */
-const db = require('../config/database');
+const db = require('../config/db');
 
 const MOODS = ['Happy', 'Calm', 'Loved', 'Neutral', 'Tired', 'Anxiety', 'Sad', 'Stress'];
 
@@ -29,25 +28,30 @@ module.exports = {
   todayISO,
 
   /** Her figures for one day, or an empty shape so the UI has something. */
-  forDate(userId, date = todayISO()) {
-    const row = db
-      .prepare('SELECT * FROM daily_logs WHERE user_id = ? AND date = ?')
-      .get(userId, date);
+  async forDate(userId, date = todayISO()) {
+    const row = await db.one(
+      'SELECT * FROM daily_logs WHERE user_id = $1 AND date = $2', [userId, date],
+    );
     return row ? toDTO(row) : { date, mood: undefined, kicks: undefined, waterLitres: undefined };
   },
 
   /** Oldest first, which is the order a chart wants to plot. */
-  history(userId, days = 14) {
-    return db.prepare(
-      'SELECT * FROM daily_logs WHERE user_id = ? ORDER BY date DESC LIMIT ?',
-    ).all(userId, days).reverse().map(toDTO);
+  async history(userId, days = 14) {
+    const rows = await db.sql(
+      'SELECT * FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT $2',
+      [userId, days],
+    );
+    return rows.reverse().map(toDTO);
   },
 
   /**
-   * Save today's figures. Only the fields supplied are touched, so nudging
-   * the water count never wipes the mood she set an hour ago.
+   * Save today's figures.
+   *
+   * ON CONFLICT does insert-or-update in one round trip, and COALESCE keeps
+   * whatever the caller left out — so nudging the water count never wipes
+   * the mood she set an hour ago.
    */
-  save(userId, { date = todayISO(), mood, kicks, waterLitres } = {}) {
+  async save(userId, { date = todayISO(), mood, kicks, waterLitres } = {}) {
     if (mood !== undefined && mood !== null && !MOODS.includes(mood)) {
       throw new Error(`Unknown mood: ${mood}`);
     }
@@ -59,53 +63,41 @@ module.exports = {
       throw new Error('Water must be a positive number');
     }
 
-    const existing = db
-      .prepare('SELECT * FROM daily_logs WHERE user_id = ? AND date = ?')
-      .get(userId, date);
-
-    if (existing) {
-      db.prepare(`
-        UPDATE daily_logs SET
-          mood         = COALESCE(?, mood),
-          kicks        = COALESCE(?, kicks),
-          water_litres = COALESCE(?, water_litres)
-        WHERE user_id = ? AND date = ?
-      `).run(mood ?? null, kicks ?? null, waterLitres ?? null, userId, date);
-    } else {
-      db.prepare(`
-        INSERT INTO daily_logs (user_id, date, mood, kicks, water_litres)
-        VALUES (?,?,?,?,?)
-      `).run(userId, date, mood ?? null, kicks ?? null, waterLitres ?? null);
-    }
-
-    return this.forDate(userId, date);
+    const row = await db.insert(
+      `INSERT INTO daily_logs (user_id, date, mood, kicks, water_litres)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         mood         = COALESCE(EXCLUDED.mood, daily_logs.mood),
+         kicks        = COALESCE(EXCLUDED.kicks, daily_logs.kicks),
+         water_litres = COALESCE(EXCLUDED.water_litres, daily_logs.water_litres)
+       RETURNING *`,
+      [userId, date, mood ?? null, kicks ?? null, waterLitres ?? null],
+    );
+    return toDTO(row);
   },
 
   /**
    * Averages over the recent window, for the wellbeing summary. Returns null
-   * fields rather than zeros when there is nothing logged — "no data" and
-   * "drank nothing" are different claims.
+   * rather than zero when there is nothing logged — "no data" and "drank
+   * nothing" are different claims.
    */
-  summary(userId, days = 7) {
-    const rows = this.history(userId, days);
-    const water = rows.map((r) => r.waterLitres).filter((v) => v != null);
-    const kicks = rows.map((r) => r.kicks).filter((v) => v != null);
-    const avg = (list) => (list.length
-      ? Math.round((list.reduce((s, n) => s + n, 0) / list.length) * 10) / 10
-      : null);
+  async summary(userId, days = 7) {
+    const row = await db.one(
+      `SELECT count(*)                        AS days,
+              round(avg(water_litres)::numeric, 1) AS avg_water,
+              round(avg(kicks)::numeric, 1)        AS avg_kicks,
+              mode() WITHIN GROUP (ORDER BY mood)  AS common_mood
+       FROM (
+         SELECT * FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT $2
+       ) recent`,
+      [userId, days],
+    );
 
     return {
-      days: rows.length,
-      avgWaterLitres: avg(water),
-      avgKicks: avg(kicks),
-      // the mood she recorded most often in the window
-      commonMood: rows.reduce((best, r) => {
-        if (!r.mood) return best;
-        const counts = best.counts ?? {};
-        counts[r.mood] = (counts[r.mood] ?? 0) + 1;
-        const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-        return { counts, mood: top[0] };
-      }, {}).mood ?? null,
+      days: row?.days ?? 0,
+      avgWaterLitres: row?.avg_water ?? null,
+      avgKicks: row?.avg_kicks ?? null,
+      commonMood: row?.common_mood ?? null,
     };
   },
 };

@@ -1,8 +1,8 @@
 /**
- * Reminder Model — appointments & reminders created by the mother.
- * Kinds: medicine | doctor | test | exercise
+ * Reminder Model — appointments & reminders created by the mother, or
+ * scheduled for her by a clinician.
  */
-const db = require('../config/database');
+const db = require('../config/db');
 
 const KINDS = ['medicine', 'doctor', 'test', 'exercise', 'vaccination'];
 const REPEATS = ['once', 'daily', 'weekly'];
@@ -22,48 +22,54 @@ module.exports = {
   KINDS,
 
   /** Soonest first — the ordering the dashboard card relies on. */
-  all(userId) {
-    return db
-      .prepare('SELECT * FROM reminders WHERE user_id = ? ORDER BY due_at ASC')
-      .all(userId)
-      .map(toDTO);
+  async all(userId) {
+    const rows = await db.sql(
+      'SELECT * FROM reminders WHERE user_id = $1 ORDER BY due_at ASC', [userId],
+    );
+    return rows.map(toDTO);
   },
 
-  /** Only what is still ahead (keeps the last hour visible). */
-  upcoming(userId) {
-    const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    return db
-      .prepare('SELECT * FROM reminders WHERE user_id = ? AND due_at >= ? ORDER BY due_at ASC')
-      .all(userId, cutoff)
-      .map(toDTO);
+  /** Only what is still ahead, keeping the last hour visible. */
+  async upcoming(userId) {
+    const rows = await db.sql(
+      `SELECT * FROM reminders
+       WHERE user_id = $1 AND due_at >= now() - interval '1 hour'
+       ORDER BY due_at ASC`,
+      [userId],
+    );
+    return rows.map(toDTO);
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM reminders WHERE id = ?').get(id);
+  async find(id) {
+    const row = await db.one('SELECT * FROM reminders WHERE id = $1', [id]);
     return row ? toDTO(row) : null;
   },
 
-  create(userId, { kind, title, note, at, repeat = 'once', assignedBy = null }) {
+  async create(userId, { kind, title, note, at, repeat = 'once', assignedBy = null }) {
     if (!KINDS.includes(kind)) throw new Error(`Unknown reminder kind: ${kind}`);
     if (!REPEATS.includes(repeat)) throw new Error(`Unknown repeat: ${repeat}`);
     if (!title || !at) throw new Error('Reminder needs a title and a due time');
-    const info = db
-      .prepare('INSERT INTO reminders (user_id, kind, title, note, due_at, repeat, assigned_by) VALUES (?,?,?,?,?,?,?)')
-      .run(userId, kind, title, note || null, at, repeat, assignedBy);
-    return this.find(Number(info.lastInsertRowid));
+
+    const row = await db.insert(
+      `INSERT INTO reminders (user_id, kind, title, note, due_at, repeat, assigned_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [userId, kind, title, note || null, at, repeat, assignedBy],
+    );
+    return toDTO(row);
   },
 
   /** Scoped to the owner so one account cannot delete another's reminders. */
-  remove(id, userId) {
+  async remove(id, userId) {
     if (userId === undefined) {
-      db.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+      await db.run('DELETE FROM reminders WHERE id = $1', [id]);
       return;
     }
-    db.prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?').run(id, userId);
+    await db.run('DELETE FROM reminders WHERE id = $1 AND user_id = $2', [id, userId]);
   },
 
   /** The single next thing due — surfaced on the dashboard card. */
-  next(userId) {
-    return this.upcoming(userId)[0] || null;
+  async next(userId) {
+    const [first] = await this.upcoming(userId);
+    return first || null;
   },
 };

@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('../config/database');
+const db = require('../config/db');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -19,27 +19,27 @@ const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
 const MAX_BIO = 280;
 
 module.exports = {
-  find(id) {
-    return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  async find(id) {
+    return db.one('SELECT * FROM users WHERE id = $1', [id]);
   },
 
-  current() {
+  async current() {
     // Demo session: the seeded mother account
-    return db.prepare("SELECT * FROM users WHERE role = 'mother' LIMIT 1").get();
+    return db.one("SELECT * FROM users WHERE role = 'mother' ORDER BY id LIMIT 1");
   },
 
   /** Life stage drives which reading and news the client shows. */
   STAGES: ['pregnant', 'new-mother', 'parent', 'planning', 'general'],
 
-  setStage(id, stage) {
+  async setStage(id, stage) {
     if (!this.STAGES.includes(stage)) throw new Error(`Unknown stage: ${stage}`);
-    db.prepare('UPDATE users SET stage = ? WHERE id = ?').run(stage, id);
+    await db.run('UPDATE users SET stage = $2 WHERE id = $1', [id, stage]);
     return this.find(id);
   },
 
   /** Shape the client reads — the avatar as a URL, not a raw file name. */
-  profile(id) {
-    const u = this.find(id);
+  async profile(id) {
+    const u = await this.find(id);
     if (!u) return null;
     return {
       id: String(u.id),
@@ -53,27 +53,28 @@ module.exports = {
     };
   },
 
-  setName(id, name) {
+  async setName(id, name) {
     const label = String(name || '').trim();
     if (!label) throw new Error('A name cannot be empty');
     if (label.length > 60) throw new Error('That name is too long');
-    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(label, id);
+    await db.run('UPDATE users SET name = $2 WHERE id = $1', [id, label]);
     return this.profile(id);
   },
 
-  setBio(id, bio) {
+  async setBio(id, bio) {
     const text = String(bio ?? '').trim();
     if (text.length > MAX_BIO) throw new Error(`A bio must be ${MAX_BIO} characters or fewer`);
-    db.prepare('UPDATE users SET bio = ? WHERE id = ?').run(text, id);
+    await db.run('UPDATE users SET bio = $2 WHERE id = $1', [id, text]);
     return this.profile(id);
   },
 
   /** `dataUrl` null removes the photo and falls back to initials. */
-  setAvatar(id, dataUrl) {
-    const previous = this.find(id)?.avatar_file;
+  async setAvatar(id, dataUrl) {
+    const current = await this.find(id);
+    const previous = current?.avatar_file;
 
     if (dataUrl === null || dataUrl === '') {
-      db.prepare('UPDATE users SET avatar_file = NULL WHERE id = ?').run(id);
+      await db.run('UPDATE users SET avatar_file = NULL WHERE id = $1', [id]);
       if (previous) this.removeFile(previous);
       return this.profile(id);
     }
@@ -89,7 +90,7 @@ module.exports = {
 
     const fileName = `${crypto.randomUUID()}.${MIME_EXT[mime]}`;
     fs.writeFileSync(path.join(UPLOAD_DIR, fileName), buffer);
-    db.prepare('UPDATE users SET avatar_file = ? WHERE id = ?').run(fileName, id);
+    await db.run('UPDATE users SET avatar_file = $2 WHERE id = $1', [id, fileName]);
 
     // replacing a photo should not leave the old one on disk forever
     if (previous) this.removeFile(previous);
@@ -97,15 +98,15 @@ module.exports = {
   },
 
   /** Editable clinical basics shown on the profile panel. */
-  setDetails(id, { bloodGroup, age }) {
+  async setDetails(id, { bloodGroup, age }) {
     if (bloodGroup !== undefined) {
-      db.prepare('UPDATE users SET blood_group = ? WHERE id = ?')
-        .run(String(bloodGroup).trim() || null, id);
+      await db.run('UPDATE users SET blood_group = $2 WHERE id = $1',
+        [id, String(bloodGroup).trim() || null]);
     }
     if (age !== undefined) {
       const n = Number(age);
       if (!Number.isFinite(n) || n < 10 || n > 70) throw new Error('That age looks wrong');
-      db.prepare('UPDATE users SET age = ? WHERE id = ?').run(n, id);
+      await db.run('UPDATE users SET age = $2 WHERE id = $1', [id, n]);
     }
     return this.profile(id);
   },
@@ -121,7 +122,7 @@ module.exports = {
     if (full) { try { fs.unlinkSync(full); } catch { /* already gone */ } }
   },
 
-  emergencyContacts(userId) {
-    return db.prepare('SELECT * FROM emergency_contacts WHERE user_id = ?').all(userId);
+  async emergencyContacts(userId) {
+    return db.sql('SELECT * FROM emergency_contacts WHERE user_id = $1 ORDER BY id', [userId]);
   },
 };

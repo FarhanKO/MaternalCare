@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('../config/database');
+const db = require('../config/db');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -55,7 +55,7 @@ function toPost(p, comments) {
     author: p.author,
     role: p.role || 'mother',
     week: p.week ?? undefined,
-    topic: p.tag || undefined,
+    topic: p.topic || undefined,
     title: p.title,
     body: p.body || '',
     image: p.image_file ? `/api/community/images/${p.image_file}` : undefined,
@@ -83,12 +83,13 @@ module.exports = {
   MAX_IMAGE_BYTES,
 
   /** Comments for a set of posts, fetched in one query rather than per post. */
-  commentsFor(postIds) {
+  async commentsFor(postIds) {
     if (!postIds.length) return new Map();
-    const holes = postIds.map(() => '?').join(',');
-    const rows = db.prepare(
-      `SELECT * FROM post_comments WHERE post_id IN (${holes}) ORDER BY created_at ASC, id ASC`,
-    ).all(...postIds);
+    const rows = await db.sql(
+      `SELECT * FROM post_comments WHERE post_id = ANY($1::int[])
+       ORDER BY created_at ASC, id ASC`,
+      [postIds.map(Number)],
+    );
 
     const grouped = new Map(postIds.map((id) => [Number(id), []]));
     for (const r of rows) grouped.get(r.post_id)?.push(toComment(r));
@@ -99,30 +100,38 @@ module.exports = {
    * Newest first. `limit`/`offset` drive the community's "load more" so the
    * client never pulls the whole board at once.
    */
-  all({ limit = 20, offset = 0, topic } = {}) {
-    const where = topic && topic !== 'All' ? 'WHERE tag = ?' : '';
-    const args = topic && topic !== 'All' ? [topic] : [];
-    const rows = db.prepare(
-      `SELECT * FROM posts ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-    ).all(...args, limit, offset);
+  async all({ limit = 20, offset = 0, topic } = {}) {
+    const filtered = topic && topic !== 'All';
+    const rows = filtered
+      ? await db.sql(
+        `SELECT * FROM posts WHERE topic = $3
+         ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
+        [limit, offset, topic],
+      )
+      : await db.sql(
+        'SELECT * FROM posts ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2',
+        [limit, offset],
+      );
 
-    const comments = this.commentsFor(rows.map((r) => r.id));
+    const comments = await this.commentsFor(rows.map((r) => r.id));
     return rows.map((p) => toPost(p, comments.get(p.id) ?? []));
   },
 
-  count(topic) {
-    const where = topic && topic !== 'All' ? 'WHERE tag = ?' : '';
-    const args = topic && topic !== 'All' ? [topic] : [];
-    return db.prepare(`SELECT COUNT(*) AS c FROM posts ${where}`).get(...args).c;
+  async count(topic) {
+    const row = topic && topic !== 'All'
+      ? await db.one('SELECT count(*) AS c FROM posts WHERE topic = $1', [topic])
+      : await db.one('SELECT count(*) AS c FROM posts');
+    return row.c;
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
+  async find(id) {
+    const row = await db.one('SELECT * FROM posts WHERE id = $1', [id]);
     if (!row) return null;
-    return toPost(row, this.commentsFor([row.id]).get(row.id) ?? []);
+    const comments = await this.commentsFor([row.id]);
+    return toPost(row, comments.get(row.id) ?? []);
   },
 
-  create(userId, { author, role = 'mother', week, topic, title, body, imageDataUrl }) {
+  async create(userId, { author, role = 'mother', week, topic, title, body, imageDataUrl }) {
     const heading = String(title || '').trim();
     if (!heading) throw new PostError('A post needs a title', 'NO_TITLE');
     if (!ROLES.includes(role)) throw new PostError(`Unknown role: ${role}`, 'BAD_ROLE');
@@ -134,40 +143,45 @@ module.exports = {
       fs.writeFileSync(path.join(UPLOAD_DIR, imageFile), buffer);
     }
 
-    const info = db.prepare(`
-      INSERT INTO posts (user_id, author, role, week, tag, title, body, image_file,
-                         hearts, clinician_answered, created_at, replies, likes, time_ago)
-      VALUES (?,?,?,?,?,?,?,?,0,0,?,0,0,NULL)
-    `).run(userId ?? null, String(author || 'A mother').trim(), role,
-      Number.isFinite(week) ? week : null, (topic || '').trim() || null,
-      heading, (body || '').trim() || null, imageFile, new Date().toISOString());
-
-    return this.find(Number(info.lastInsertRowid));
+    const row = await db.insert(
+      `INSERT INTO posts (user_id, author, role, week, topic, title, body, image_file,
+                          hearts, clinician_answered, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,FALSE,now()) RETURNING *`,
+      [userId ?? null, String(author || 'A mother').trim(), role,
+        Number.isFinite(week) ? week : null, (topic || '').trim() || null,
+        heading, (body || '').trim() || null, imageFile],
+    );
+    return toPost(row, []);
   },
 
-  comment(postId, userId, { author, role = 'mother', body }) {
+  async comment(postId, userId, { author, role = 'mother', body }) {
     const text = String(body || '').trim();
     if (!text) throw new PostError('A comment cannot be empty', 'EMPTY');
-    if (!db.prepare('SELECT 1 FROM posts WHERE id = ?').get(postId)) {
+    if (!await db.one('SELECT 1 FROM posts WHERE id = $1', [postId])) {
       throw new PostError('That post no longer exists', 'NOT_FOUND');
     }
 
-    db.prepare(`
-      INSERT INTO post_comments (post_id, user_id, author, role, body, created_at)
-      VALUES (?,?,?,?,?,?)
-    `).run(postId, userId ?? null, String(author || 'A mother').trim(), role, text,
-      new Date().toISOString());
+    await db.tx(async (t) => {
+      await t.run(
+        `INSERT INTO post_comments (post_id, user_id, author, role, body, created_at)
+         VALUES ($1,$2,$3,$4,$5,now())`,
+        [postId, userId ?? null, String(author || 'A mother').trim(), role, text],
+      );
+      // a clinician replying is what marks a question as answered
+      if (role === 'doctor') {
+        await t.run('UPDATE posts SET clinician_answered = TRUE WHERE id = $1', [postId]);
+      }
+    });
 
-    // a clinician replying is what marks a question as answered
-    if (role === 'doctor') {
-      db.prepare('UPDATE posts SET clinician_answered = 1 WHERE id = ?').run(postId);
-    }
     return this.find(postId);
   },
 
   /** Toggling is the client's business; the model just applies the delta. */
-  heart(postId, delta = 1) {
-    db.prepare('UPDATE posts SET hearts = MAX(0, hearts + ?) WHERE id = ?').run(delta, postId);
+  async heart(postId, delta = 1) {
+    await db.run(
+      'UPDATE posts SET hearts = GREATEST(0, hearts + $2) WHERE id = $1',
+      [postId, delta],
+    );
     return this.find(postId);
   },
 

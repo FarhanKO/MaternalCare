@@ -6,7 +6,7 @@
  * with a given clinician. `sender` says which end wrote each line, and
  * `read_at` is set when the *other* end opens the thread.
  */
-const db = require('../config/database');
+const db = require('../config/db');
 
 const SENDERS = ['mother', 'doctor'];
 /** Long enough for real clinical advice, short enough to stay a message. */
@@ -22,112 +22,151 @@ const toDTO = (m) => ({
   read: Boolean(m.read_at),
 });
 
+/**
+ * One thread summary per counterpart, with the last message and unread count
+ * resolved in the same statement.
+ *
+ * The previous version ran the list query, then two more per thread. DISTINCT
+ * ON gives the newest row per group in one pass, which is a Postgres feature
+ * with no SQLite equivalent — it is why this could not be done before.
+ */
+const THREADS = `
+  SELECT DISTINCT ON (m.%GROUP%)
+         m.%GROUP% AS counterpart_id,
+         m.id, m.sender, m.body, m.sent_at, m.read_at,
+         (SELECT count(*) FROM messages c
+           WHERE c.user_id = m.user_id AND c.doctor_id = m.doctor_id
+             AND c.sender = $2 AND c.read_at IS NULL)      AS unread,
+         (SELECT count(*) FROM messages c
+           WHERE c.user_id = m.user_id AND c.doctor_id = m.doctor_id) AS total
+  FROM messages m
+  WHERE m.%OWNER% = $1
+  ORDER BY m.%GROUP%, m.sent_at DESC, m.id DESC
+`;
+
 module.exports = {
   SENDERS,
 
   /** Every line in one conversation, oldest first. */
-  thread(userId, doctorId) {
-    return db.prepare(
-      'SELECT * FROM messages WHERE user_id = ? AND doctor_id = ? ORDER BY sent_at ASC, id ASC',
-    ).all(userId, doctorId).map(toDTO);
+  async thread(userId, doctorId) {
+    const rows = await db.sql(
+      `SELECT * FROM messages WHERE user_id = $1 AND doctor_id = $2
+       ORDER BY sent_at ASC, id ASC`,
+      [userId, doctorId],
+    );
+    return rows.map(toDTO);
   },
 
-  send(userId, doctorId, sender, body) {
+  async send(userId, doctorId, sender, body) {
     if (!SENDERS.includes(sender)) throw new Error(`Unknown sender: ${sender}`);
     const text = String(body ?? '').trim();
     if (!text) throw new Error('A message cannot be empty');
     if (text.length > MAX_BODY) throw new Error('That message is too long');
 
-    const info = db.prepare(
-      'INSERT INTO messages (user_id, doctor_id, sender, body, sent_at) VALUES (?,?,?,?,?)',
-    ).run(userId, doctorId, sender, text, new Date().toISOString());
-
-    return toDTO(db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid)));
+    const row = await db.insert(
+      `INSERT INTO messages (user_id, doctor_id, sender, body, sent_at)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [userId, doctorId, sender, text, new Date().toISOString()],
+    );
+    return toDTO(row);
   },
 
   /**
    * Mark what the *other* side wrote as read. Opening your own thread should
    * never clear the badge on lines you sent yourself.
    */
-  markRead(userId, doctorId, reader) {
+  async markRead(userId, doctorId, reader) {
     const from = reader === 'mother' ? 'doctor' : 'mother';
-    db.prepare(
-      'UPDATE messages SET read_at = ? WHERE user_id = ? AND doctor_id = ? AND sender = ? AND read_at IS NULL',
-    ).run(new Date().toISOString(), userId, doctorId, from);
+    await db.run(
+      `UPDATE messages SET read_at = now()
+       WHERE user_id = $1 AND doctor_id = $2 AND sender = $3 AND read_at IS NULL`,
+      [userId, doctorId, from],
+    );
   },
 
   /** Unread lines waiting for one side of one thread. */
-  unread(userId, doctorId, reader) {
+  async unread(userId, doctorId, reader) {
     const from = reader === 'mother' ? 'doctor' : 'mother';
-    return db.prepare(
-      'SELECT COUNT(*) AS c FROM messages WHERE user_id = ? AND doctor_id = ? AND sender = ? AND read_at IS NULL',
-    ).get(userId, doctorId, from).c;
+    const row = await db.one(
+      `SELECT count(*) AS c FROM messages
+       WHERE user_id = $1 AND doctor_id = $2 AND sender = $3 AND read_at IS NULL`,
+      [userId, doctorId, from],
+    );
+    return row.c;
   },
 
   /** Every doctor this mother has a conversation with, most recent first. */
-  threadsForUser(userId) {
-    const rows = db.prepare(`
-      SELECT m.doctor_id, d.name, d.specialty, d.hospital,
-             MAX(m.sent_at) AS last_at,
-             COUNT(*) AS total
-      FROM messages m JOIN doctors d ON d.id = m.doctor_id
-      WHERE m.user_id = ?
-      GROUP BY m.doctor_id
-      ORDER BY last_at DESC
-    `).all(userId);
+  async threadsForUser(userId) {
+    const sql = THREADS.replaceAll('%GROUP%', 'doctor_id').replaceAll('%OWNER%', 'user_id');
+    const rows = await db.sql(
+      `SELECT t.*, d.name, d.specialty, d.hospital
+       FROM (${sql}) t
+       JOIN doctors d ON d.id = t.counterpart_id
+       ORDER BY t.sent_at DESC`,
+      [userId, 'doctor'],
+    );
 
-    return rows.map((r) => {
-      const last = db.prepare(
-        'SELECT * FROM messages WHERE user_id = ? AND doctor_id = ? ORDER BY sent_at DESC, id DESC LIMIT 1',
-      ).get(userId, r.doctor_id);
-      return {
-        doctorId: String(r.doctor_id),
-        doctorName: r.name,
-        specialty: r.specialty,
-        hospital: r.hospital,
-        lastMessage: last ? toDTO(last) : null,
-        total: r.total,
-        unread: this.unread(userId, r.doctor_id, 'mother'),
-      };
-    });
+    return rows.map((r) => ({
+      doctorId: String(r.counterpart_id),
+      doctorName: r.name,
+      specialty: r.specialty,
+      hospital: r.hospital,
+      lastMessage: {
+        id: String(r.id),
+        doctorId: String(r.counterpart_id),
+        patientId: String(userId),
+        sender: r.sender,
+        body: r.body,
+        sentAt: r.sent_at,
+        read: Boolean(r.read_at),
+      },
+      total: r.total,
+      unread: r.unread,
+    }));
   },
 
   /** Every mother this doctor is talking to, most recent first. */
-  threadsForDoctor(doctorId) {
-    const rows = db.prepare(`
-      SELECT m.user_id, u.name,
-             MAX(m.sent_at) AS last_at,
-             COUNT(*) AS total
-      FROM messages m JOIN users u ON u.id = m.user_id
-      WHERE m.doctor_id = ?
-      GROUP BY m.user_id
-      ORDER BY last_at DESC
-    `).all(doctorId);
+  async threadsForDoctor(doctorId) {
+    const sql = THREADS.replaceAll('%GROUP%', 'user_id').replaceAll('%OWNER%', 'doctor_id');
+    const rows = await db.sql(
+      `SELECT t.*, u.name
+       FROM (${sql}) t
+       JOIN users u ON u.id = t.counterpart_id
+       ORDER BY t.sent_at DESC`,
+      [doctorId, 'mother'],
+    );
 
-    return rows.map((r) => {
-      const last = db.prepare(
-        'SELECT * FROM messages WHERE user_id = ? AND doctor_id = ? ORDER BY sent_at DESC, id DESC LIMIT 1',
-      ).get(r.user_id, doctorId);
-      return {
-        patientId: String(r.user_id),
-        patientName: r.name,
-        lastMessage: last ? toDTO(last) : null,
-        total: r.total,
-        unread: this.unread(r.user_id, doctorId, 'doctor'),
-      };
-    });
+    return rows.map((r) => ({
+      patientId: String(r.counterpart_id),
+      patientName: r.name,
+      lastMessage: {
+        id: String(r.id),
+        doctorId: String(doctorId),
+        patientId: String(r.counterpart_id),
+        sender: r.sender,
+        body: r.body,
+        sentAt: r.sent_at,
+        read: Boolean(r.read_at),
+      },
+      total: r.total,
+      unread: r.unread,
+    }));
   },
 
   /** Total unread across every thread — drives the dock badge. */
-  unreadForDoctor(doctorId) {
-    return db.prepare(
-      "SELECT COUNT(*) AS c FROM messages WHERE doctor_id = ? AND sender = 'mother' AND read_at IS NULL",
-    ).get(doctorId).c;
+  async unreadForDoctor(doctorId) {
+    const row = await db.one(
+      "SELECT count(*) AS c FROM messages WHERE doctor_id = $1 AND sender = 'mother' AND read_at IS NULL",
+      [doctorId],
+    );
+    return row.c;
   },
 
-  unreadForUser(userId) {
-    return db.prepare(
-      "SELECT COUNT(*) AS c FROM messages WHERE user_id = ? AND sender = 'doctor' AND read_at IS NULL",
-    ).get(userId).c;
+  async unreadForUser(userId) {
+    const row = await db.one(
+      "SELECT count(*) AS c FROM messages WHERE user_id = $1 AND sender = 'doctor' AND read_at IS NULL",
+      [userId],
+    );
+    return row.c;
   },
 };

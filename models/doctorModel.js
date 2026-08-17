@@ -7,7 +7,7 @@
  * send everybody to the busiest consultant; availability alone would send them
  * to whoever happens to be idle. Both are scored, then added.
  */
-const db = require('../config/database');
+const db = require('../config/db');
 
 /** Consulting times a clinic offers in a day. */
 const SLOT_TIMES = [
@@ -15,26 +15,24 @@ const SLOT_TIMES = [
   '14:00', '14:40', '15:20', '16:00',
 ];
 
-// local calendar date — see the note in appointmentModel
-const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-/** Requests and confirmed visits still ahead — what actually fills a diary. */
-function activeAppointments(doctorId) {
-  return db.prepare(
-    `SELECT COUNT(*) AS c FROM appointments
-     WHERE doctor_id = ? AND status IN ('requested','accepted') AND date >= ?`,
-  ).get(doctorId, todayISO()).c;
-}
-
-/** Requests this doctor has not answered yet — the mother's queue ahead of her. */
-function pendingCount(doctorId) {
-  return db.prepare(
-    "SELECT COUNT(*) AS c FROM appointments WHERE doctor_id = ? AND status = 'requested'",
-  ).get(doctorId).c;
-}
+/**
+ * Every doctor with their live diary counts.
+ *
+ * This used to be one query for the list plus two per doctor for the booked
+ * and pending counts — fifteen round trips for seven clinicians, which is
+ * about two seconds against a database in Sydney. The counts are correlated
+ * subqueries now, so it is one.
+ */
+const WITH_COUNTS = `
+  SELECT d.*,
+         (SELECT count(*) FROM appointments a
+           WHERE a.doctor_id = d.id
+             AND a.status IN ('requested','accepted')
+             AND a.date >= CURRENT_DATE)                  AS booked,
+         (SELECT count(*) FROM appointments a
+           WHERE a.doctor_id = d.id AND a.status = 'requested') AS queue
+  FROM doctors d
+`;
 
 /**
  * Weight for what a clinician is trained in. Postgraduate maternal
@@ -69,13 +67,13 @@ const SPECIALTY_FOR = {
   parent: /paediatric/i,
 };
 
+/** Row (already carrying booked/queue) → the shape the client reads. */
 function toDTO(d) {
-  const booked = activeAppointments(d.id);
-  const panel = (d.patients || 0) + booked;
+  const panel = (d.patients || 0) + (d.booked || 0);
   const capacity = d.capacity || 30;
   const load = Math.min(1, panel / capacity);
   const openings = Math.max(0, capacity - panel);
-  const queue = pendingCount(d.id);
+  const queue = d.queue || 0;
 
   const status = !d.available ? 'away'
     : openings === 0 ? 'full'
@@ -107,17 +105,18 @@ function toDTO(d) {
 module.exports = {
   SLOT_TIMES,
 
-  all() {
-    return db.prepare('SELECT * FROM doctors ORDER BY id').all().map(toDTO);
+  async all() {
+    const rows = await db.sql(`${WITH_COUNTS} ORDER BY d.id`);
+    return rows.map(toDTO);
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM doctors WHERE id = ?').get(id);
+  async find(id) {
+    const row = await db.one(`${WITH_COUNTS} WHERE d.id = $1`, [id]);
     return row ? toDTO(row) : null;
   },
 
-  exists(id) {
-    return Boolean(db.prepare('SELECT 1 FROM doctors WHERE id = ?').get(id));
+  async exists(id) {
+    return Boolean(await db.one('SELECT 1 FROM doctors WHERE id = $1', [id]));
   },
 
   /**
@@ -131,10 +130,11 @@ module.exports = {
    *   2 — full or on leave
    * Nobody is hidden; the tier is returned so the UI can say why.
    */
-  recommend({ stage } = {}) {
+  async recommend({ stage } = {}) {
     const pattern = SPECIALTY_FOR[stage];
+    const doctors = await this.all();
 
-    return this.all()
+    return doctors
       .map((d) => {
         const qual = qualificationScore({ qualification: d.qualification, years: d.years });
         const avail = availabilityScore(d.load);

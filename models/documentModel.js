@@ -2,15 +2,15 @@
  * Document Model — prescriptions and reports a mother photographs or uploads.
  *
  * Images can run to several megabytes, so the bytes go to disk under
- * data/uploads and only the metadata lives in SQLite. `taken_on` is the date
- * the document is *about* rather than when it was uploaded, because a mother
- * often photographs last week's prescription — the timeline reads by the
- * former.
+ * data/uploads and only the metadata lives in the database. `taken_on` is the
+ * date the document is *about* rather than when it was uploaded, because a
+ * mother often photographs last week's prescription — the timeline reads by
+ * the former.
  */
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('./../config/database');
+const db = require('../config/db');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -83,7 +83,9 @@ module.exports = {
    * Store one document. `uploadedBy` records who added it so the mother can
    * tell her own photo from something the clinic filed for her.
    */
-  create(userId, { kind, title, note, dataUrl, originalName, takenOn, uploadedBy = 'mother' }) {
+  async create(userId, {
+    kind, title, note, dataUrl, originalName, takenOn, uploadedBy = 'mother',
+  }) {
     if (!KINDS.includes(kind)) throw new DocumentError(`Unknown document kind: ${kind}`, 'BAD_KIND');
 
     const { mime, buffer } = decodeDataUrl(dataUrl);
@@ -94,57 +96,65 @@ module.exports = {
     const label = String(title || '').trim()
       || (kind === 'prescription' ? 'Prescription' : 'Report');
 
-    const info = db.prepare(`
-      INSERT INTO documents
-        (user_id, kind, title, note, file_name, original_name, mime, size, taken_on, uploaded_at, uploaded_by)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    `).run(userId, kind, label, (note || '').trim() || null, fileName,
-      originalName || null, mime, buffer.length, date, new Date().toISOString(), uploadedBy);
-
-    return this.find(Number(info.lastInsertRowid));
+    const row = await db.insert(
+      `INSERT INTO documents
+         (user_id, kind, title, note, file_name, original_name, mime, size,
+          taken_on, uploaded_at, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [userId, kind, label, (note || '').trim() || null, fileName,
+        originalName || null, mime, buffer.length, date,
+        new Date().toISOString(), uploadedBy],
+    );
+    return toDTO(row);
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
+  async find(id) {
+    const row = await db.one('SELECT * FROM documents WHERE id = $1', [id]);
     return row ? toDTO(row) : null;
   },
 
   /** Newest first by the date the document is about. */
-  forUser(userId, kind) {
-    const sql = kind
-      ? 'SELECT * FROM documents WHERE user_id = ? AND kind = ? ORDER BY taken_on DESC, id DESC'
-      : 'SELECT * FROM documents WHERE user_id = ? ORDER BY taken_on DESC, id DESC';
+  async forUser(userId, kind) {
     const rows = kind
-      ? db.prepare(sql).all(userId, kind)
-      : db.prepare(sql).all(userId);
+      ? await db.sql(
+        `SELECT * FROM documents WHERE user_id = $1 AND kind = $2
+         ORDER BY taken_on DESC, id DESC`, [userId, kind],
+      )
+      : await db.sql(
+        'SELECT * FROM documents WHERE user_id = $1 ORDER BY taken_on DESC, id DESC',
+        [userId],
+      );
     return rows.map(toDTO);
   },
 
-  /** How many of each kind this patient has — drives the clinician's tab counts. */
-  countsFor(userId) {
-    const rows = db.prepare(
-      'SELECT kind, COUNT(*) AS c FROM documents WHERE user_id = ? GROUP BY kind',
-    ).all(userId);
+  /** How many of each kind this patient has — drives the clinician's tabs. */
+  async countsFor(userId) {
+    const rows = await db.sql(
+      'SELECT kind, count(*) AS c FROM documents WHERE user_id = $1 GROUP BY kind',
+      [userId],
+    );
     const out = { prescription: 0, report: 0 };
     for (const r of rows) out[r.kind] = r.c;
     return out;
   },
 
   /** Absolute path for streaming the bytes back, or null if the row is gone. */
-  pathFor(id) {
-    const row = db.prepare('SELECT file_name, mime FROM documents WHERE id = ?').get(id);
+  async pathFor(id) {
+    const row = await db.one('SELECT file_name, mime FROM documents WHERE id = $1', [id]);
     if (!row) return null;
     const full = path.join(UPLOAD_DIR, row.file_name);
     return fs.existsSync(full) ? { path: full, mime: row.mime } : null;
   },
 
   /** Removing the row removes the file too — nothing orphaned on disk. */
-  remove(id, userId) {
-    const row = db.prepare('SELECT * FROM documents WHERE id = ? AND user_id = ?').get(id, userId);
+  async remove(id, userId) {
+    const row = await db.one(
+      'DELETE FROM documents WHERE id = $1 AND user_id = $2 RETURNING file_name',
+      [id, userId],
+    );
     if (!row) return false;
     const full = path.join(UPLOAD_DIR, row.file_name);
     if (fs.existsSync(full)) fs.unlinkSync(full);
-    db.prepare('DELETE FROM documents WHERE id = ?').run(id);
     return true;
   },
 };

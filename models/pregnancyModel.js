@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const db = require('../config/db');
 
 const DAY = 86400000;
 
@@ -25,11 +25,11 @@ const WEEK_NOTES = {
 };
 
 module.exports = {
-  forUser(userId) {
-    const p = db.prepare('SELECT * FROM pregnancies WHERE user_id = ?').get(userId);
+  async forUser(userId) {
+    const p = await db.one('SELECT * FROM pregnancies WHERE user_id = $1', [userId]);
     if (!p) return null;
 
-    const lmp = new Date(p.lmp + 'T00:00:00');
+    const lmp = new Date(`${p.lmp}T00:00:00`);
     const now = new Date();
     const daysElapsed = Math.floor((now - lmp) / DAY);
     const week = Math.min(42, Math.floor(daysElapsed / 7));
@@ -61,13 +61,15 @@ module.exports = {
    *
    * Guidance, not a verdict — the copy says so, and it defers to her doctor.
    */
-  weightGain(userId) {
-    const p = db.prepare('SELECT * FROM pregnancies WHERE user_id = ?').get(userId);
+  async weightGain(userId) {
+    const p = await db.one('SELECT * FROM pregnancies WHERE user_id = $1', [userId]);
     if (!p || !p.pre_weight_kg || !p.height_cm) return null;
 
-    const latest = db.prepare(
-      'SELECT date, weight_kg FROM vitals WHERE user_id = ? AND weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1',
-    ).get(userId);
+    const latest = await db.one(
+      `SELECT date, weight_kg FROM vitals
+       WHERE user_id = $1 AND weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1`,
+      [userId],
+    );
     if (!latest) return null;
 
     const metres = p.height_cm / 100;
@@ -86,7 +88,7 @@ module.exports = {
       obese: [5, 9],
     }[category];
 
-    const { week } = this.forUser(userId);
+    const { week } = await this.forUser(userId);
     const gained = Math.round((latest.weight_kg - p.pre_weight_kg) * 10) / 10;
 
     /*

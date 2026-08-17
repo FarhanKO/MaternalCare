@@ -64,8 +64,8 @@ module.exports = {
   },
 
   /** Assessment built from the user's latest logged vitals */
-  fromLatestVitals(user, pregnancy) {
-    const v = vitalModel.latest(user.id);
+  async fromLatestVitals(user, pregnancy) {
+    const v = await vitalModel.latest(user.id);
     if (!v || !pregnancy) return null;
     return this.assess({
       age: user.age, systolic: v.systolic, diastolic: v.diastolic,

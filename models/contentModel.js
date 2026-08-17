@@ -1,22 +1,38 @@
-const db = require('../config/database');
+/**
+ * Content Model — the reading list and hospital directory behind the
+ * server-rendered pages.
+ *
+ * Community posts moved to postModel when the React board needed comments,
+ * images and roles that this shape could not hold.
+ */
+const db = require('../config/db');
 
 module.exports = {
-  articles(category) {
-    if (category && category !== 'All')
-      return db.prepare('SELECT * FROM articles WHERE category = ? ORDER BY id').all(category);
-    return db.prepare('SELECT * FROM articles ORDER BY id').all();
+  async articles(category) {
+    if (category && category !== 'All') {
+      return db.sql('SELECT * FROM articles WHERE category = $1 ORDER BY id', [category]);
+    }
+    return db.sql('SELECT * FROM articles ORDER BY id');
   },
-  articleCategories() {
-    return db.prepare('SELECT DISTINCT category FROM articles ORDER BY category').all().map(r => r.category);
+
+  async articleCategories() {
+    const rows = await db.sql('SELECT DISTINCT category FROM articles ORDER BY category');
+    return rows.map((r) => r.category);
   },
-  posts() {
-    return db.prepare('SELECT * FROM posts ORDER BY id').all();
+
+  async posts() {
+    return db.sql('SELECT * FROM posts ORDER BY created_at DESC, id DESC');
   },
-  addPost({ author, tag, title, body }) {
-    db.prepare(`INSERT INTO posts (author, tag, title, body, replies, likes, time_ago)
-                VALUES (?,?,?,?,0,0,'just now')`).run(author, tag, title, body);
+
+  async addPost({ author, topic, title, body }) {
+    await db.run(
+      `INSERT INTO posts (author, role, topic, title, body, hearts, clinician_answered, created_at)
+       VALUES ($1, 'mother', $2, $3, $4, 0, FALSE, now())`,
+      [author, topic ?? null, title, body ?? null],
+    );
   },
-  hospitals() {
-    return db.prepare('SELECT * FROM hospitals ORDER BY distance_km ASC').all();
+
+  async hospitals() {
+    return db.sql('SELECT * FROM hospitals ORDER BY distance_km ASC');
   },
 };
