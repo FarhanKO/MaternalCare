@@ -4,7 +4,8 @@ import { HeartHandshake, Link2, RefreshCw } from 'lucide-react';
 import { Dashboard } from '@/components/Dashboard';
 import { SosScreen } from '@/components/SosScreen';
 import {
-  api, apiBase, savedToken, setApiBase, type Dashboard as Data, type SosAlert,
+  api, apiBase, pairFromLink, savedToken, setApiBase,
+  type Dashboard as Data, type SosAlert,
 } from '@/lib/api';
 import { notify, startEmergency, stopEmergency, releaseScreen, unlockAudio } from '@/lib/alert';
 import { isNative, nativeAlarmOff, nativeAlarmOn, startNativeWatch } from '@/lib/native';
@@ -14,7 +15,9 @@ const POLL_IDLE = 12000;
 const POLL_ALERT = 5000;
 
 export function App() {
-  const [token] = useState(savedToken);
+  const [token, setToken] = useState(savedToken);
+  const [pairText, setPairText] = useState('');
+  const [pairError, setPairError] = useState('');
   const [data, setData] = useState<Data | null>(null);
   const [alert, setAlert] = useState<SosAlert | null>(null);
   const [error, setError] = useState('');
@@ -110,20 +113,50 @@ export function App() {
     } catch { /* she still sees the alert either way */ }
   };
 
+  const pair = () => {
+    const r = pairFromLink(pairText);
+    if (!r.ok) { setPairError(r.error ?? 'That did not work'); return; }
+    setToken(savedToken());
+  };
+
   /* ---------------------------------------------------------- no link */
   if (!token) {
     return (
       <div className="grid min-h-screen place-items-center px-6">
-        <div className="glass w-full max-w-sm rounded-4xl p-7 text-center">
+        <div className="glass w-full max-w-sm rounded-4xl p-7">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-brand-500/12 text-brand-600">
             <Link2 className="h-7 w-7" />
           </span>
-          <h1 className="mt-3 text-xl font-extrabold tracking-tight text-ink">
-            Open your invitation
+          <h1 className="mt-3 text-center text-xl font-extrabold tracking-tight text-ink">
+            Pair this app
           </h1>
-          <p className="mt-1.5 text-[12.5px] font-medium leading-relaxed text-ink-muted">
-            This app works from the personal link the mother sends you. Open that link on
-            this phone and it will pair automatically.
+          <p className="mt-1.5 text-center text-[12.5px] font-medium leading-relaxed text-ink-muted">
+            Paste the personal link she sent you. It only has to be done once.
+          </p>
+
+          <textarea
+            value={pairText}
+            onChange={(e) => { setPairText(e.target.value); setPairError(''); }}
+            rows={3}
+            placeholder="https://…/?t=…"
+            aria-label="Your invitation link"
+            className="mt-4 w-full resize-none rounded-2xl border border-white/60 bg-white/80 px-3.5 py-2.5 text-[12px] font-medium text-ink outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
+          />
+
+          {pairError && (
+            <p className="mt-1.5 text-[11px] font-bold text-rose-600">{pairError}</p>
+          )}
+
+          <button
+            onClick={pair}
+            className="mt-2 w-full rounded-2xl bg-brand-500 py-3 text-[13px] font-extrabold text-white transition hover:bg-brand-600"
+          >
+            Pair
+          </button>
+
+          <p className="mt-3 text-center text-[10.5px] font-medium leading-relaxed text-ink-faint">
+            Opening the link in a browser pairs it automatically. In the installed app
+            there is no address bar, so it has to be pasted here.
           </p>
         </div>
       </div>

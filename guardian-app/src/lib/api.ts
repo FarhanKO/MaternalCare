@@ -138,3 +138,33 @@ export const savedToken = () => {
 };
 
 export const forgetToken = () => localStorage.removeItem(KEY);
+
+/**
+ * Pair from a link the guardian pasted in.
+ *
+ * Inside the APK the page is served from the bundle, so there is never a
+ * query string to read — without this there is no way in at all. Accepts a
+ * whole link or a bare token, since people paste whatever they were sent.
+ */
+export function pairFromLink(input: string): { ok: boolean; error?: string } {
+  const text = input.trim();
+  if (!text) return { ok: false, error: 'Paste the link you were sent' };
+
+  let token: string | null = null;
+  let api: string | null = null;
+
+  try {
+    const url = new URL(text);
+    token = url.searchParams.get('t');
+    api = url.searchParams.get('api');
+  } catch {
+    // not a URL — treat it as a bare token
+    if (/^[A-Za-z0-9_-]{16,}$/.test(text)) token = text;
+  }
+
+  if (!token) return { ok: false, error: 'That link has no invitation code in it' };
+
+  localStorage.setItem(KEY, token);
+  if (api) setApiBase(api);
+  return { ok: true };
+}
