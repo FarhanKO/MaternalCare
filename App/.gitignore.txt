@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+
+# build output
+frontend/dist/
+dist/
+*.tsbuildinfo
+
+# database (regenerated + seeded on first run)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# uploaded prescriptions and reports — patient data, never committed
+data/uploads/
+
+# environment
+.env
+.env.local
+frontend/.env.local
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+
+# built guardian APK — a build artifact, rebuilt with `npm run apk`
+public/downloads/*.apk
+guardian-app/android/app/build/
+guardian-app/android/.gradle/
+guardian-app/android/local.properties
+guardian-app/dist/
