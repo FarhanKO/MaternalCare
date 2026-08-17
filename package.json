@@ -5,11 +5,14 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "node --watch app.js"
+    "dev": "node --watch app.js",
+    "db:check": "node db/check.js",
+    "db:reset": "node db/reset.js"
   },
   "dependencies": {
     "chart.js": "^4.4.9",
     "ejs": "^3.1.10",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.23.0"
   }
 }
