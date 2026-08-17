@@ -12,6 +12,10 @@ import {
   type RankedDoctor, type SlotOffer,
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
+import type {
+  ChildState, DailyLogState, Milestone, ServerPost, ServerProfile,
+  Vaccination, VaccinationStats,
+} from '@/data/records';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
@@ -137,6 +141,76 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status, note }),
     }).then((r) => r.data),
+
+  /* ------------------------------------------------------- profile */
+
+  getProfile: () => request<Envelope<ServerProfile>>('/profile').then((r) => r.data),
+
+  /** Send only what changed; the server leaves the rest alone. */
+  updateProfile: (patch: Partial<{
+    name: string; bio: string; avatar: string | null;
+    bloodGroup: string; age: number; stage: string;
+  }>) => request<Envelope<ServerProfile>>('/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  }).then((r) => r.data),
+
+  /* ------------------------------ mood, kicks, hydration by day */
+
+  getDailyLog: () => request<Envelope<DailyLogState>>('/daily-log').then((r) => r.data),
+
+  saveDailyLog: (patch: { mood?: string; kicks?: number; waterLitres?: number }) =>
+    request<Envelope<DailyLogState>>('/daily-log', {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }).then((r) => r.data),
+
+  /* ----------------------------------------------------- community */
+
+  getPosts: (opts: { limit?: number; offset?: number; topic?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.limit) q.set('limit', String(opts.limit));
+    if (opts.offset) q.set('offset', String(opts.offset));
+    if (opts.topic && opts.topic !== 'All') q.set('topic', opts.topic);
+    return request<Envelope<ServerPost[]> & { meta: { total: number } }>(
+      `/community/posts?${q}`,
+    ).then((r) => ({ posts: r.data, total: r.meta.total }));
+  },
+
+  createPost: (body: { title: string; body?: string; topic?: string; image?: string }) =>
+    request<Envelope<ServerPost>>('/community/posts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  commentOnPost: (postId: string, body: string) =>
+    request<Envelope<ServerPost>>(`/community/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }).then((r) => r.data),
+
+  heartPost: (postId: string, delta: 1 | -1) =>
+    request<Envelope<ServerPost>>(`/community/posts/${postId}/heart`, {
+      method: 'POST',
+      body: JSON.stringify({ delta }),
+    }).then((r) => r.data),
+
+  /* --------------------------------------------------------- child */
+
+  getChild: () => request<Envelope<ChildState | null>>('/child').then((r) => r.data),
+
+  toggleMilestone: (id: string) =>
+    request<Envelope<Milestone[]>>(`/child/milestones/${id}`, { method: 'PATCH' })
+      .then((r) => r.data),
+
+  getVaccinations: () =>
+    request<Envelope<Vaccination[]> & { meta: VaccinationStats }>('/vaccinations')
+      .then((r) => ({ rows: r.data, stats: r.meta })),
+
+  markVaccinationDone: (id: string) =>
+    request<Envelope<Vaccination[]> & { meta: VaccinationStats }>(`/vaccinations/${id}/done`, {
+      method: 'PATCH',
+    }).then((r) => ({ rows: r.data, stats: r.meta })),
 
   /* --------------------------------------------------- emergency SOS */
 

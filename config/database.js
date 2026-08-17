@@ -133,6 +133,28 @@ CREATE TABLE IF NOT EXISTS symptoms (
   from_voice INTEGER NOT NULL DEFAULT 0,
   logged_at TEXT NOT NULL
 );
+-- Sprint 3: comments on a community post. The old posts table only counted
+-- replies in an integer, so nothing could ever be read back.
+CREATE TABLE IF NOT EXISTS post_comments (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id    INTEGER NOT NULL REFERENCES posts(id),
+  user_id    INTEGER REFERENCES users(id),
+  author     TEXT NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'mother',
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+-- Sprint 3: what she reports about herself each day. One row per day, so the
+-- dashboard can chart a trend instead of forgetting on refresh.
+CREATE TABLE IF NOT EXISTS daily_logs (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL REFERENCES users(id),
+  date         TEXT NOT NULL,
+  mood         TEXT,
+  kicks        INTEGER,
+  water_litres REAL,
+  UNIQUE (user_id, date)
+);
 -- Sprint 3: emergency alerts. One row per time the mother raised SOS, with
 -- where she was, plus a row per person the alert was fanned out to.
 CREATE TABLE IF NOT EXISTS sos_alerts (
@@ -222,6 +244,34 @@ if (!userCols.includes('next_visit')) {
 // Sprint 3: the emergency line differs by country, so it is hers to set
 if (!userCols.includes('emergency_number')) {
   db.exec("ALTER TABLE users ADD COLUMN emergency_number TEXT NOT NULL DEFAULT '999'");
+}
+
+// Sprint 3: profile photo and bio, which until now vanished on refresh
+if (!userCols.includes('avatar_file')) {
+  db.exec('ALTER TABLE users ADD COLUMN avatar_file TEXT');
+}
+if (!userCols.includes('bio')) {
+  db.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
+}
+
+// Sprint 3: the React community needs more than the old EJS posts shape held
+const postCols = db.prepare('PRAGMA table_info(posts)').all().map((c) => c.name);
+for (const [col, ddl] of [
+  ['user_id', 'INTEGER REFERENCES users(id)'],
+  ['role', "TEXT NOT NULL DEFAULT 'mother'"],
+  ['week', 'INTEGER'],
+  ['image_file', 'TEXT'],
+  ['hearts', 'INTEGER NOT NULL DEFAULT 0'],
+  ['clinician_answered', 'INTEGER NOT NULL DEFAULT 0'],
+  ['created_at', 'TEXT'],
+]) {
+  if (!postCols.includes(col)) db.exec(`ALTER TABLE posts ADD COLUMN ${col} ${ddl}`);
+}
+// the seeded rows predate created_at; give them one so ordering works
+db.exec("UPDATE posts SET created_at = COALESCE(created_at, datetime('now'))");
+// 'likes' was the old name for what the React UI calls hearts
+if (postCols.includes('likes')) {
+  db.exec('UPDATE posts SET hearts = likes WHERE hearts = 0 AND likes > 0');
 }
 
 // Sprint 3: a guardian who has installed the companion app can be force-alarmed

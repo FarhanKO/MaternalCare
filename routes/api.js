@@ -13,6 +13,9 @@ const messageApi = require('../controllers/api/messageApiController');
 const documentApi = require('../controllers/api/documentApiController');
 const sosApi = require('../controllers/api/sosApiController');
 const guardianApi = require('../controllers/api/guardianApiController');
+const communityApi = require('../controllers/api/communityApiController');
+const profileApi = require('../controllers/api/profileApiController');
+const childApi = require('../controllers/api/childApiController');
 const userModel = require('../models/userModel');
 const pregnancyModel = require('../models/pregnancyModel');
 
@@ -51,6 +54,30 @@ router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
+
+/* profile: name, photo, bio — previously lost on every refresh */
+router.get('/profile', profileApi.show);
+router.patch('/profile', profileApi.update);
+router.get('/profile/avatar/:file', profileApi.avatar);
+
+/* mood, kicks and hydration she reports each day */
+router.get('/daily-log', profileApi.dailyLog);
+router.put('/daily-log', profileApi.saveDailyLog);
+
+/* community board */
+router.get('/community/posts', communityApi.index);
+router.post('/community/posts', communityApi.create);
+router.post('/community/posts/:id/comments', communityApi.comment);
+router.post('/community/posts/:id/heart', communityApi.heart);
+router.get('/community/images/:file', communityApi.image);
+
+/* child: growth, milestones, vaccinations — the React client had no route
+   to these, so it drew them from hardcoded arrays */
+router.get('/child', childApi.show);
+router.post('/child/growth', childApi.addGrowth);
+router.patch('/child/milestones/:id', childApi.toggleMilestone);
+router.get('/vaccinations', childApi.vaccinations);
+router.patch('/vaccinations/:id/done', childApi.markVaccinationDone);
 
 /* the guardian companion app — scoped by link token, read-only */
 router.get('/guardian/:token', guardianApi.dashboard);

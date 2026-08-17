@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BadgeCheck, BookOpen, ChevronDown, ChevronRight, ExternalLink, Heart, ImagePlus, MessageCircle,
   Newspaper, Plus, Search, Send, ShieldCheck, Sparkles, Users, X,
@@ -8,6 +8,8 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
+import { api, fileUrl } from '@/lib/api';
+import type { ServerPost } from '@/data/records';
 import { useProfile } from '@/context/ProfileContext';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { ArticleModal } from '@/components/mother/ArticleModal';
@@ -221,7 +223,10 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stage, symptomKey, week, lowHydration, me.details.age, me.details.bloodGroup],
   );
+  // the board lives in the database now; SEED is only what shows if it is
+  // unreachable, so an offline backend degrades to a demo rather than a blank
   const [posts, setPosts] = useState<Post[]>(SEED);
+  const [boardLive, setBoardLive] = useState(false);
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -244,6 +249,36 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
     );
   }, [posts, filter, query]);
 
+  /** Server shape → the shape this component renders. */
+  const fromServer = (p: ServerPost): Post => ({
+    id: p.id,
+    author: p.author,
+    role: p.role,
+    week: p.week,
+    topic: p.topic ?? 'Symptoms',
+    title: p.title,
+    body: p.body,
+    image: p.image ? fileUrl(p.image) : undefined,
+    hearts: p.hearts,
+    clinicianAnswered: p.clinicianAnswered,
+    ago: p.ago,
+    comments: p.comments.map((c) => ({
+      id: c.id, author: c.author, role: c.role, body: c.body, ago: c.ago,
+    })),
+  });
+
+  const loadBoard = useCallback(async () => {
+    try {
+      const { posts: rows } = await api.getPosts({ limit: 50 });
+      setPosts(rows.map(fromServer));
+      setBoardLive(true);
+    } catch {
+      setBoardLive(false);   // keep SEED so the section still reads as a demo
+    }
+  }, []);
+
+  useEffect(() => { loadBoard(); }, [loadBoard]);
+
   const pickImage = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -255,25 +290,59 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
     setComposing(false); setTitle(''); setBody(''); setImage(null); setTopic(TOPICS[0]);
   };
 
-  const publish = () => {
+  const publish = async () => {
     if (!title.trim() && !body.trim()) return;
-    setPosts((p) => [{
-      id: uid(), author: me.name, role: 'mother', week, topic,
+    const draft = {
       title: title.trim() || 'Untitled',
       body: body.trim(),
+      topic,
       image: image ?? undefined,
-      hearts: 0, clinicianAnswered: false, ago: 'just now', comments: [],
-    }, ...p]);
+    };
     resetComposer();
+    try {
+      const saved = await api.createPost(draft);
+      setPosts((p) => [fromServer(saved), ...p]);
+    } catch {
+      // offline: show it locally so her writing is not lost mid-session
+      setPosts((p) => [{
+        id: uid(), author: me.name, role: 'mother', week, topic: draft.topic,
+        title: draft.title, body: draft.body, image: draft.image,
+        hearts: 0, clinicianAnswered: false, ago: 'just now', comments: [],
+      }, ...p]);
+    }
   };
 
-  const addComment = (postId: string) => {
+  const addComment = async (postId: string) => {
     const text = (drafts[postId] || '').trim();
     if (!text) return;
-    setPosts((all) => all.map((p) => p.id === postId
-      ? { ...p, comments: [...p.comments, { id: uid(), author: me.name, role: 'mother', body: text, ago: 'just now' }] }
-      : p));
     setDrafts((d) => ({ ...d, [postId]: '' }));
+
+    // show it immediately, then reconcile with what the server stored
+    const optimistic = { id: uid(), author: me.name, role: 'mother' as const, body: text, ago: 'just now' };
+    setPosts((all) => all.map((p) => (p.id === postId
+      ? { ...p, comments: [...p.comments, optimistic] } : p)));
+
+    try {
+      const saved = await api.commentOnPost(postId, text);
+      setPosts((all) => all.map((p) => (p.id === postId ? fromServer(saved) : p)));
+    } catch {
+      /* offline — the optimistic comment stands for this session */
+    }
+  };
+
+  /** Hearts are a toggle in the UI, a delta on the server. */
+  const toggleHeart = async (postId: string) => {
+    const wasLiked = Boolean(liked[postId]);
+    const delta = wasLiked ? -1 : 1;
+    setLiked((l) => ({ ...l, [postId]: !wasLiked }));
+    setPosts((all) => all.map((p) => (p.id === postId
+      ? { ...p, hearts: Math.max(0, p.hearts + delta) } : p)));
+    try {
+      const saved = await api.heartPost(postId, delta);
+      setPosts((all) => all.map((p) => (p.id === postId ? fromServer(saved) : p)));
+    } catch {
+      /* offline — the local count stands */
+    }
   };
 
   return (
@@ -466,7 +535,7 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
 
                       <div className="mt-4 flex items-center gap-4">
                         <button
-                          onClick={() => setLiked((l) => ({ ...l, [p.id]: !l[p.id] }))}
+                          onClick={() => toggleHeart(p.id)}
                           className={cn('inline-flex items-center gap-1.5 text-xs font-semibold transition-colors',
                             isLiked ? 'text-rose-600' : 'text-ink-muted hover:text-ink')}
                         >

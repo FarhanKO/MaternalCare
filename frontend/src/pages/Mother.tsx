@@ -479,9 +479,49 @@ function PregnancyArc({ week, total }: { week: number; total: number }) {
 /* ---------------- page ---------------- */
 export function Mother() {
   const navigate = useNavigate();
-  const [kicks, setKicks] = useState(12);
-  const [water, setWater] = useState(1.4);
-  const [moodIdx, setMoodIdx] = useState(1); // Calm
+  /*
+   * Mood, kicks and hydration are hers to report and are stored per day.
+   * They were useState, so every figure reset on refresh and nothing could
+   * be charted. Local state still drives the UI for instant feedback; each
+   * change is written through, debounced so holding "+" is one request.
+   */
+  const [kicks, setKicksLocal] = useState(12);
+  const [water, setWaterLocal] = useState(1.4);
+  const [moodIdx, setMoodIdxLocal] = useState(1); // Calm
+  const [logLoaded, setLogLoaded] = useState(false);
+  const saveTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getDailyLog()
+      .then(({ today }) => {
+        if (cancelled) return;
+        if (today.kicks != null) setKicksLocal(today.kicks);
+        if (today.waterLitres != null) setWaterLocal(today.waterLitres);
+        if (today.mood) {
+          const i = MOODS.findIndex((m) => m.name === today.mood);
+          if (i >= 0) setMoodIdxLocal(i);
+        }
+        setLogLoaded(true);
+      })
+      .catch(() => setLogLoaded(true));   // offline — the defaults stand
+    return () => { cancelled = true; };
+  }, []);
+
+  const queueSave = (patch: { mood?: string; kicks?: number; waterLitres?: number }) => {
+    if (!logLoaded) return;               // never write before the first read
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      api.saveDailyLog(patch).catch(() => { /* offline — applies this session */ });
+    }, 600);
+  };
+
+  const setKicks = (v: number) => { setKicksLocal(v); queueSave({ kicks: v }); };
+  const setWater = (v: number) => { setWaterLocal(v); queueSave({ waterLitres: v }); };
+  const setMoodIdx = (i: number) => {
+    setMoodIdxLocal(i);
+    queueSave({ mood: MOODS[i]?.name });
+  };
   const [logOpen, setLogOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
   const [params, setParams] = useSearchParams();
