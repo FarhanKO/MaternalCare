@@ -7,7 +7,9 @@
     "start": "node app.js",
     "dev": "node --watch app.js",
     "db:check": "node db/check.js",
-    "db:reset": "node db/reset.js"
+    "db:reset": "node db/reset.js",
+    "db:seed": "node db/seed.js",
+    "db:latency": "node db/latency.js"
   },
   "dependencies": {
     "chart.js": "^4.4.9",
