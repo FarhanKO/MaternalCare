@@ -9,7 +9,7 @@
  *                     → cancelled (by the mother, before an answer)
  *            accepted → completed
  */
-const db = require('../config/database');
+const db = require('../config/db');
 const doctorModel = require('./doctorModel');
 
 const OPEN = ['requested', 'accepted'];
@@ -37,19 +37,21 @@ class NotBookableError extends Error {
   }
 }
 
-function takenTimes(doctorId, date) {
-  const rows = db.prepare(
+async function takenTimes(doctorId, date) {
+  const rows = await db.sql(
     `SELECT time FROM appointments
-     WHERE doctor_id = ? AND date = ? AND status IN ('requested','accepted')`,
-  ).all(doctorId, date);
+     WHERE doctor_id = $1 AND date = $2 AND status IN ('requested','accepted')`,
+    [doctorId, date],
+  );
   return new Set(rows.map((r) => r.time));
 }
 
 /** Slots still free on a day, with today's already-passed times removed. */
-function freeSlots(doctorId, date) {
-  const taken = takenTimes(doctorId, date);
+async function freeSlots(doctorId, date) {
+  const taken = await takenTimes(doctorId, date);
   const isToday = date === todayISO();
-  const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
 
   return doctorModel.SLOT_TIMES.filter((t) => {
     if (taken.has(t)) return false;
@@ -59,15 +61,39 @@ function freeSlots(doctorId, date) {
   });
 }
 
-/** The next few working days that still have room — used to offer a way out. */
-function nextOpenings(doctorId, fromDate, days = 14, limit = 6) {
+/**
+ * The next few working days that still have room — used to offer a way out.
+ *
+ * Every taken slot in the window comes back in one query, rather than one
+ * query per day as before.
+ */
+async function nextOpenings(doctorId, fromDate, days = 14, limit = 6) {
   const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(start.getTime() + days * DAY);
+
+  const rows = await db.sql(
+    `SELECT date, time FROM appointments
+     WHERE doctor_id = $1 AND status IN ('requested','accepted')
+       AND date >= $2 AND date < $3`,
+    [doctorId, iso(start), iso(end)],
+  );
+  const taken = new Set(rows.map((r) => `${r.date} ${r.time}`));
+
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
   const out = [];
+
   for (let i = 0; i < days && out.length < limit; i += 1) {
     const d = new Date(start.getTime() + i * DAY);
-    if (d.getDay() === 0) continue; // clinic closed Sunday
-    for (const time of freeSlots(doctorId, iso(d))) {
-      out.push({ date: iso(d), time });
+    if (d.getDay() === 0) continue;                 // clinic closed Sunday
+    const date = iso(d);
+    for (const time of doctorModel.SLOT_TIMES) {
+      if (taken.has(`${date} ${time}`)) continue;
+      if (date === todayISO()) {
+        const [h, m] = time.split(':').map(Number);
+        if (h * 60 + m <= nowMins + 30) continue;
+      }
+      out.push({ date, time });
       if (out.length >= limit) break;
     }
   }
@@ -75,12 +101,14 @@ function nextOpenings(doctorId, fromDate, days = 14, limit = 6) {
 }
 
 /** How many unanswered requests this doctor received before this one. */
-function queuePosition(row) {
+async function queuePosition(row) {
   if (row.status !== 'requested') return 0;
-  return db.prepare(
-    `SELECT COUNT(*) AS c FROM appointments
-     WHERE doctor_id = ? AND status = 'requested' AND requested_at < ?`,
-  ).get(row.doctor_id, row.requested_at).c + 1;
+  const r = await db.one(
+    `SELECT count(*) AS c FROM appointments
+     WHERE doctor_id = $1 AND status = 'requested' AND requested_at < $2`,
+    [row.doctor_id, row.requested_at],
+  );
+  return r.c + 1;
 }
 
 /** Days a request has gone unanswered — drives the "still waiting" nudge. */
@@ -89,14 +117,28 @@ function waitingDays(row) {
   return Math.floor((Date.now() - new Date(row.requested_at).getTime()) / DAY);
 }
 
+/**
+ * Rows are selected with the doctor joined and the queue position computed in
+ * SQL, so building the DTO needs no further queries.
+ */
+const WITH_DOCTOR = `
+  SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital,
+         CASE WHEN a.status = 'requested' THEN
+           (SELECT count(*) + 1 FROM appointments q
+             WHERE q.doctor_id = a.doctor_id AND q.status = 'requested'
+               AND q.requested_at < a.requested_at)
+         ELSE 0 END AS queue_position
+  FROM appointments a
+  JOIN doctors d ON d.id = a.doctor_id
+`;
+
 function toDTO(row) {
-  const doctor = db.prepare('SELECT name, specialty, hospital FROM doctors WHERE id = ?').get(row.doctor_id);
   return {
     id: String(row.id),
     doctorId: String(row.doctor_id),
-    doctorName: doctor ? doctor.name : 'Unknown clinician',
-    specialty: doctor ? doctor.specialty : '',
-    hospital: doctor ? doctor.hospital : '',
+    doctorName: row.doctor_name ?? 'Unknown clinician',
+    specialty: row.specialty ?? '',
+    hospital: row.hospital ?? '',
     patientId: String(row.user_id),
     date: row.date,
     time: row.time,
@@ -105,7 +147,7 @@ function toDTO(row) {
     note: row.note || undefined,
     requestedAt: row.requested_at || undefined,
     respondedAt: row.responded_at || undefined,
-    queuePosition: queuePosition(row),
+    queuePosition: row.queue_position ?? 0,
     waitingDays: waitingDays(row),
   };
 }
@@ -116,79 +158,86 @@ module.exports = {
   freeSlots,
   nextOpenings,
 
-  /** Free times for a doctor on a given day. */
-  slots(doctorId, date) {
-    return { date, times: freeSlots(doctorId, date) };
-  },
-
   /* ------------------------------------------------ server-rendered views
    * The EJS pages (routes/web.js) render raw joined rows. They predate the
    * request flow and are kept working alongside it.
    */
 
-  doctors({ specialty, availableOnly } = {}) {
-    let sql = 'SELECT * FROM doctors';
+  async doctors({ specialty, availableOnly } = {}) {
     const where = [];
     const args = [];
-    if (specialty && specialty !== 'All') { where.push('specialty LIKE ?'); args.push(`%${specialty}%`); }
-    if (availableOnly) where.push('available = 1');
-    if (where.length) sql += ' WHERE ' + where.join(' AND ');
-    sql += ' ORDER BY rating DESC';
-    return db.prepare(sql).all(...args);
+    if (specialty && specialty !== 'All') {
+      args.push(`%${specialty}%`);
+      where.push(`specialty ILIKE $${args.length}`);
+    }
+    if (availableOnly) where.push('available = TRUE');
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    return db.sql(`SELECT * FROM doctors ${clause} ORDER BY rating DESC`, args);
   },
 
-  specialties() {
-    return db.prepare('SELECT DISTINCT specialty FROM doctors ORDER BY specialty').all()
-      .map((r) => r.specialty);
+  async specialties() {
+    const rows = await db.sql('SELECT DISTINCT specialty FROM doctors ORDER BY specialty');
+    return rows.map((r) => r.specialty);
   },
 
-  forUser(userId) {
-    return db.prepare(`
+  async forUser(userId) {
+    return db.sql(`
       SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital
       FROM appointments a JOIN doctors d ON d.id = a.doctor_id
-      WHERE a.user_id = ?
+      WHERE a.user_id = $1
       ORDER BY CASE a.status WHEN 'requested' THEN 0 WHEN 'accepted' THEN 1
                              WHEN 'completed' THEN 2 ELSE 3 END, a.date ASC
-    `).all(userId);
+    `, [userId]);
   },
 
-  upcoming(userId, limit = 3) {
-    return db.prepare(`
+  async upcoming(userId, limit = 3) {
+    return db.sql(`
       SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital
       FROM appointments a JOIN doctors d ON d.id = a.doctor_id
-      WHERE a.user_id = ? AND a.status = 'accepted'
-      ORDER BY a.date ASC LIMIT ?`).all(userId, limit);
+      WHERE a.user_id = $1 AND a.status = 'accepted'
+      ORDER BY a.date ASC LIMIT $2
+    `, [userId, limit]);
   },
 
   /** Booked at the desk, so it is confirmed the moment it is written. */
-  book(userId, { doctor_id, date, time, reason }) {
-    db.prepare(`INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
-                VALUES (?,?,?,?,?, 'accepted', ?)`)
-      .run(userId, doctor_id, date, time, reason, new Date().toISOString());
+  async book(userId, { doctor_id, date, time, reason }) {
+    await db.run(
+      `INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
+       VALUES ($1,$2,$3,$4,$5,'accepted',now())`,
+      [userId, doctor_id, date, time, reason],
+    );
   },
 
-  cancel(id) {
-    db.prepare("UPDATE appointments SET status = 'cancelled' WHERE id = ?").run(id);
+  async cancel(id) {
+    await db.run("UPDATE appointments SET status = 'cancelled' WHERE id = $1", [id]);
   },
 
   /* --------------------------------------------------- the request flow */
 
+  /** Free times for a doctor on a given day. */
+  async slots(doctorId, date) {
+    return { date, times: await freeSlots(doctorId, date) };
+  },
+
   /** The mother's own requests, shaped for the React client. */
-  requestsFor(userId) {
-    return db.prepare('SELECT * FROM appointments WHERE user_id = ? ORDER BY date ASC, time ASC')
-      .all(userId).map(toDTO);
+  async requestsFor(userId) {
+    const rows = await db.sql(`${WITH_DOCTOR} WHERE a.user_id = $1 ORDER BY a.date ASC, a.time ASC`,
+      [userId]);
+    return rows.map(toDTO);
   },
 
   /** A doctor's inbox — oldest unanswered request first. */
-  forDoctor(doctorId) {
-    return db.prepare(
-      `SELECT * FROM appointments WHERE doctor_id = ?
-       ORDER BY CASE status WHEN 'requested' THEN 0 ELSE 1 END, requested_at ASC`,
-    ).all(doctorId).map(toDTO);
+  async forDoctor(doctorId) {
+    const rows = await db.sql(
+      `${WITH_DOCTOR} WHERE a.doctor_id = $1
+       ORDER BY CASE a.status WHEN 'requested' THEN 0 ELSE 1 END, a.requested_at ASC`,
+      [doctorId],
+    );
+    return rows.map(toDTO);
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
+  async find(id) {
+    const row = await db.one(`${WITH_DOCTOR} WHERE a.id = $1`, [id]);
     return row ? toDTO(row) : null;
   },
 
@@ -197,51 +246,59 @@ module.exports = {
    * the slot went while she was choosing — in both cases with somewhere to go
    * next, because a bare error leaves her stuck.
    */
-  request(userId, doctorId, { date, time, reason }) {
-    const doctor = doctorModel.find(doctorId);
+  async request(userId, doctorId, { date, time, reason }) {
+    const doctor = await doctorModel.find(doctorId);
     if (!doctor) throw new NotBookableError('That clinician is no longer listed');
     if (doctor.status === 'away') throw new NotBookableError(`${doctor.name} is on leave right now`);
     if (!doctor.bookable) throw new NotBookableError(`${doctor.name}'s list is full`);
     if (!date || !time) throw new Error('A request needs a date and a time');
     if (date < todayISO()) throw new Error('That date has passed');
 
-    if (!freeSlots(doctorId, date).includes(time)) {
-      throw new SlotTakenError(nextOpenings(doctorId, date));
+    const free = await freeSlots(doctorId, date);
+    if (!free.includes(time)) {
+      throw new SlotTakenError(await nextOpenings(doctorId, date));
     }
 
     // one open request per doctor keeps the queue honest
-    const dup = db.prepare(
-      `SELECT 1 FROM appointments WHERE user_id = ? AND doctor_id = ? AND status = 'requested'`,
-    ).get(userId, doctorId);
+    const dup = await db.one(
+      "SELECT 1 FROM appointments WHERE user_id = $1 AND doctor_id = $2 AND status = 'requested'",
+      [userId, doctorId],
+    );
     if (dup) throw new NotBookableError(`You already have a request waiting with ${doctor.name}`);
 
-    const info = db.prepare(
+    const row = await db.insert(
       `INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
-       VALUES (?,?,?,?,?,'requested',?)`,
-    ).run(userId, doctorId, date, time, reason || 'Antenatal appointment', new Date().toISOString());
-
-    return this.find(Number(info.lastInsertRowid));
+       VALUES ($1,$2,$3,$4,$5,'requested',$6) RETURNING id`,
+      [userId, doctorId, date, time, reason || 'Antenatal appointment', new Date().toISOString()],
+    );
+    return this.find(row.id);
   },
 
   /** The doctor answers. A decline carries a reason the mother will read. */
-  respond(id, status, note) {
+  async respond(id, status, note) {
     if (!['accepted', 'declined'].includes(status)) throw new Error(`Cannot set status ${status}`);
-    const row = db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
+    const row = await db.one('SELECT * FROM appointments WHERE id = $1', [id]);
     if (!row) return null;
     if (row.status !== 'requested') throw new Error('That request has already been answered');
 
-    db.prepare('UPDATE appointments SET status = ?, note = ?, responded_at = ? WHERE id = ?')
-      .run(status, note || null, new Date().toISOString(), id);
+    await db.run(
+      'UPDATE appointments SET status = $2, note = $3, responded_at = now() WHERE id = $1',
+      [id, status, note || null],
+    );
     return this.find(id);
   },
 
   /** The mother withdraws, which frees the slot again. */
-  withdraw(id, userId) {
-    const row = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(id, userId);
+  async withdraw(id, userId) {
+    const row = await db.one(
+      'SELECT * FROM appointments WHERE id = $1 AND user_id = $2', [id, userId],
+    );
     if (!row) return null;
     if (!OPEN.includes(row.status)) throw new Error('That appointment is already closed');
-    db.prepare("UPDATE appointments SET status = 'cancelled', responded_at = ? WHERE id = ?")
-      .run(new Date().toISOString(), id);
+
+    await db.run(
+      "UPDATE appointments SET status = 'cancelled', responded_at = now() WHERE id = $1", [id],
+    );
     return this.find(id);
   },
 };

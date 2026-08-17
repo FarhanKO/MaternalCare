@@ -96,13 +96,22 @@ module.exports = {
     return this.all(userId);
   },
 
-  /** Domain logic: how heavily the journal weighs on the wellbeing score. */
-  async burden(userId) {
-    const list = await this.all(userId);
+  /**
+   * How heavily a journal weighs on the wellbeing score.
+   *
+   * Pure, taking the list rather than a user id, so a caller that already
+   * holds the symptoms — the clinician caseload fetches everyone's in one
+   * query — can score them without going back to the database per patient.
+   */
+  burdenOf(list) {
     return list.reduce((total, s) => {
       const persistence = Math.min(2, 1 + (s.daysPresent - 1) * 0.12);
       return total + (INTENSITY_WEIGHT[s.intensity] || 10) * persistence
         + (URGENT.has(s.name) ? 14 : 0);
     }, 0);
+  },
+
+  async burden(userId) {
+    return this.burdenOf(await this.all(userId));
   },
 };

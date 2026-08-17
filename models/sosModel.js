@@ -12,7 +12,8 @@
  * A screen that claimed every guardian had been reached would be a dangerous
  * lie in exactly the situation where the mother is relying on it.
  */
-const db = require('../config/database');
+const crypto = require('crypto');
+const db = require('../config/db');
 const messageModel = require('./messageModel');
 
 const OPEN = 'active';
@@ -39,26 +40,34 @@ const toNotification = (n) => ({
   detail: n.detail || undefined,
 });
 
-function toAlert(row) {
-  const notifications = db
-    .prepare('SELECT * FROM sos_notifications WHERE alert_id = ? ORDER BY id')
-    .all(row.id)
-    .map(toNotification);
+/** An alert plus its fan-out, in one query rather than one per alert. */
+async function hydrate(rows) {
+  if (!rows.length) return [];
+  const notes = await db.sql(
+    'SELECT * FROM sos_notifications WHERE alert_id = ANY($1::int[]) ORDER BY id',
+    [rows.map((r) => Number(r.id))],
+  );
 
-  return {
-    id: String(row.id),
-    patientId: String(row.user_id),
-    triggeredAt: row.triggered_at,
-    location: row.lat != null && row.lng != null
-      ? { lat: row.lat, lng: row.lng, accuracy: row.accuracy ?? undefined }
-      : null,
-    locationNote: row.location_note || undefined,
-    status: row.status,
-    closedAt: row.closed_at || undefined,
-    closedBy: row.closed_by || undefined,
-    notifications,
-    reached: notifications.filter((n) => n.state === 'alerted').length,
-  };
+  const byAlert = new Map(rows.map((r) => [Number(r.id), []]));
+  for (const n of notes) byAlert.get(n.alert_id)?.push(toNotification(n));
+
+  return rows.map((row) => {
+    const notifications = byAlert.get(Number(row.id)) ?? [];
+    return {
+      id: String(row.id),
+      patientId: String(row.user_id),
+      triggeredAt: row.triggered_at,
+      location: row.lat != null && row.lng != null
+        ? { lat: row.lat, lng: row.lng, accuracy: row.accuracy ?? undefined }
+        : null,
+      locationNote: row.location_note || undefined,
+      status: row.status,
+      closedAt: row.closed_at || undefined,
+      closedBy: row.closed_by || undefined,
+      notifications,
+      reached: notifications.filter((n) => n.state === 'alerted').length,
+    };
+  });
 }
 
 /**
@@ -68,19 +77,19 @@ function toAlert(row) {
  * being alarmed for an obstetric emergency is noise, and an alert everybody
  * learns to ignore is worse than no alert.
  */
-function cliniciansFor(userId) {
-  return db.prepare(`
+async function cliniciansFor(userId) {
+  return db.sql(`
     SELECT DISTINCT d.id, d.name, d.specialty
     FROM appointments a JOIN doctors d ON d.id = a.doctor_id
-    WHERE a.user_id = ? AND a.status IN ('accepted','requested')
-  `).all(userId);
+    WHERE a.user_id = $1 AND a.status IN ('accepted','requested')
+  `, [userId]);
 }
 
 module.exports = {
   /* -------------------------------------------------- emergency line */
 
-  emergencyNumber(userId) {
-    const row = db.prepare('SELECT emergency_number FROM users WHERE id = ?').get(userId);
+  async emergencyNumber(userId) {
+    const row = await db.one('SELECT emergency_number FROM users WHERE id = $1', [userId]);
     return (row && row.emergency_number) || DEFAULT_EMERGENCY;
   },
 
@@ -89,7 +98,7 @@ module.exports = {
    * link, so anything else could smuggle in a different scheme. Brackets are
    * allowed because "(02) 5566 7788" is how people write an area code.
    */
-  setEmergencyNumber(userId, value) {
+  async setEmergencyNumber(userId, value) {
     const cleaned = String(value ?? '').trim();
     if (!cleaned) throw new Error('An emergency number is required');
 
@@ -100,76 +109,85 @@ module.exports = {
       throw new Error('That is not a dialable number');
     }
 
-    db.prepare('UPDATE users SET emergency_number = ? WHERE id = ?').run(cleaned, userId);
+    await db.run('UPDATE users SET emergency_number = $2 WHERE id = $1', [userId, cleaned]);
     return cleaned;
   },
 
   /* --------------------------------------------------------- guardians */
 
-  contacts(userId) {
-    return db
-      .prepare('SELECT * FROM emergency_contacts WHERE user_id = ? ORDER BY id')
-      .all(userId)
-      .map(toContact);
+  async contacts(userId) {
+    const rows = await db.sql(
+      'SELECT * FROM emergency_contacts WHERE user_id = $1 ORDER BY id', [userId],
+    );
+    return rows.map(toContact);
   },
 
-  addContact(userId, { name, relation, phone }) {
+  async addContact(userId, { name, relation, phone }) {
     const label = String(name || '').trim();
     if (!label) throw new Error('A guardian needs a name');
-    const info = db
-      .prepare(`INSERT INTO emergency_contacts (user_id, name, relation, phone, access_token)
-                VALUES (?,?,?,?,?)`)
-      .run(userId, label, (relation || '').trim() || null, (phone || '').trim() || null,
-        require('crypto').randomBytes(18).toString('base64url'));
-    return toContact(db.prepare('SELECT * FROM emergency_contacts WHERE id = ?')
-      .get(Number(info.lastInsertRowid)));
+
+    const row = await db.insert(
+      `INSERT INTO emergency_contacts (user_id, name, relation, phone, access_token)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [userId, label, (relation || '').trim() || null, (phone || '').trim() || null,
+        crypto.randomBytes(18).toString('base64url')],
+    );
+    return toContact(row);
   },
 
-  removeContact(id, userId) {
-    const info = db
-      .prepare('DELETE FROM emergency_contacts WHERE id = ? AND user_id = ?')
-      .run(id, userId);
-    return info.changes > 0;
+  async removeContact(id, userId) {
+    const changed = await db.run(
+      'DELETE FROM emergency_contacts WHERE id = $1 AND user_id = $2', [id, userId],
+    );
+    return changed > 0;
   },
 
   /* ------------------------------------------------------------ alerts */
 
-  active(userId) {
-    const row = db
-      .prepare('SELECT * FROM sos_alerts WHERE user_id = ? AND status = ? ORDER BY id DESC LIMIT 1')
-      .get(userId, OPEN);
-    return row ? toAlert(row) : null;
+  async active(userId) {
+    const row = await db.one(
+      'SELECT * FROM sos_alerts WHERE user_id = $1 AND status = $2 ORDER BY id DESC LIMIT 1',
+      [userId, OPEN],
+    );
+    if (!row) return null;
+    const [alert] = await hydrate([row]);
+    return alert;
   },
 
-  find(id) {
-    const row = db.prepare('SELECT * FROM sos_alerts WHERE id = ?').get(id);
-    return row ? toAlert(row) : null;
+  async find(id) {
+    const row = await db.one('SELECT * FROM sos_alerts WHERE id = $1', [id]);
+    if (!row) return null;
+    const [alert] = await hydrate([row]);
+    return alert;
   },
 
-  history(userId, limit = 10) {
-    return db
-      .prepare('SELECT * FROM sos_alerts WHERE user_id = ? ORDER BY id DESC LIMIT ?')
-      .all(userId, limit)
-      .map(toAlert);
+  async history(userId, limit = 10) {
+    const rows = await db.sql(
+      'SELECT * FROM sos_alerts WHERE user_id = $1 ORDER BY id DESC LIMIT $2',
+      [userId, limit],
+    );
+    return hydrate(rows);
   },
 
   /** Every open alert across the caseload — the clinician's red banner. */
-  openForDoctor(doctorId) {
-    return db.prepare(`
-      SELECT s.* FROM sos_alerts s
+  async openForDoctor(doctorId) {
+    const rows = await db.sql(`
+      SELECT s.*, u.name AS patient_name, u.emergency_number
+      FROM sos_alerts s
+      JOIN users u ON u.id = s.user_id
       WHERE s.status = 'active' AND s.user_id IN (
-        SELECT DISTINCT a.user_id FROM appointments a WHERE a.doctor_id = ?
+        SELECT DISTINCT a.user_id FROM appointments a WHERE a.doctor_id = $1
       )
       ORDER BY s.id DESC
-    `).all(doctorId).map((row) => {
-      const patient = db.prepare('SELECT name, emergency_number FROM users WHERE id = ?').get(row.user_id);
-      return {
-        ...toAlert(row),
-        patientName: patient ? patient.name : 'Unknown patient',
-        // her line, not a hardcoded one — the clinic may be in another country
-        emergencyNumber: (patient && patient.emergency_number) || DEFAULT_EMERGENCY,
-      };
-    });
+    `, [doctorId]);
+
+    const alerts = await hydrate(rows);
+    return alerts.map((a, i) => ({
+      ...a,
+      patientName: rows[i].patient_name ?? 'Unknown patient',
+      // her line, not a hardcoded one — the clinic may be in another country
+      emergencyNumber: rows[i].emergency_number || DEFAULT_EMERGENCY,
+    }));
   },
 
   /**
@@ -177,72 +195,83 @@ module.exports = {
    * returns the open one rather than stacking duplicates — a panicking user
    * pressing twice should not create two incidents.
    */
-  trigger(userId, { lat, lng, accuracy, locationNote } = {}) {
-    const existing = this.active(userId);
+  async trigger(userId, { lat, lng, accuracy, locationNote } = {}) {
+    const existing = await this.active(userId);
     if (existing) return existing;
 
-    const info = db.prepare(`
-      INSERT INTO sos_alerts (user_id, triggered_at, lat, lng, accuracy, location_note, status)
-      VALUES (?,?,?,?,?,?, 'active')
-    `).run(userId, new Date().toISOString(),
-      Number.isFinite(lat) ? lat : null,
-      Number.isFinite(lng) ? lng : null,
-      Number.isFinite(accuracy) ? accuracy : null,
-      locationNote || null);
+    const mother = await db.one('SELECT name FROM users WHERE id = $1', [userId]);
+    const clinicians = await cliniciansFor(userId);
+    const contacts = await this.contacts(userId);
 
-    const alertId = Number(info.lastInsertRowid);
-    const addNote = db.prepare(`
-      INSERT INTO sos_notifications (alert_id, recipient, relation, channel, state, detail)
-      VALUES (?,?,?,?,?,?)
-    `);
+    const alertId = await db.tx(async (t) => {
+      const created = await t.one(
+        `INSERT INTO sos_alerts (user_id, triggered_at, lat, lng, accuracy, location_note, status)
+         VALUES ($1,$2,$3,$4,$5,$6,'active') RETURNING id`,
+        [userId, new Date().toISOString(),
+          Number.isFinite(lat) ? lat : null,
+          Number.isFinite(lng) ? lng : null,
+          Number.isFinite(accuracy) ? accuracy : null,
+          locationNote || null],
+      );
 
-    const mother = db.prepare('SELECT name FROM users WHERE id = ?').get(userId);
+      for (const doc of clinicians) {
+        await t.run(
+          `INSERT INTO sos_notifications (alert_id, recipient, relation, channel, state, detail)
+           VALUES ($1,$2,$3,'in-app','alerted','Showing on their clinician portal')`,
+          [created.id, doc.name, doc.specialty],
+        );
+      }
+
+      // guardians: recorded, but nothing can reach their phone until the
+      // companion app exists, so they are queued rather than claimed as sent
+      for (const c of contacts) {
+        await t.run(
+          `INSERT INTO sos_notifications (alert_id, recipient, relation, channel, state, detail)
+           VALUES ($1,$2,$3,$4,'pending',$5)`,
+          [created.id, c.name, c.relation,
+            c.appLinked ? 'guardian-app' : 'sms',
+            c.appLinked
+              ? 'Will force-alarm once the guardian app ships'
+              : 'Needs the guardian app or an SMS gateway'],
+        );
+      }
+      return created.id;
+    });
+
+    // messaging sits outside the transaction: a failed send must not undo
+    // the alert itself
     const where = Number.isFinite(lat) && Number.isFinite(lng)
       ? `Location: https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`
       : 'Location unavailable.';
-
-    // clinicians: a real in-app alert, and a message in the thread they already read
-    for (const doc of cliniciansFor(userId)) {
-      addNote.run(alertId, doc.name, doc.specialty, 'in-app', 'alerted',
-        'Showing on their clinician portal');
+    for (const doc of clinicians) {
       try {
-        messageModel.send(userId, doc.id, 'mother',
+        await messageModel.send(userId, doc.id, 'mother',
           `🚨 EMERGENCY — ${mother ? mother.name : 'Your patient'} raised an SOS. ${where}`);
-      } catch {
-        // the alert itself must survive a failed message
-      }
-    }
-
-    // guardians: recorded, but nothing can reach their phone until the
-    // companion app exists, so they are queued rather than claimed as sent
-    for (const c of this.contacts(userId)) {
-      const linked = Boolean(c.app_linked);
-      addNote.run(alertId, c.name, c.relation,
-        linked ? 'guardian-app' : 'sms',
-        'pending',
-        linked
-          ? 'Will force-alarm once the guardian app ships'
-          : 'Needs the guardian app or an SMS gateway');
+      } catch { /* the alert itself must survive a failed message */ }
     }
 
     return this.find(alertId);
   },
 
   /** Stand down. `by` is who closed it, so the record says what happened. */
-  close(id, userId, status, by) {
+  async close(id, userId, status, by) {
     if (!['safe', 'cancelled'].includes(status)) throw new Error(`Cannot close as ${status}`);
-    const row = db.prepare('SELECT * FROM sos_alerts WHERE id = ? AND user_id = ?').get(id, userId);
+    const row = await db.one(
+      'SELECT * FROM sos_alerts WHERE id = $1 AND user_id = $2', [id, userId],
+    );
     if (!row) return null;
-    if (row.status !== OPEN) return toAlert(row);
+    if (row.status !== OPEN) return this.find(id);
 
-    db.prepare('UPDATE sos_alerts SET status = ?, closed_at = ?, closed_by = ? WHERE id = ?')
-      .run(status, new Date().toISOString(), by || 'mother', id);
+    await db.run(
+      'UPDATE sos_alerts SET status = $2, closed_at = now(), closed_by = $3 WHERE id = $1',
+      [id, status, by || 'mother'],
+    );
 
     if (status === 'safe') {
-      const mother = db.prepare('SELECT name FROM users WHERE id = ?').get(userId);
-      for (const doc of cliniciansFor(userId)) {
+      const mother = await db.one('SELECT name FROM users WHERE id = $1', [userId]);
+      for (const doc of await cliniciansFor(userId)) {
         try {
-          messageModel.send(userId, doc.id, 'mother',
+          await messageModel.send(userId, doc.id, 'mother',
             `✅ Stood down — ${mother ? mother.name : 'your patient'} has marked herself safe.`);
         } catch { /* non-critical */ }
       }

@@ -160,16 +160,37 @@ INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, reques
 SELECT (SELECT id FROM users WHERE name = 'Ayesha Rahman'),
        d.id, CURRENT_DATE + t.off, t.tm, t.reason, t.status,
        now() - (abs(t.off) || ' days')::interval
+-- Dr. Lena Ortiz is the clinician the portal signs in as, so she is Ayesha's
+-- obstetrician. Without that relationship her request inbox, her SOS alerts
+-- and the mother's care team would all be empty on a fresh database.
 FROM (VALUES
-  ('Dr. Nusrat Kabir',   4, '10:30 AM', 'Antenatal check-up — Week 29',   'accepted'),
+  ('Dr. Lena Ortiz',     4, '10:30 AM', 'Antenatal check-up — Week 29',   'accepted'),
   ('Dr. Sara Ahmed',    17, '09:00 AM', 'Anomaly ultrasound scan',        'accepted'),
   ('Dr. Kamal Hossain', 26, '11:15 AM', 'Zara''s 15-month wellness visit','accepted'),
-  ('Dr. Nusrat Kabir', -24, '10:00 AM', 'Antenatal check-up — Week 25',   'completed'),
+  ('Dr. Lena Ortiz',   -24, '10:00 AM', 'Antenatal check-up — Week 25',   'completed'),
   ('Dr. Rafiq Islam',  -38, '04:30 PM', 'Nutrition plan review',          'completed'),
-  ('Dr. Nusrat Kabir', -52, '10:00 AM', 'Antenatal check-up — Week 21',   'completed'),
+  ('Dr. Lena Ortiz',   -52, '10:00 AM', 'Antenatal check-up — Week 21',   'completed'),
   ('Dr. Kamal Hossain',-80, '12:00 PM', 'Zara''s 12-month check-up',      'completed')
 ) AS t(doc, off, tm, reason, status)
 JOIN doctors d ON d.name = t.doc;
+
+-- One waiting request so the clinician's inbox has something to answer, and
+-- an open conversation so the messaging screens are not blank on first run.
+INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
+SELECT (SELECT id FROM users WHERE name = 'Nusrat Jahan'),
+       (SELECT id FROM doctors WHERE name = 'Dr. Lena Ortiz'),
+       CURRENT_DATE + 2, '09:40', 'Blood pressure review', 'requested',
+       now() - interval '6 hours';
+
+INSERT INTO messages (user_id, doctor_id, sender, body, sent_at, read_at)
+SELECT (SELECT id FROM users WHERE name = 'Ayesha Rahman'),
+       (SELECT id FROM doctors WHERE name = 'Dr. Lena Ortiz'),
+       sender, body, now() - (hrs || ' hours')::interval,
+       CASE WHEN read THEN now() - (hrs || ' hours')::interval + interval '20 minutes' END
+FROM (VALUES
+  ('mother', 'My back ache has not eased in six days. Should I be worried?', 5::numeric, TRUE),
+  ('doctor', 'Six days is worth checking. Keep to your side at night and bring it up on Tuesday — call sooner if it becomes constant or you feel it in your abdomen.', 4, FALSE)
+) AS m(sender, body, hrs, read);
 
 /* ------------------------------------------------------------- her log */
 

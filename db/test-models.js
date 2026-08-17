@@ -144,11 +144,12 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const doctorId = docs.find((d) => d.name === 'Dr. Lena Ortiz').id;
   await messageModel.send(me.id, doctorId, 'mother', '__probe__ hello');
   const thread = await messageModel.thread(me.id, doctorId);
-  check('messageModel.send + thread', thread.length === 1, `${thread.length} message`);
+  check('messageModel.send + thread', thread.length === 3, `${thread.length} messages`);
   const threads = await messageModel.threadsForUser(me.id);
-  check('messageModel.threadsForUser (DISTINCT ON)', threads.length === 1 && threads[0].unread === 0,
+  check('messageModel.threadsForUser (DISTINCT ON)', threads.length === 1 && threads[0].unread === 1,
     `${threads.length} thread, last: "${threads[0].lastMessage.body.slice(0, 20)}…"`);
   const docThreads = await messageModel.threadsForDoctor(doctorId);
+  // the seeded message from her is already read, so only the probe is unread
   check('messageModel.threadsForDoctor', docThreads[0].unread === 1, `${docThreads[0].unread} unread`);
   await messageModel.markRead(me.id, doctorId, 'doctor');
   check('messageModel.markRead', (await messageModel.unreadForDoctor(doctorId)) === 0);
@@ -164,6 +165,99 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const counts = await documentModel.countsFor(me.id);
   check('documentModel.countsFor', counts.report === 1, JSON.stringify(counts));
   check('documentModel.remove', await documentModel.remove(doc.id, me.id));
+
+  /* ---------------- the dependent models (step 3) ---------------- */
+  const patientModel = require('../models/patientModel');
+  const appointmentModel = require('../models/appointmentModel');
+  const sosModel = require('../models/sosModel');
+  const guardianModel = require('../models/guardianModel');
+  const riskModel = require('../models/riskModel');
+
+  console.log('\n  --- caseload (worst N+1, now 2 queries) ---');
+  const roster = await patientModel.all();
+  check('patientModel.all', roster.length === 6, `${roster.length} patients`);
+  const nusrat = roster.find((p) => p.name === 'Nusrat Jahan');
+  check('  week derived in SQL', nusrat.week === 34, `week ${nusrat.week}`);
+  check('  BP trend aggregated by LATERAL', nusrat.trend.length === 5,
+    `[${nusrat.trend.join(', ')}]`);
+  check('  triage from BP + history + age', nusrat.risk === 'high', nusrat.risk);
+  const ayeshaRow = roster.find((p) => p.name === 'Ayesha Rahman');
+  check('  flags come from her own journal', ayeshaRow.flags.some((f) => /Back ache/.test(f)),
+    ayeshaRow.flags.join(' | ') || '(none)');
+  check('  score reuses the fetched symptoms', ayeshaRow.score > 0 && ayeshaRow.score <= 100,
+    `${ayeshaRow.score}`);
+  check('patientModel.find', (await patientModel.find(nusrat.id)).name === 'Nusrat Jahan');
+  check('patientModel.exists rejects a doctor id', !(await patientModel.exists(99999)));
+
+  console.log('\n  --- appointments ---');
+  const mine = await appointmentModel.requestsFor(me.id);
+  check('appointmentModel.requestsFor', mine.length === 7, `${mine.length} appointments`);
+  check('  doctor joined in', mine.every((a) => a.doctorName && a.doctorName !== 'Unknown clinician'),
+    mine[0].doctorName);
+  check('  date stayed a plain string', /^\d{4}-\d{2}-\d{2}$/.test(mine[0].date), mine[0].date);
+  const lenaId = docs.find((d) => d.name === 'Dr. Lena Ortiz').id;
+  const free = await appointmentModel.freeSlots(lenaId, '2099-01-02');
+  check('appointmentModel.freeSlots', free.length === 9, `${free.length} slots`);
+
+  const tomorrow = new Date(Date.now() + 86400000);
+  const tISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  const req = await appointmentModel.request(me.id, lenaId, {
+    date: tISO, time: '10:20', reason: '__probe__',
+  });
+  // Nusrat's seeded request is already waiting with Lena, so this one is second
+  check('appointmentModel.request', req.status === 'requested' && req.queuePosition === 2,
+    `${req.status} · queue ${req.queuePosition}`);
+  try {
+    await appointmentModel.request(me.id, lenaId, { date: tISO, time: '11:00' });
+    bad('  duplicate open request refused');
+  } catch (e) {
+    check('  duplicate open request refused', e.code === 'NOT_BOOKABLE', e.message.slice(0, 42));
+  }
+  const answered = await appointmentModel.respond(req.id, 'accepted', 'See reception first');
+  check('appointmentModel.respond', answered.status === 'accepted', answered.note);
+  await db.run('DELETE FROM appointments WHERE reason = $1', ['__probe__']);
+
+  console.log('\n  --- SOS ---');
+  const guardians = await sosModel.contacts(me.id);
+  check('sosModel.contacts', guardians.length === 3, `${guardians.length} guardians`);
+  check('  each carries a link token', guardians.every((g) => g.token?.length > 10),
+    `${guardians[0].token.slice(0, 8)}…`);
+  const alert = await sosModel.trigger(me.id, { lat: 23.78, lng: 90.41, accuracy: 9 });
+  check('sosModel.trigger fans out', alert.notifications.length === 6,
+    `${alert.reached} alerted, ${alert.notifications.length - alert.reached} queued`);
+  check('  clinicians alerted, guardians queued',
+    alert.notifications.filter((n) => n.state === 'alerted').length === 3
+    && alert.notifications.filter((n) => n.state === 'pending').length === 3);
+  const again = await sosModel.trigger(me.id, {});
+  check('  pressing twice does not stack', again.id === alert.id, `same alert ${again.id}`);
+  const forDoc = await sosModel.openForDoctor(lenaId);
+  check('sosModel.openForDoctor', forDoc.length === 1 && forDoc[0].patientName === 'Ayesha Rahman',
+    `${forDoc[0]?.patientName} · dials ${forDoc[0]?.emergencyNumber}`);
+
+  console.log('\n  --- guardian app ---');
+  const token = guardians[0].token;
+  const dash = await guardianModel.dashboard(token);
+  check('guardianModel.dashboard', dash.overview.motherName === 'Ayesha Rahman',
+    `${dash.guardian.name} watching ${dash.overview.motherName}`);
+  check('  status agrees with the insights',
+    (dash.overview.status === 'high') === dash.insight.some((i) => i.level === 'urgent'),
+    `${dash.overview.status} · ${dash.insight.map((i) => i.level).join(',')}`);
+  check('  live alert surfaces', dash.alert !== null, dash.alert?.status);
+  const gv = await guardianModel.vitals(token);
+  check('guardianModel.vitals', gv.length === 12 && gv[0].date < gv[11].date,
+    `${gv.length} points, oldest first`);
+  const acked = await guardianModel.acknowledge(token);
+  check('guardianModel.acknowledge',
+    acked.notifications.some((n) => n.state === 'acknowledged'), 'On the way');
+  check('guardianModel rejects a bad token', (await guardianModel.dashboard('not-a-real-token')) === null);
+
+  const closed = await sosModel.close(alert.id, me.id, 'safe', 'mother');
+  check('sosModel.close', closed.status === 'safe', `closed by ${closed.closedBy}`);
+  await db.run('DELETE FROM messages WHERE body LIKE $1 OR body LIKE $2', ['%EMERGENCY%', '%Stood down%']);
+
+  console.log('\n  --- risk ---');
+  const risk = await riskModel.fromLatestVitals(me, preg);
+  check('riskModel.fromLatestVitals', risk && risk.level, `${risk?.label} (${risk?.score})`);
 
   console.log(`\n  ${pass} passed, ${fail} failed\n`);
   await db.pool.end();

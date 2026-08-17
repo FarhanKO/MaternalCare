@@ -8,9 +8,7 @@
  * her clinical notes.
  */
 const crypto = require('crypto');
-const db = require('../config/database');
-const pregnancyModel = require('./pregnancyModel');
-const vitalModel = require('./vitalModel');
+const db = require('../config/db');
 const symptomModel = require('./symptomModel');
 const sosModel = require('./sosModel');
 
@@ -20,16 +18,42 @@ function newToken() {
   return crypto.randomBytes(18).toString('base64url');
 }
 
-/** Resolve a link token to the guardian and the mother it belongs to. */
-function resolve(token) {
+/**
+ * Resolve a link token to the guardian and the mother it belongs to.
+ * One join rather than two lookups — this runs on every guardian request,
+ * including the alert poll.
+ */
+async function resolve(token) {
   if (!token || token.length < 10) return null;
-  const row = db
-    .prepare('SELECT * FROM emergency_contacts WHERE access_token = ?')
-    .get(String(token));
+  const row = await db.one(`
+    SELECT c.id AS contact_id, c.name AS contact_name, c.relation,
+           u.*
+    FROM emergency_contacts c
+    JOIN users u ON u.id = c.user_id
+    WHERE c.access_token = $1
+  `, [String(token)]);
   if (!row) return null;
-  const mother = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
-  if (!mother) return null;
-  return { contact: row, mother };
+
+  return {
+    contact: { id: row.contact_id, name: row.contact_name, relation: row.relation },
+    mother: row,
+  };
+}
+
+/**
+ * Her pregnancy, latest reading and journal, fetched once.
+ *
+ * overview() and insight() both need all three. Fetching inside each of them
+ * meant the dashboard asked for the same rows twice.
+ */
+async function context(motherId) {
+  const [pregnancy, latest, symptoms] = await Promise.all([
+    db.one(`SELECT lmp, LEAST(42, FLOOR((CURRENT_DATE - lmp) / 7))::int AS week
+            FROM pregnancies WHERE user_id = $1`, [motherId]),
+    db.one('SELECT * FROM vitals WHERE user_id = $1 ORDER BY date DESC LIMIT 1', [motherId]),
+    symptomModel.all(motherId),
+  ]);
+  return { pregnancy, latest: latest || {}, symptoms };
 }
 
 /**
@@ -39,23 +63,20 @@ function resolve(token) {
  * not from a separate threshold table. Reading "Needs attention" above a list
  * with nothing urgent in it just teaches a guardian to distrust the badge.
  */
-function overview(mother, insights) {
-  const preg = pregnancyModel.forUser(mother.id);
-  const latest = vitalModel.latest(mother.id) || {};
+function overview(mother, { pregnancy, latest }, insights) {
   const worst = insights.some((i) => i.level === 'urgent') ? 'high'
     : insights.some((i) => i.level === 'watch') ? 'watch'
     : 'settled';
 
-  const due = preg && preg.lmp
-    ? new Date(new Date(`${preg.lmp}T00:00:00`).getTime() + 280 * DAY)
+  const due = pregnancy && pregnancy.lmp
+    ? new Date(new Date(`${pregnancy.lmp}T00:00:00`).getTime() + 280 * DAY)
     : null;
-  const daysToGo = due ? Math.round((due - Date.now()) / DAY) : null;
 
   return {
     motherName: mother.name,
-    week: preg ? preg.week : null,
+    week: pregnancy ? pregnancy.week : null,
     dueDate: due ? due.toISOString().slice(0, 10) : null,
-    daysToGo,
+    daysToGo: due ? Math.round((due - Date.now()) / DAY) : null,
     status: worst,
     lastReadingOn: latest.date || null,
     vitals: {
@@ -73,13 +94,9 @@ function overview(mother, insights) {
  * something concrete they can do. Built from her own readings and logged
  * symptoms rather than generic pregnancy advice.
  */
-function insight(mother) {
-  const preg = pregnancyModel.forUser(mother.id);
-  const week = preg ? preg.week : 0;
-  const v = vitalModel.latest(mother.id) || {};
-  const symptoms = symptomModel.all(mother.id);
+function insight({ pregnancy, latest: v, symptoms }) {
+  const week = pregnancy ? pregnancy.week : 0;
   const out = [];
-
   const push = (level, facing, help) => out.push({ level, facing, help });
 
   if (v.systolic >= 140 || v.diastolic >= 90) {
@@ -147,43 +164,74 @@ module.exports = {
   resolve,
 
   /** Everything the app's home screen needs in one call. */
-  dashboard(token) {
-    const found = resolve(token);
+  async dashboard(token) {
+    const found = await resolve(token);
     if (!found) return null;
     const { contact, mother } = found;
-    const insights = insight(mother);
+
+    // resolve() already returned the mother row, so her emergency number is
+    // in hand — asking for it again would be a wasted round trip
+    const [ctx, alert] = await Promise.all([
+      context(mother.id),
+      sosModel.active(mother.id),
+    ]);
+    const insights = insight(ctx);
+
     return {
       guardian: { name: contact.name, relation: contact.relation || undefined },
-      overview: overview(mother, insights),
+      overview: overview(mother, ctx, insights),
       insight: insights,
-      alert: sosModel.active(mother.id),
-      emergencyNumber: sosModel.emergencyNumber(mother.id),
+      alert,
+      emergencyNumber: mother.emergency_number || '999',
     };
   },
 
   /** Recent readings for the little charts. */
-  vitals(token, limit = 12) {
-    const found = resolve(token);
+  async vitals(token, limit = 12) {
+    const found = await resolve(token);
     if (!found) return null;
-    return vitalModel.history(found.mother.id, 60)
-      .slice(-limit)
-      .map((v) => ({
-        date: v.date,
-        systolic: v.systolic,
-        diastolic: v.diastolic,
-        sugar: v.sugar,
-        weightKg: v.weight_kg,
-        tempC: v.temp_c,
-      }));
+
+    const rows = await db.sql(
+      `SELECT * FROM vitals WHERE user_id = $1 ORDER BY date DESC LIMIT $2`,
+      [found.mother.id, limit],
+    );
+    return rows.reverse().map((v) => ({
+      date: v.date,
+      systolic: v.systolic,
+      diastolic: v.diastolic,
+      sugar: v.sugar,
+      weightKg: v.weight_kg,
+      tempC: v.temp_c,
+    }));
   },
 
-  /** Just the alert — polled far more often than the rest. */
-  alert(token) {
-    const found = resolve(token);
-    if (!found) return null;
+  /**
+   * Just the alert. The guardian app polls this every few seconds, on a phone
+   * over mobile data, so it is the hottest path in the system.
+   *
+   * The token lookup and the open-alert check are one statement, and the
+   * fan-out is only fetched when there is something to fan out — so the
+   * ordinary case, which is no emergency, costs a single round trip.
+   */
+  async alert(token) {
+    if (!token || token.length < 10) return null;
+
+    const row = await db.one(`
+      SELECT u.id AS mother_id, u.emergency_number, s.id AS alert_id
+      FROM emergency_contacts c
+      JOIN users u ON u.id = c.user_id
+      LEFT JOIN LATERAL (
+        SELECT id FROM sos_alerts
+        WHERE user_id = u.id AND status = 'active'
+        ORDER BY id DESC LIMIT 1
+      ) s ON TRUE
+      WHERE c.access_token = $1
+    `, [String(token)]);
+
+    if (!row) return null;
     return {
-      alert: sosModel.active(found.mother.id),
-      emergencyNumber: sosModel.emergencyNumber(found.mother.id),
+      alert: row.alert_id ? await sosModel.find(row.alert_id) : null,
+      emergencyNumber: row.emergency_number || '999',
     };
   },
 
@@ -191,16 +239,17 @@ module.exports = {
    * "I am on my way." Flips this guardian's row on the alert so the mother
    * sees who is actually coming, rather than only who was told.
    */
-  acknowledge(token) {
-    const found = resolve(token);
+  async acknowledge(token) {
+    const found = await resolve(token);
     if (!found) return null;
-    const active = sosModel.active(found.mother.id);
+
+    const active = await sosModel.active(found.mother.id);
     if (!active) return null;
 
-    db.prepare(`
+    await db.run(`
       UPDATE sos_notifications SET state = 'acknowledged', detail = 'On the way'
-      WHERE alert_id = ? AND recipient = ?
-    `).run(active.id, found.contact.name);
+      WHERE alert_id = $1 AND recipient = $2
+    `, [active.id, found.contact.name]);
 
     return sosModel.find(active.id);
   },
