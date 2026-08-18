@@ -131,3 +131,64 @@ module.exports = {
     return toPost(row, comments.get(row.id) ?? []);
   },
 
+  async create(userId, { author, role = 'mother', week, topic, title, body, imageDataUrl }) {
+    const heading = String(title || '').trim();
+    if (!heading) throw new PostError('A post needs a title', 'NO_TITLE');
+    if (!ROLES.includes(role)) throw new PostError(`Unknown role: ${role}`, 'BAD_ROLE');
+
+    let imageFile = null;
+    if (imageDataUrl) {
+      const { mime, buffer } = decodeImage(imageDataUrl);
+      imageFile = `${crypto.randomUUID()}.${MIME_EXT[mime]}`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, imageFile), buffer);
+    }
+
+    const row = await db.insert(
+      `INSERT INTO posts (user_id, author, role, week, topic, title, body, image_file,
+                          hearts, clinician_answered, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,FALSE,now()) RETURNING *`,
+      [userId ?? null, String(author || 'A mother').trim(), role,
+        Number.isFinite(week) ? week : null, (topic || '').trim() || null,
+        heading, (body || '').trim() || null, imageFile],
+    );
+    return toPost(row, []);
+  },
+
+  async comment(postId, userId, { author, role = 'mother', body }) {
+    const text = String(body || '').trim();
+    if (!text) throw new PostError('A comment cannot be empty', 'EMPTY');
+    if (!await db.one('SELECT 1 FROM posts WHERE id = $1', [postId])) {
+      throw new PostError('That post no longer exists', 'NOT_FOUND');
+    }
+
+    await db.tx(async (t) => {
+      await t.run(
+        `INSERT INTO post_comments (post_id, user_id, author, role, body, created_at)
+         VALUES ($1,$2,$3,$4,$5,now())`,
+        [postId, userId ?? null, String(author || 'A mother').trim(), role, text],
+      );
+      // a clinician replying is what marks a question as answered
+      if (role === 'doctor') {
+        await t.run('UPDATE posts SET clinician_answered = TRUE WHERE id = $1', [postId]);
+      }
+    });
+
+    return this.find(postId);
+  },
+
+  /** Toggling is the client's business; the model just applies the delta. */
+  async heart(postId, delta = 1) {
+    await db.run(
+      'UPDATE posts SET hearts = GREATEST(0, hearts + $2) WHERE id = $1',
+      [postId, delta],
+    );
+    return this.find(postId);
+  },
+
+  /** Absolute path for streaming a post image back. */
+  imagePath(fileName) {
+    if (!/^[\w.-]+$/.test(fileName)) return null;   // no traversal
+    const full = path.join(UPLOAD_DIR, fileName);
+    return fs.existsSync(full) ? full : null;
+  },
+};
