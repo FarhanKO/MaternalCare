@@ -95,3 +95,78 @@ module.exports = {
     return row.c;
   },
 
+  /** Every doctor this mother has a conversation with, most recent first. */
+  async threadsForUser(userId) {
+    const sql = THREADS.replaceAll('%GROUP%', 'doctor_id').replaceAll('%OWNER%', 'user_id');
+    const rows = await db.sql(
+      `SELECT t.*, d.name, d.specialty, d.hospital
+       FROM (${sql}) t
+       JOIN doctors d ON d.id = t.counterpart_id
+       ORDER BY t.sent_at DESC`,
+      [userId, 'doctor'],
+    );
+
+    return rows.map((r) => ({
+      doctorId: String(r.counterpart_id),
+      doctorName: r.name,
+      specialty: r.specialty,
+      hospital: r.hospital,
+      lastMessage: {
+        id: String(r.id),
+        doctorId: String(r.counterpart_id),
+        patientId: String(userId),
+        sender: r.sender,
+        body: r.body,
+        sentAt: r.sent_at,
+        read: Boolean(r.read_at),
+      },
+      total: r.total,
+      unread: r.unread,
+    }));
+  },
+
+  /** Every mother this doctor is talking to, most recent first. */
+  async threadsForDoctor(doctorId) {
+    const sql = THREADS.replaceAll('%GROUP%', 'user_id').replaceAll('%OWNER%', 'doctor_id');
+    const rows = await db.sql(
+      `SELECT t.*, u.name
+       FROM (${sql}) t
+       JOIN users u ON u.id = t.counterpart_id
+       ORDER BY t.sent_at DESC`,
+      [doctorId, 'mother'],
+    );
+
+    return rows.map((r) => ({
+      patientId: String(r.counterpart_id),
+      patientName: r.name,
+      lastMessage: {
+        id: String(r.id),
+        doctorId: String(doctorId),
+        patientId: String(r.counterpart_id),
+        sender: r.sender,
+        body: r.body,
+        sentAt: r.sent_at,
+        read: Boolean(r.read_at),
+      },
+      total: r.total,
+      unread: r.unread,
+    }));
+  },
+
+  /** Total unread across every thread — drives the dock badge. */
+  async unreadForDoctor(doctorId) {
+    const row = await db.one(
+      "SELECT count(*) AS c FROM messages WHERE doctor_id = $1 AND sender = 'mother' AND read_at IS NULL",
+      [doctorId],
+    );
+    return row.c;
+  },
+
+  async unreadForUser(userId) {
+    const row = await db.one(
+      "SELECT count(*) AS c FROM messages WHERE user_id = $1 AND sender = 'doctor' AND read_at IS NULL",
+      [userId],
+    );
+    return row.c;
+  },
+};
