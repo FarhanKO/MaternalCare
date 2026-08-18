@@ -56,3 +56,105 @@ const toDTO = (r) => ({
   url: `/api/documents/${r.id}/file`,
 });
 
+/** Pulls the payload out of a data: URL and checks it is something we accept. */
+function decodeDataUrl(dataUrl) {
+  const match = /^data:([^;,]+);base64,(.+)$/s.exec(String(dataUrl || ''));
+  if (!match) throw new DocumentError('That file could not be read', 'BAD_PAYLOAD');
+
+  const mime = match[1].toLowerCase();
+  if (!MIME_EXT[mime]) {
+    throw new DocumentError('Upload a photo (JPG, PNG, WEBP) or a PDF', 'BAD_TYPE');
+  }
+
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length) throw new DocumentError('That file is empty', 'EMPTY');
+  if (buffer.length > MAX_BYTES) {
+    throw new DocumentError('Files must be 5 MB or smaller', 'TOO_LARGE');
+  }
+  return { mime, buffer };
+}
+
+module.exports = {
+  KINDS,
+  MAX_BYTES,
+  DocumentError,
+
+  /**
+   * Store one document. `uploadedBy` records who added it so the mother can
+   * tell her own photo from something the clinic filed for her.
+   */
+  async create(userId, {
+    kind, title, note, dataUrl, originalName, takenOn, uploadedBy = 'mother',
+  }) {
+    if (!KINDS.includes(kind)) throw new DocumentError(`Unknown document kind: ${kind}`, 'BAD_KIND');
+
+    const { mime, buffer } = decodeDataUrl(dataUrl);
+    const fileName = `${crypto.randomUUID()}.${MIME_EXT[mime]}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, fileName), buffer);
+
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(takenOn || '') ? takenOn : todayISO();
+    const label = String(title || '').trim()
+      || (kind === 'prescription' ? 'Prescription' : 'Report');
+
+    const row = await db.insert(
+      `INSERT INTO documents
+         (user_id, kind, title, note, file_name, original_name, mime, size,
+          taken_on, uploaded_at, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [userId, kind, label, (note || '').trim() || null, fileName,
+        originalName || null, mime, buffer.length, date,
+        new Date().toISOString(), uploadedBy],
+    );
+    return toDTO(row);
+  },
+
+  async find(id) {
+    const row = await db.one('SELECT * FROM documents WHERE id = $1', [id]);
+    return row ? toDTO(row) : null;
+  },
+
+  /** Newest first by the date the document is about. */
+  async forUser(userId, kind) {
+    const rows = kind
+      ? await db.sql(
+        `SELECT * FROM documents WHERE user_id = $1 AND kind = $2
+         ORDER BY taken_on DESC, id DESC`, [userId, kind],
+      )
+      : await db.sql(
+        'SELECT * FROM documents WHERE user_id = $1 ORDER BY taken_on DESC, id DESC',
+        [userId],
+      );
+    return rows.map(toDTO);
+  },
+
+  /** How many of each kind this patient has — drives the clinician's tabs. */
+  async countsFor(userId) {
+    const rows = await db.sql(
+      'SELECT kind, count(*) AS c FROM documents WHERE user_id = $1 GROUP BY kind',
+      [userId],
+    );
+    const out = { prescription: 0, report: 0 };
+    for (const r of rows) out[r.kind] = r.c;
+    return out;
+  },
+
+  /** Absolute path for streaming the bytes back, or null if the row is gone. */
+  async pathFor(id) {
+    const row = await db.one('SELECT file_name, mime FROM documents WHERE id = $1', [id]);
+    if (!row) return null;
+    const full = path.join(UPLOAD_DIR, row.file_name);
+    return fs.existsSync(full) ? { path: full, mime: row.mime } : null;
+  },
+
+  /** Removing the row removes the file too — nothing orphaned on disk. */
+  async remove(id, userId) {
+    const row = await db.one(
+      'DELETE FROM documents WHERE id = $1 AND user_id = $2 RETURNING file_name',
+      [id, userId],
+    );
+    if (!row) return false;
+    const full = path.join(UPLOAD_DIR, row.file_name);
+    if (fs.existsSync(full)) fs.unlinkSync(full);
+    return true;
+  },
+};
