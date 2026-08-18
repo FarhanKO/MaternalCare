@@ -43,3 +43,61 @@ module.exports = {
     );
     return rows.reverse().map(toDTO);
   },
+
+  /**
+   * Save today's figures.
+   *
+   * ON CONFLICT does insert-or-update in one round trip, and COALESCE keeps
+   * whatever the caller left out — so nudging the water count never wipes
+   * the mood she set an hour ago.
+   */
+  async save(userId, { date = todayISO(), mood, kicks, waterLitres } = {}) {
+    if (mood !== undefined && mood !== null && !MOODS.includes(mood)) {
+      throw new Error(`Unknown mood: ${mood}`);
+    }
+    if (kicks !== undefined && kicks !== null && (!Number.isFinite(kicks) || kicks < 0)) {
+      throw new Error('Kicks must be a positive number');
+    }
+    if (waterLitres !== undefined && waterLitres !== null
+        && (!Number.isFinite(waterLitres) || waterLitres < 0)) {
+      throw new Error('Water must be a positive number');
+    }
+
+    const row = await db.insert(
+      `INSERT INTO daily_logs (user_id, date, mood, kicks, water_litres)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         mood         = COALESCE(EXCLUDED.mood, daily_logs.mood),
+         kicks        = COALESCE(EXCLUDED.kicks, daily_logs.kicks),
+         water_litres = COALESCE(EXCLUDED.water_litres, daily_logs.water_litres)
+       RETURNING *`,
+      [userId, date, mood ?? null, kicks ?? null, waterLitres ?? null],
+    );
+    return toDTO(row);
+  },
+
+  /**
+   * Averages over the recent window, for the wellbeing summary. Returns null
+   * rather than zero when there is nothing logged — "no data" and "drank
+   * nothing" are different claims.
+   */
+  async summary(userId, days = 7) {
+    const row = await db.one(
+      `SELECT count(*)                        AS days,
+              round(avg(water_litres)::numeric, 1) AS avg_water,
+              round(avg(kicks)::numeric, 1)        AS avg_kicks,
+              mode() WITHIN GROUP (ORDER BY mood)  AS common_mood
+       FROM (
+         SELECT * FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT $2
+       ) recent`,
+      [userId, days],
+    );
+
+    return {
+      days: row?.days ?? 0,
+      avgWaterLitres: row?.avg_water ?? null,
+      avgKicks: row?.avg_kicks ?? null,
+      commonMood: row?.common_mood ?? null,
+    };
+  },
+};
