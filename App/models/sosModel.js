@@ -253,4 +253,29 @@ module.exports = {
     return this.find(alertId);
   },
 
+  /** Stand down. `by` is who closed it, so the record says what happened. */
+  async close(id, userId, status, by) {
+    if (!['safe', 'cancelled'].includes(status)) throw new Error(`Cannot close as ${status}`);
+    const row = await db.one(
+      'SELECT * FROM sos_alerts WHERE id = $1 AND user_id = $2', [id, userId],
+    );
+    if (!row) return null;
+    if (row.status !== OPEN) return this.find(id);
 
+    await db.run(
+      'UPDATE sos_alerts SET status = $2, closed_at = now(), closed_by = $3 WHERE id = $1',
+      [id, status, by || 'mother'],
+    );
+
+    if (status === 'safe') {
+      const mother = await db.one('SELECT name FROM users WHERE id = $1', [userId]);
+      for (const doc of await cliniciansFor(userId)) {
+        try {
+          await messageModel.send(userId, doc.id, 'mother',
+            `✅ Stood down — ${mother ? mother.name : 'your patient'} has marked herself safe.`);
+        } catch { /* non-critical */ }
+      }
+    }
+    return this.find(id);
+  },
+};
