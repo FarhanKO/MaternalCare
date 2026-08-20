@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, MessageCircle, Plus, Send, X } from 'lucide-react';
+import { ChevronLeft, Clock, MessageCircle, Plus, Send, X } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
-import { messageStamp, type DoctorThread, type Message } from '@/data/care';
+import {
+  messageStamp, prettyTime, type DoctorThread, type Message, type UpcomingVisit,
+} from '@/data/care';
 import type { Patient } from '@/data/doctor';
 
 const P = { peach: '#fb7534', peachDark: '#ea5c1d' };
@@ -158,6 +160,8 @@ export function MessageThreads({ doctorId, roster, onChange }: Props) {
   const [open, setOpen] = useState<{ id: string; name: string } | null>(null);
   const [picking, setPicking] = useState(false);
 
+  const [imminent, setImminent] = useState<UpcomingVisit[]>([]);
+
   const load = useCallback(async () => {
     try {
       const r = await api.getDoctorThreads(doctorId);
@@ -172,6 +176,25 @@ export function MessageThreads({ doctorId, roster, onChange }: Props) {
   }, [doctorId]);
 
   useEffect(() => { load(); }, [load]);
+
+  /**
+   * Visits about to start.
+   *
+   * Computed on read rather than pushed by a scheduler, and shown here rather
+   * than written into the conversation — the patient does not need to watch
+   * her clinician being reminded. Re-checked on a slow poll so a clinician who
+   * leaves the tab open still sees it arrive.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => api.getDoctorUpcoming(doctorId)
+      .then((v) => { if (!cancelled) setImminent(v); })
+      .catch(() => { if (!cancelled) setImminent([]); });
+
+    check();
+    const id = window.setInterval(check, 60_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [doctorId]);
 
   // patients with no conversation yet, so the clinician can start one
   const talkedTo = new Set(threads.map((t) => t.patientId));
@@ -192,6 +215,12 @@ export function MessageThreads({ doctorId, roster, onChange }: Props) {
             </div>
           </div>
 
+          {imminent.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+              <Clock className="h-3.5 w-3.5" /> {imminent.length} starting soon
+            </span>
+          )}
+
           {!open && newContacts.length > 0 && (
             <button
               onClick={() => setPicking((v) => !v)}
@@ -202,6 +231,40 @@ export function MessageThreads({ doctorId, roster, onChange }: Props) {
             </button>
           )}
         </div>
+
+        {/*
+          The one thing a clinician must do before an appointment starts, said
+          where they are already looking, with the instruction attached rather
+          than assumed.
+        */}
+        {imminent.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {imminent.map((v) => (
+              <motion.div
+                key={v.id}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl bg-amber-500/12 px-3.5 py-3 ring-1 ring-amber-500/30"
+              >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] font-extrabold text-amber-900">
+                  <Clock className="h-4 w-4 flex-none" />
+                  You have an appointment with {v.patientName}
+                  <span className="font-bold text-amber-800">· {prettyTime(v.time)}</span>
+                </div>
+                <p className="mt-1 text-[11.5px] font-semibold leading-relaxed text-amber-800/90">
+                  Ready your meeting link — paste the Google Meet, Zoom or WhatsApp link into{' '}
+                  {v.patientName.split(' ')[0]}&rsquo;s chat box below. She cannot send one herself.
+                </p>
+                <button
+                  onClick={() => setOpen({ id: v.patientId, name: v.patientName })}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-amber-500/25 px-3 py-1.5 text-[11.5px] font-bold text-amber-900 transition hover:bg-amber-500/35"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Open her chat
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         <AnimatePresence mode="wait">
           {open ? (

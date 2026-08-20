@@ -10,6 +10,7 @@ import {
   RequestRefused, type Appointment, type CareDocument, type CareTeamMember,
   type DocumentKind, type DoctorThread, type Message, type MotherThread,
   type MessageKind, type PayMethod, type Plan, type RankedDoctor, type SlotOffer,
+  type UpcomingVisit,
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
@@ -161,6 +162,11 @@ export const api = {
     if (!res.ok) throw new Error(json.error ?? `Booking failed (${res.status})`);
     return json.data as Appointment;
   },
+
+  /** Visits starting within the hour — drives the "ready your link" nudge. */
+  getDoctorUpcoming: (doctorId: string, within = 60) =>
+    request<Envelope<UpcomingVisit[]>>(`/doctors/${doctorId}/upcoming?within=${within}`)
+      .then((r) => r.data),
 
   cancelAppointment: (id: string) =>
     request<Envelope<Appointment>>(`/appointments/${id}`, { method: 'DELETE' }).then((r) => r.data),

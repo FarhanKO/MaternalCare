@@ -131,6 +131,18 @@ export interface MotherThread {
   unread: number;
 }
 
+/** A confirmed visit about to start, for the clinician's meeting-link nudge. */
+export interface UpcomingVisit {
+  id: string;
+  patientId: string;
+  patientName: string;
+  date: string;
+  time: string;
+  reason: string;
+  /** 'YYYY-MM-DDTHH:mm' in clinic-local time */
+  startsAt: string;
+}
+
 export interface DoctorThread {
   patientId: string;
   patientName: string;
