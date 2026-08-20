@@ -21,6 +21,7 @@ import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { MessageThreads } from '@/components/doctor/MessageThreads';
 import { KpiModal, type KpiKey } from '@/components/doctor/KpiModal';
 import { BackgroundPaths } from '@/components/ui/BackgroundPaths';
+import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { PatientFiles } from '@/components/doctor/PatientFiles';
 import { SosBanner } from '@/components/doctor/SosBanner';
 import { cn } from '@/lib/cn';
@@ -377,9 +378,17 @@ export function Doctor() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setKpi(k.key); }
                     }}
-                    className="h-full cursor-pointer p-5"
+                    className="relative h-full cursor-pointer overflow-hidden p-5"
                   >
-                    <div className="flex items-center justify-between">
+                    {/*
+                      The drifting beams from the symptom logger. Six per card
+                      rather than the logger's twelve: there are four of these
+                      on screen at once, each its own canvas, on a page that
+                      already runs charts.
+                    */}
+                    <BeamsBackground intensity="subtle" count={6} />
+
+                    <div className="relative flex items-center justify-between">
                       <span className="grid h-10 w-10 place-items-center rounded-2xl" style={{ background: `${k.tint}1f`, color: k.tint }}>
                         <k.icon className="h-5 w-5" />
                       </span>
@@ -391,8 +400,8 @@ export function Doctor() {
                         {k.value}
                       </motion.span>
                     </div>
-                    <div className="mt-4 text-sm font-bold text-ink">{k.label}</div>
-                    <div className="text-xs text-ink-muted">{k.note}</div>
+                    <div className="relative mt-4 text-sm font-bold text-ink">{k.label}</div>
+                    <div className="relative text-xs text-ink-muted">{k.note}</div>
                   </GlassCard>
                 </Reveal>
               ))}
