@@ -30,12 +30,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# built guardian APK — a build artifact, rebuilt with `npm run apk`
+# The guardian APK is delivered here by the Guardian MaternityCare+ project
+# (npm run apk over there). A build artifact, so it is not committed.
 public/downloads/*.apk
-guardian-app/android/app/build/
-guardian-app/android/.gradle/
-guardian-app/android/local.properties
-guardian-app/dist/
 
 # seeded design canvases are published artifacts, not source
 design/**/*.html
