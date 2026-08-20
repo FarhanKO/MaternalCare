@@ -16,13 +16,19 @@ interface Beam {
 
 interface BeamsBackgroundProps {
   className?: string;
-  intensity?: 'subtle' | 'medium' | 'strong';
+  /**
+   * 'vivid' exists for surfaces that need the beams to actually read — a
+   * small card, where the 24px canvas blur and the 10px CSS one leave the
+   * default levels close to invisible. The other three are unchanged, so
+   * anywhere already using them looks exactly as it did.
+   */
+  intensity?: 'subtle' | 'medium' | 'strong' | 'vivid';
   /** number of drifting beams */
   count?: number;
 }
 
 const OPACITY: Record<NonNullable<BeamsBackgroundProps['intensity']>, number> = {
-  subtle: 0.6, medium: 0.85, strong: 1,
+  subtle: 0.6, medium: 0.85, strong: 1, vivid: 1.5,
 };
 
 /* brand-blue → aqua band so it matches the MaternalCare+ palette */

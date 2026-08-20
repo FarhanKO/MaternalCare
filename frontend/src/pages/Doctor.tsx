@@ -20,7 +20,6 @@ import { AssignModal } from '@/components/doctor/AssignModal';
 import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { MessageThreads } from '@/components/doctor/MessageThreads';
 import { KpiModal, type KpiKey } from '@/components/doctor/KpiModal';
-import { BackgroundPaths } from '@/components/ui/BackgroundPaths';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { PatientFiles } from '@/components/doctor/PatientFiles';
 import { SosBanner } from '@/components/doctor/SosBanner';
@@ -324,11 +323,8 @@ export function Doctor() {
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {meId && <SosBanner doctorId={meId} />}
-        {/* greeting — flowing paths behind it, clipped to this band */}
-        <Reveal className="relative mb-6 overflow-hidden rounded-4xl px-5 py-6 sm:px-7 sm:py-8">
-          <div className="absolute inset-0 rounded-4xl bg-gradient-to-br from-white/40 via-white/10 to-transparent" />
-          <BackgroundPaths />
-          <div className="relative flex flex-wrap items-end justify-between gap-4">
+        {/* greeting */}
+        <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-peach-600">Clinician portal</span>
             <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
@@ -359,7 +355,6 @@ export function Doctor() {
               LO
             </motion.button>
           </div>
-          </div>
         </Reveal>
 
         {/* ============================== OVERVIEW ============================== */}
@@ -388,7 +383,7 @@ export function Doctor() {
                       alone. It is the one number a clinician should be drawn to
                       first; putting it behind all four would say nothing.
                     */}
-                    {k.key === 'high-risk' && <BeamsBackground intensity="subtle" count={6} />}
+                    {k.key === 'high-risk' && <BeamsBackground intensity="vivid" count={14} />}
 
                     <div className="relative flex items-center justify-between">
                       <span className="grid h-10 w-10 place-items-center rounded-2xl" style={{ background: `${k.tint}1f`, color: k.tint }}>
