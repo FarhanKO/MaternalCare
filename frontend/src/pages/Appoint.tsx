@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarDays, CheckCircle2, Clock,
-  Info, Lock, MapPin, ReceiptText, SearchX, ShieldQuestion, Star, Stethoscope, Users,
+  Info, Lock, MapPin, MessageCircle, ReceiptText, SearchX, ShieldQuestion, Star,
+  Stethoscope, Users,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { LiquidButton } from '@/components/ui/LiquidButton';
@@ -12,8 +13,9 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
   PAY_METHODS, prettyDate, prettyTime, RequestRefused, taka,
-  type Appointment, type PayMethod, type RankedDoctor, type SlotOffer,
+  type Appointment, type PayMethod, type Plan, type RankedDoctor, type SlotOffer,
 } from '@/data/care';
+import { shortName } from '@/components/mother/DoctorChat';
 
 /** Auto Assign's accent — the same mint the green button on her Doctor tab uses. */
 const C = { mint: '#2fbf9b' };
@@ -70,7 +72,9 @@ const LEVEL = ['Best match', 'Close second', 'Third choice'];
 
 /* ------------------------------------------------------------------ hero */
 
-function Hero({ from, onBook, loading }: { from: number | null; onBook: () => void; loading: boolean }) {
+function Hero({ from, onBook, loading, auto }: {
+  from: number | null; onBook: () => void; loading: boolean; auto: boolean;
+}) {
   return (
     <section className="relative overflow-hidden">
       <div className="mx-auto grid max-w-[1380px] items-stretch gap-0 lg:grid-cols-[1fr_0.95fr]">
@@ -87,21 +91,43 @@ function Hero({ from, onBook, loading }: { from: number | null; onBook: () => vo
 
           <Reveal delay={0.05}>
             <h1 className="mt-8 text-balance text-[2.4rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-[3.4rem]">
-              A doctor for you,{' '}
-              <span className="font-serif text-[1.08em] font-medium italic text-gradient">
-                without the wait
-              </span>
+              {auto ? (
+                <>
+                  Let us find the{' '}
+                  <span className="font-serif text-[1.08em] font-medium italic text-gradient">
+                    right one
+                  </span>
+                </>
+              ) : (
+                <>
+                  A doctor for you,{' '}
+                  <span className="font-serif text-[1.08em] font-medium italic text-gradient">
+                    without the wait
+                  </span>
+                </>
+              )}
             </h1>
           </Reveal>
 
           <Reveal delay={0.1}>
             <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-ink-soft">
-              Direct access to obstetricians, paediatricians and nutritionists who are ranked by
-              what they are qualified in and how much room is left on their list.{' '}
-              <span className="font-semibold text-ink">
-                Pay the consultation fee and the slot is confirmed on the spot
-              </span>{' '}
-              — no queue, and nobody has to accept it first.
+              {auto ? (
+                <>
+                  We rank every clinician who can take you — on what they are qualified in and how
+                  much room is left on their list —{' '}
+                  <span className="font-semibold text-ink">then suggest the best three</span>. You
+                  choose one, pick a time, and the slot is confirmed on the spot.
+                </>
+              ) : (
+                <>
+                  Direct access to obstetricians, paediatricians and nutritionists who are ranked by
+                  what they are qualified in and how much room is left on their list.{' '}
+                  <span className="font-semibold text-ink">
+                    Pay the consultation fee and the slot is confirmed on the spot
+                  </span>{' '}
+                  — no queue, and nobody has to accept it first.
+                </>
+              )}
             </p>
           </Reveal>
 
@@ -133,7 +159,9 @@ function Hero({ from, onBook, loading }: { from: number | null; onBook: () => vo
                 onClick={onBook}
                 iconRight={<ArrowRight className="h-[18px] w-[18px]" />}
               >
-                {loading ? 'Checking who is free…' : 'Book an appointment'}
+                {loading ? 'Checking who is free…'
+                  : auto ? 'Find my doctor'
+                  : 'Book an appointment'}
               </LiquidButton>
             </div>
           </Reveal>
@@ -279,6 +307,14 @@ export function Appoint() {
   const [params] = useSearchParams();
   const auto = params.get('mode') === 'auto';
 
+  /**
+   * The page opens on its own hero. Nothing below it exists until she asks
+   * for it — landing straight on a list of clinicians made the two buttons on
+   * her Doctor tab look like the same screen, because below the fold they
+   * were.
+   */
+  const [started, setStarted] = useState(false);
+
   const [step, setStep] = useState<Step>(auto ? 'finding' : 'clinician');
   const [doctor, setDoctor] = useState<RankedDoctor | null>(null);
 
@@ -289,6 +325,7 @@ export function Appoint() {
   const [reason, setReason] = useState(REASONS[0]);
 
   const [method, setMethod] = useState<PayMethod>('bkash');
+  const [plan, setPlan] = useState<Plan>('visit');
   const [paying, setPaying] = useState(false);
   const [booked, setBooked] = useState<Appointment | null>(null);
   const [refusal, setRefusal] = useState<{ message: string; alternatives: SlotOffer[] } | null>(null);
@@ -311,10 +348,11 @@ export function Appoint() {
    * an empty result, and a warm cache does not flash it for 40ms.
    */
   useEffect(() => {
-    if (step !== 'finding' || state === 'loading') return undefined;
+    // it only counts once she has actually asked — the page opens on the hero
+    if (!started || step !== 'finding' || state === 'loading') return undefined;
     const id = window.setTimeout(() => setStep('clinician'), FINDING_MS);
     return () => window.clearTimeout(id);
-  }, [step, state]);
+  }, [started, step, state]);
 
   // free times for whichever clinician and day are currently chosen
   useEffect(() => {
@@ -337,8 +375,16 @@ export function Appoint() {
    */
   const shortlist = auto ? doctors.slice(0, SUGGEST) : doctors;
 
+  /** What she is actually paying, for the summary row and the pay button. */
+  const total = doctor
+    ? doctor.feeBdt + (plan === 'visit-plus-chat' ? doctor.chatFeeBdt : 0)
+    : 0;
+
+  /** Reveal the flow, then bring it into view once it has actually rendered. */
   const toFlow = useCallback(() => {
-    flowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setStarted(true);
+    requestAnimationFrame(() =>
+      flowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }, []);
 
   const pay = async () => {
@@ -346,7 +392,7 @@ export function Appoint() {
     setPaying(true);
     setRefusal(null);
     try {
-      const appt = await api.payAndBook({ doctorId: doctor.id, date, time, reason, method });
+      const appt = await api.payAndBook({ doctorId: doctor.id, date, time, reason, method, plan });
       setBooked(appt);
       setStep('done');
     } catch (err) {
@@ -364,10 +410,12 @@ export function Appoint() {
 
   return (
     <div className="min-h-screen">
-      <Hero from={cheapest} onBook={toFlow} loading={state === 'loading'} />
+      <Hero from={cheapest} onBook={toFlow} loading={state === 'loading'} auto={auto} />
 
-      <section ref={flowRef} className="scroll-mt-8 px-4 py-16 sm:py-20">
-        <div className="mx-auto max-w-3xl">
+      <section ref={flowRef} className="scroll-mt-8 px-4 pb-16 sm:pb-20">
+        <div className={cn('mx-auto max-w-3xl', started ? 'pt-16 sm:pt-20' : 'pt-0')}>
+          {!started ? null : (
+          <>
           {step !== 'done' && (
             <div className="mb-8">
               <Stepper step={step} />
@@ -667,11 +715,61 @@ export function Appoint() {
                       ))}
                       <div className="flex items-baseline justify-between gap-4 border-t border-ink/10 pt-2.5">
                         <dt className="text-[11px] font-bold uppercase tracking-wider text-ink-faint">
-                          Consultation fee
+                          {plan === 'visit-plus-chat' ? 'Visit + a month of chat' : 'Consultation fee'}
                         </dt>
-                        <dd className="text-lg font-bold tracking-tight text-ink">{taka(doctor.feeBdt)}</dd>
+                        <dd className="text-lg font-bold tracking-tight text-ink">{taka(total)}</dd>
                       </div>
                     </dl>
+
+                    {/* what she is buying, before how she pays for it */}
+                    <div className="mt-4 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+                      What you are booking
+                    </div>
+                    <div className="mt-1.5 grid gap-2">
+                      <button
+                        onClick={() => setPlan('visit')}
+                        className={cn(
+                          'rounded-2xl border p-3.5 text-left transition',
+                          plan === 'visit'
+                            ? 'border-brand-500/45 bg-brand-500/[0.07]'
+                            : 'border-white/70 bg-white/60 hover:bg-white',
+                        )}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[13px] font-extrabold text-ink">The visit</span>
+                          <span className="text-[14px] font-bold text-ink">{taka(doctor.feeBdt)}</span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
+                          One consultation, on call, at the time you picked.
+                        </p>
+                      </button>
+
+                      <button
+                        onClick={() => setPlan('visit-plus-chat')}
+                        className={cn(
+                          'rounded-2xl border p-3.5 text-left transition',
+                          plan === 'visit-plus-chat'
+                            ? 'border-brand-500/45 bg-brand-500/[0.07]'
+                            : 'border-white/70 bg-white/60 hover:bg-white',
+                        )}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[13px] font-extrabold text-ink">
+                            Visit + a month of chat
+                          </span>
+                          <span className="text-[14px] font-bold text-ink">
+                            {taka(doctor.feeBdt + doctor.chatFeeBdt)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
+                          The visit, plus 30 days of messaging — {shortName(doctor.name)} answers
+                          between appointments and can read the reports you upload in that time.
+                        </p>
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-700">
+                          <MessageCircle className="h-3 w-3" /> {taka(doctor.chatFeeBdt)} more
+                        </span>
+                      </button>
+                    </div>
 
                     <div className="mt-4 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
                       Pay with
@@ -722,7 +820,7 @@ export function Appoint() {
                         Back
                       </button>
                       <LiquidButton onClick={pay} icon={<Lock className="h-4 w-4" />}>
-                        {paying ? 'Confirming…' : `Pay ${taka(doctor.feeBdt)} & confirm`}
+                        {paying ? 'Confirming…' : `Pay ${taka(total)} & confirm`}
                       </LiquidButton>
                     </div>
                   </GlassCard>
@@ -807,6 +905,8 @@ export function Appoint() {
                 </motion.div>
               )}
             </>
+          )}
+          </>
           )}
         </div>
       </section>

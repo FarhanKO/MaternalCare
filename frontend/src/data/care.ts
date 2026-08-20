@@ -19,6 +19,8 @@ export interface Doctor {
   queue: number;
   /** what one paid visit with them costs, in taka */
   feeBdt: number;
+  /** what a month of messaging with them adds on top */
+  chatFeeBdt: number;
   /** 0–1 */
   load: number;
   status: DoctorStatus;
@@ -58,9 +60,18 @@ export interface Appointment {
   waitingDays: number;
   /** present only on appointments bought outright from the booking page */
   payment?: Payment;
+  plan?: Plan;
+  /** the day her month of messaging runs out, on a chat plan */
+  chatUntil?: string;
 }
 
 export type PayMethod = 'bkash' | 'nagad' | 'card';
+
+/** The consultation alone, or the consultation plus a month of messaging. */
+export type Plan = 'visit' | 'visit-plus-chat';
+
+/** What a message carries. Only a clinician may send 'call-link'. */
+export type MessageKind = 'text' | 'image' | 'call-request' | 'call-link';
 
 export interface Payment {
   feeBdt: number;
@@ -92,6 +103,9 @@ export interface Message {
   sentAt: string;
   /** true once the other side has opened the thread */
   read: boolean;
+  kind: MessageKind;
+  /** path on the API host where a sent photograph lives */
+  imageUrl?: string;
 }
 
 /** A doctor the mother is entitled to write to. */
@@ -102,6 +116,9 @@ export interface CareTeamMember {
   hospital: string;
   qualification: string;
   unread: number;
+  /** true while a paid month of messaging with them is still running */
+  chatOpen?: boolean;
+  chatUntil?: string;
 }
 
 export interface MotherThread {

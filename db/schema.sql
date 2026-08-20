@@ -145,7 +145,11 @@ CREATE TABLE appointments (
   fee_bdt        INTEGER,
   payment_method TEXT CHECK (payment_method IN ('bkash', 'nagad', 'card')),
   payment_ref    TEXT,
-  paid_at        TIMESTAMPTZ
+  paid_at        TIMESTAMPTZ,
+  -- 'visit' is the consultation alone; 'visit-plus-chat' adds a month of
+  -- messaging. chat_until is a date, so the entitlement lapses by itself.
+  plan           TEXT CHECK (plan IS NULL OR plan IN ('visit', 'visit-plus-chat')),
+  chat_until     DATE
 );
 CREATE INDEX appointments_user_idx   ON appointments (user_id, date);
 CREATE INDEX appointments_doctor_idx ON appointments (doctor_id, status);
@@ -207,7 +211,12 @@ CREATE TABLE messages (
   body      TEXT    NOT NULL,
   sent_at   TIMESTAMPTZ NOT NULL,
   -- set when the *other* side opens the thread
-  read_at   TIMESTAMPTZ
+  read_at   TIMESTAMPTZ,
+  -- a thread carries photographs and the call handshake, not only text
+  kind      TEXT    NOT NULL DEFAULT 'text'
+                      CHECK (kind IN ('text', 'image', 'call-request', 'call-link')),
+  file_name TEXT,
+  mime      TEXT
 );
 CREATE INDEX messages_thread_idx ON messages (user_id, doctor_id, sent_at);
 

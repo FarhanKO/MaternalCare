@@ -9,7 +9,7 @@ import type { Patient } from '@/data/doctor';
 import {
   RequestRefused, type Appointment, type CareDocument, type CareTeamMember,
   type DocumentKind, type DoctorThread, type Message, type MotherThread,
-  type PayMethod, type RankedDoctor, type SlotOffer,
+  type MessageKind, type PayMethod, type Plan, type RankedDoctor, type SlotOffer,
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
@@ -145,7 +145,8 @@ export const api = {
    * fee is decided by the server from the clinician.
    */
   async payAndBook(body: {
-    doctorId: string; date: string; time: string; reason?: string; method: PayMethod;
+    doctorId: string; date: string; time: string; reason?: string;
+    method: PayMethod; plan?: Plan;
   }) {
     const res = await fetch(`${BASE}/appointments/paid`, {
       method: 'POST',
@@ -341,11 +342,34 @@ export const api = {
   getThread: (doctorId: string) =>
     request<Envelope<Message[]>>(`/messages/${doctorId}`).then((r) => r.data),
 
-  sendMessage: (doctorId: string, body: string) =>
-    request<Envelope<Message>>('/messages', {
+  /**
+   * Send a line. `kind` decides what it is; an image rides as a data URL.
+   *
+   * The link rule is refused server-side with 422 and its own code, so the
+   * chat can show a dialog explaining who arranges calls rather than a bare
+   * error string.
+   */
+  async sendMessage(
+    doctorId: string,
+    body: string,
+    opts: { kind?: MessageKind; image?: string } = {},
+  ) {
+    const res = await fetch(`${BASE}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ doctorId, body }),
-    }).then((r) => r.data),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doctorId, body, ...opts }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(json.error ?? `Send failed (${res.status})`) as Error & {
+        code?: string; hint?: string;
+      };
+      err.code = json.code;
+      err.hint = json.hint;
+      throw err;
+    }
+    return json.data as Message;
+  },
 
   /* clinician side of the same conversation */
   getDoctorThreads: (doctorId: string) =>

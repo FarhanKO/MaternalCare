@@ -36,6 +36,7 @@ router.post('/patients/:id/reminders', patientApi.assign);
 router.get('/doctors', careApi.doctors);
 router.get('/doctors/recommended', careApi.recommended);
 router.get('/doctors/:id/slots', careApi.slots);
+router.get('/doctors/:id/plans', careApi.plans);
 router.get('/doctors/:id/appointments', careApi.doctorAppointments);
 
 /* appointment requests — the mother asks, the doctor answers */
@@ -105,10 +106,14 @@ router.post('/patients/:id/documents', documentApi.createForPatient);
 router.get('/care-team', messageApi.careTeam);
 router.get('/messages', messageApi.threads);
 router.post('/messages', messageApi.send);
+/* photographs sent in a thread, streamed from disk */
+router.get('/messages/attachments/:file', messageApi.attachment);
 router.get('/messages/:doctorId', messageApi.thread);
 router.get('/doctors/:id/threads', messageApi.doctorThreads);
 router.get('/doctors/:id/threads/:patientId', messageApi.doctorThread);
 router.post('/doctors/:id/messages', messageApi.doctorSend);
+/* visits about to start — drives the "ready your meeting link" nudge */
+router.get('/doctors/:id/upcoming', messageApi.doctorUpcoming);
 
 /* symptoms */
 router.get('/symptoms', symptomApi.index);

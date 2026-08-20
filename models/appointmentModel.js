@@ -168,6 +168,9 @@ function toDTO(row) {
     respondedAt: row.responded_at || undefined,
     queuePosition: row.queue_position ?? 0,
     waitingDays: waitingDays(row),
+    plan: row.plan || undefined,
+    /** the date her month of messaging runs out, on a chat plan */
+    chatUntil: row.chat_until || undefined,
     payment: row.paid_at
       ? {
         feeBdt: row.fee_bdt,
@@ -181,6 +184,9 @@ function toDTO(row) {
 
 /** Payment rails a Bangladeshi clinic actually takes. */
 const PAY_METHODS = ['bkash', 'nagad', 'card'];
+
+/** The consultation alone, or the consultation plus a month of messaging. */
+const PLANS = ['visit', 'visit-plus-chat'];
 
 /**
  * A reference the mother can quote back to the clinic. Deliberately not
@@ -313,29 +319,81 @@ module.exports = {
    * is read from the clinician rather than from the request, so a tampered
    * body cannot buy a consultant's slot at a junior's price.
    */
-  async bookPaid(userId, doctorId, { date, time, reason, method }) {
+  async bookPaid(userId, doctorId, { date, time, reason, method, plan }) {
     const pay = String(method || '').toLowerCase();
     if (!PAY_METHODS.includes(pay)) throw new Error('Choose how you want to pay');
 
+    const chosen = String(plan || 'visit');
+    if (!PLANS.includes(chosen)) throw new Error('Choose what you are booking');
+
     const doctor = await ensureSlotFree(doctorId, date, time);
-    const fee = doctorModel.consultationFee({
+    // priced from the clinician, never from the request body
+    const priced = doctorModel.plansFor({
       qualification: doctor.qualification,
       years: doctor.years,
-    });
+    })[chosen];
     const now = new Date().toISOString();
+
+    // a month of chat runs from the visit, not from the moment she paid —
+    // the point of it is the questions that come *after* being seen
+    const chatUntil = chosen === 'visit-plus-chat'
+      ? iso(new Date(new Date(`${date}T00:00:00`).getTime() + doctorModel.CHAT_DAYS * DAY))
+      : null;
 
     const row = await db.insert(
       `INSERT INTO appointments
          (user_id, doctor_id, date, time, reason, status,
           requested_at, responded_at, note,
-          fee_bdt, payment_method, payment_ref, paid_at)
-       VALUES ($1,$2,$3,$4,$5,'accepted',$6,$6,$7,$8,$9,$10,$6)
+          fee_bdt, payment_method, payment_ref, paid_at, plan, chat_until)
+       VALUES ($1,$2,$3,$4,$5,'accepted',$6,$6,$7,$8,$9,$10,$6,$11,$12)
        RETURNING id`,
       [userId, doctorId, date, time, reason || 'Paid consultation', now,
         'Confirmed on payment of the consultation fee',
-        fee, pay, paymentReference()],
+        priced.priceBdt, pay, paymentReference(), chosen, chatUntil],
     );
     return this.find(row.id);
+  },
+
+  /**
+   * Is her chat with this clinician live right now?
+   *
+   * True while any 'visit-plus-chat' booking with them still has days on it.
+   * Read on every message she sends, so it is one indexed lookup.
+   */
+  async chatOpen(userId, doctorId) {
+    const row = await db.one(
+      `SELECT max(chat_until) AS until FROM appointments
+       WHERE user_id = $1 AND doctor_id = $2
+         AND plan = 'visit-plus-chat' AND chat_until >= CURRENT_DATE
+         AND status IN ('accepted','completed')`,
+      [userId, doctorId],
+    );
+    return row && row.until ? { open: true, until: row.until } : { open: false, until: null };
+  },
+
+  /**
+   * Confirmed visits starting within the next `minutes`, for the clinician's
+   * "ready your meeting link" nudge. Ordered soonest first.
+   */
+  async imminentForDoctor(doctorId, minutes = 60) {
+    const rows = await db.sql(`
+      SELECT a.*, u.name AS patient_name,
+             d.name AS doctor_name, d.specialty, d.hospital,
+             0 AS queue_position
+      FROM appointments a
+      JOIN users u   ON u.id = a.user_id
+      JOIN doctors d ON d.id = a.doctor_id
+      WHERE a.doctor_id = $1 AND a.status = 'accepted' AND a.time IS NOT NULL
+        AND (a.date + a.time::time) BETWEEN now() - interval '15 minutes'
+                                        AND now() + ($2 || ' minutes')::interval
+      ORDER BY a.date, a.time
+    `, [doctorId, String(minutes)]);
+
+    return rows.map((r) => ({
+      ...toDTO(r),
+      patientName: r.patient_name,
+      startsAt: `${r.date}T${r.time}`,
+    }));
   },
 
   /** The doctor answers. A decline carries a reason the mother will read. */

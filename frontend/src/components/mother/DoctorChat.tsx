@@ -1,12 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, MessageCircle, Send, ShieldAlert, Stethoscope } from 'lucide-react';
+import {
+  Camera, ChevronLeft, Image as ImageIcon, MessageCircle, Phone, Send,
+  ShieldAlert, Stethoscope, Video,
+} from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { cn } from '@/lib/cn';
-import { api } from '@/lib/api';
+import { api, fileUrl } from '@/lib/api';
 import {
-  messageStamp, type CareTeamMember, type Message, type MotherThread,
+  messageStamp, type CareTeamMember, type Message, type MessageKind,
+  type MotherThread,
 } from '@/data/care';
 
 const C = { brand: '#3f66f0', violet: '#8b7bf3' };
@@ -35,6 +39,8 @@ function Conversation({
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  /** the link-rule dialog: null when closed, the hint text when open */
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -54,21 +60,55 @@ function Conversation({
     endRef.current?.scrollIntoView({ block: 'nearest' });
   }, [messages]);
 
-  const send = async () => {
-    const body = draft.trim();
-    if (!body || sending) return;
+  /**
+   * One path for every kind of line she can send.
+   *
+   * The link refusal comes back from the server as its own code, because the
+   * rule is enforced there — a check that only lived in this component would
+   * be advice, not a rule. It surfaces as a dialog rather than the inline
+   * error strip, since it needs to explain who arranges calls.
+   */
+  const push = async (
+    body: string,
+    opts: { kind?: MessageKind; image?: string } = {},
+  ) => {
+    if (sending) return;
     setSending(true);
     setError('');
     try {
-      const saved = await api.sendMessage(doctor.doctorId, body);
+      const saved = await api.sendMessage(doctor.doctorId, body, opts);
       setMessages((prev) => [...(prev ?? []), saved]);
       setDraft('');
       onSent();
     } catch (e) {
-      setError((e as Error).message);
+      const err = e as Error & { code?: string; hint?: string };
+      if (err.code === 'LINK_NOT_ALLOWED') setBlocked(err.hint ?? '');
+      else setError(err.message);
     } finally {
       setSending(false);
     }
+  };
+
+  const send = () => {
+    const body = draft.trim();
+    if (body) push(body);
+  };
+
+  /** Gallery and camera differ only by the capture hint on the input. */
+  const pickImage = (capture: boolean) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp';
+    if (capture) input.setAttribute('capture', 'environment');
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => push(draft.trim(), { kind: 'image', image: String(reader.result) });
+      reader.onerror = () => setError('Could not read that image');
+      reader.readAsDataURL(file);
+    };
+    input.click();
   };
 
   return (
@@ -76,7 +116,7 @@ function Conversation({
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -16, transition: { duration: 0.15 } }}
-      className="flex h-[480px] flex-col"
+      className="relative flex h-[480px] flex-col"
     >
       <div className="flex items-center gap-2.5 border-b border-white/60 pb-3">
         <button onClick={onBack} aria-label="Back to conversations"
@@ -129,7 +169,29 @@ function Conversation({
             >
               <div className={cn('max-w-[80%] rounded-2xl px-3.5 py-2.5',
                 mine ? 'bg-brand-500 text-white' : 'border border-white/60 bg-white/75 text-ink')}>
-                <div className="whitespace-pre-wrap text-[12.5px] font-medium leading-relaxed">{m.body}</div>
+                {m.kind === 'call-request' && (
+                  <div className={cn('mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide',
+                    mine ? 'text-white/80' : 'text-brand-700')}>
+                    <Phone className="h-3 w-3" /> Call requested
+                  </div>
+                )}
+                {m.kind === 'call-link' && (
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                    <Video className="h-3 w-3" /> Meeting link
+                  </div>
+                )}
+                {m.imageUrl && (
+                  <a href={fileUrl(m.imageUrl)} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={fileUrl(m.imageUrl)}
+                      alt="Sent photo"
+                      className="mb-1.5 max-h-56 w-full rounded-xl object-cover"
+                    />
+                  </a>
+                )}
+                {m.body && (
+                  <div className="whitespace-pre-wrap text-[12.5px] font-medium leading-relaxed">{m.body}</div>
+                )}
                 <div className={cn('mt-1 text-[10px] font-semibold',
                   mine ? 'text-white/70' : 'text-ink-faint')}>
                   {messageStamp(m.sentAt)}
@@ -148,7 +210,35 @@ function Conversation({
         </div>
       )}
 
-      <div className="flex items-end gap-2 border-t border-white/60 pt-3">
+      {/* photograph, camera, and asking for a call */}
+      <div className="flex items-center gap-2 border-t border-white/60 pt-3">
+        <button
+          onClick={() => pickImage(false)}
+          disabled={sending}
+          className="flex items-center gap-1.5 rounded-xl border border-white/60 bg-white/70 px-2.5 py-1.5 text-[11px] font-bold text-ink-soft transition hover:bg-white hover:text-ink disabled:opacity-50"
+        >
+          <ImageIcon className="h-3.5 w-3.5" /> Gallery
+        </button>
+        <button
+          onClick={() => pickImage(true)}
+          disabled={sending}
+          className="flex items-center gap-1.5 rounded-xl border border-white/60 bg-white/70 px-2.5 py-1.5 text-[11px] font-bold text-ink-soft transition hover:bg-white hover:text-ink disabled:opacity-50"
+        >
+          <Camera className="h-3.5 w-3.5" /> Camera
+        </button>
+        <button
+          onClick={() => push(
+            `Could we have a call? ${draft.trim() || 'Whenever suits you.'}`,
+            { kind: 'call-request' },
+          )}
+          disabled={sending}
+          className="ml-auto flex items-center gap-1.5 rounded-xl bg-brand-500/12 px-2.5 py-1.5 text-[11px] font-bold text-brand-700 transition hover:bg-brand-500/20 disabled:opacity-50"
+        >
+          <Phone className="h-3.5 w-3.5" /> Ask for a call
+        </button>
+      </div>
+
+      <div className="flex items-end gap-2 pt-2">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -176,6 +266,40 @@ function Conversation({
       <p className="mt-2 text-[10px] font-semibold text-ink-faint">
         Messages are not monitored around the clock. For anything urgent, use SOS or call your clinic.
       </p>
+
+      {/*
+        Why the send failed, rather than a red strip saying it did. She is
+        trying to arrange a call, so the answer is how calls get arranged.
+      */}
+      <AnimatePresence>
+        {blocked !== null && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-20 grid place-items-center rounded-3xl bg-ink/30 p-4 backdrop-blur-sm"
+            onClick={() => setBlocked(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 10 }} animate={{ scale: 1, y: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-xs rounded-3xl bg-white p-5 text-center shadow-glass-lg"
+            >
+              <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-rose-500/12 text-rose-600">
+                <ShieldAlert className="h-5 w-5" />
+              </span>
+              <div className="mt-3 text-[14px] font-extrabold text-ink">Send failed</div>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">
+                {blocked || 'Schedule a meeting with your doctor first. They will send the joining link into this chat.'}
+              </p>
+              <button
+                onClick={() => setBlocked(null)}
+                className="mt-4 w-full rounded-2xl bg-brand-500 py-2.5 text-[12px] font-bold text-white transition hover:bg-brand-600"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap">
+  <style>
+    body { margin: 0; font-family: Manrope, system-ui, sans-serif; }
+    a { color: #3f66f0; } a:hover { color: #3352d4; }
+    .modal {
+      width: 512px; border-radius: 32px; overflow: hidden;
+      background: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.7), 0 16px 40px -12px rgba(29,54,120,0.2), 0 40px 90px -28px rgba(29,54,120,0.26);
+    }
+    .eyebrow { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #3f66f0; }
+    .title { margin: 8px 0 0; font-size: 24px; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: #0d1526; }
+    .hook { margin: 12px 0 0; border-left: 2px solid #a3c0ff; padding-left: 12px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 17px; font-style: italic; line-height: 1.6; color: #3d4763; }
+    .h3 { margin: 20px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9aa3ba; }
+    .body { margin: 6px 0 0; font-size: 13px; line-height: 1.65; color: #3d4763; }
+  </style>
+</helmet>
+
+<div style="width: 1160px; min-height: 820px; box-sizing: border-box; padding: 44px 48px; background: linear-gradient(160deg, #dbe6fb 0%, #eef2fb 45%, #e6f3f6 100%); color: #0d1526;">
+
+  <div style="display: flex; align-items: baseline; gap: 12px;">
+    <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa3ba;">Side by side</div>
+    <div style="height: 1px; flex-grow: 1; background: rgba(13,21,38,0.1);"></div>
+  </div>
+
+  <h1 style="margin: 14px 0 26px; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15;">
+    The same article, opened
+  </h1>
+
+  <div style="display: flex; gap: 40px; align-items: flex-start;">
+
+    <!-- ============================================== NOW -->
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7590;">Now &#183; 176px panel</div>
+
+      <div class="modal">
+        <div style="position: relative; height: 176px; overflow: hidden; background: linear-gradient(140deg, #eef4ff, #ffffff 55%, #fdeef3);">
+          <div style="position: absolute; inset: 0; opacity: 0.5; background-image: linear-gradient(to right, rgba(47,58,92,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(47,58,92,0.06) 1px, transparent 1px); background-size: 22px 22px;"></div>
+          <div style="position: relative; height: 100%; padding: 12px 20px; box-sizing: border-box;">
+            <svg viewBox="0 0 320 150" style="width: 100%; height: 100%;">
+              <g fill="none" stroke="#2f3a5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 128 H306" stroke-width="3" />
+                <path d="M30 116 q-4 -20 16 -21 q22 -1 22 12 q0 9 -10 9 z" />
+                <circle cx="62" cy="90" r="15" />
+                <path d="M77 84 q46 -6 88 6 q16 5 22 14" />
+                <path d="M76 102 q26 6 44 4" />
+                <path d="M96 96 q26 6 34 20" />
+                <path d="M187 106 q28 6 34 20" />
+                <path d="M187 116 q26 12 30 26" />
+                <path d="M249 122 q22 -2 30 6" />
+              </g>
+              <path d="M120 106 a24 22 0 0 0 44 6" fill="none" stroke="#f2789f" stroke-width="2.5" stroke-linecap="round" />
+              <ellipse cx="232" cy="120" rx="17" ry="11" fill="none" stroke="#3f66f0" stroke-width="2" />
+              <text x="252" y="102" font-size="9.5" fill="#3f66f0" font-weight="700" text-anchor="middle">pillow between</text>
+              <text x="252" y="112" font-size="9.5" fill="#3f66f0" font-weight="700" text-anchor="middle">the knees</text>
+              <text x="150" y="140" font-size="9.5" fill="#f2789f" font-weight="700" text-anchor="middle">support the bump</text>
+              <text x="62" y="42" font-size="10" fill="#2f3a5c" opacity="0.55" font-weight="700" text-anchor="middle">either side</text>
+            </svg>
+          </div>
+          <span style="position: absolute; right: 16px; top: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.7); color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </span>
+        </div>
+
+        <div style="padding: 20px 24px 24px;">
+          <div class="eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M3 5a2 2 0 0 1 2-2h5v18H5a2 2 0 0 1-2-2Z" /><path d="M21 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2Z" /></svg>
+            Reading &#183; 3 min
+          </div>
+          <h2 class="title">Sleeping safely in the third trimester</h2>
+          <p class="hook">From 28 weeks, the position you fall asleep in matters more than any other habit you can change tonight.</p>
+          <div class="h3">Why it matters</div>
+          <p class="body">Lying flat on your back lets the weight of the uterus press on the vena cava, the large vein returning blood to your heart&#8230;</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== NEW -->
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #3352d4;">Redrawn &#183; 208px panel</div>
+
+      <div class="modal">
+        <div style="position: relative; height: 208px; overflow: hidden;">
+          <svg viewBox="0 0 480 184" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%;">
+            <rect width="480" height="184" fill="#eef4ff" />
+            <rect x="0" y="146" width="480" height="38" fill="#dfeaff" />
+            <rect x="44" y="120" width="86" height="26" rx="13" fill="#c6d9ff" />
+            <g stroke="#293e87" fill="none" stroke-linecap="round">
+              <path d="M156 96 H268" stroke-width="60" />
+              <path d="M276 104 L330 128" stroke-width="42" />
+              <path d="M336 132 L404 142" stroke-width="34" />
+            </g>
+            <circle cx="118" cy="94" r="27" fill="#293e87" />
+            <circle cx="206" cy="118" r="30" fill="#5b83fb" />
+            <path d="M182 104 L246 132" stroke="#7a9dff" stroke-width="20" stroke-linecap="round" fill="none" />
+            <rect x="308" y="112" width="46" height="30" rx="15" fill="#22b8c4" transform="rotate(24 331 127)" />
+            <text x="44" y="42" font-size="15" font-weight="800" fill="#0d1526">Either side. Never flat on your back.</text>
+            <text x="44" y="62" font-size="12.5" font-weight="600" fill="#6b7590">A pillow between the knees keeps the hips stacked.</text>
+          </svg>
+          <span style="position: absolute; right: 16px; top: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.7); color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </span>
+        </div>
+
+        <div style="padding: 20px 24px 24px;">
+          <div class="eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M3 5a2 2 0 0 1 2-2h5v18H5a2 2 0 0 1-2-2Z" /><path d="M21 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2Z" /></svg>
+            Reading &#183; 3 min
+          </div>
+          <h2 class="title">Sleeping safely in the third trimester</h2>
+          <p class="hook">From 28 weeks, the position you fall asleep in matters more than any other habit you can change tonight.</p>
+          <div class="h3">Why it matters</div>
+          <p class="body">Lying flat on your back lets the weight of the uterus press on the vena cava, the large vein returning blood to your heart&#8230;</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 30px; border-radius: 18px; background: rgba(255,255,255,0.7); border: 1px solid rgba(13,21,38,0.07); padding: 20px 22px;">
+    <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #3f66f0;">Two changes to the panel itself</div>
+    <p style="margin: 9px 0 0; max-width: 900px; font-size: 13px; line-height: 1.65; color: #3d4763;">
+      The graph paper and the pastel wash go &#8212; each drawing now brings its own ground, so the
+      colour can belong to the subject rather than to every article at once. And the panel grows
+      from <strong>h-44 to h-52</strong>: at 176px the art was letterboxed into a 3:1 strip, which
+      is what forced the labels down to 9.5px in the first place.
+    </p>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

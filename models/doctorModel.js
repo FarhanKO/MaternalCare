@@ -79,6 +79,42 @@ function consultationFee(doctor) {
 }
 
 /**
+ * What a month of chat access adds on top of the visit.
+ *
+ * Priced off the same visit fee rather than as a flat rate: a month of a
+ * consultant's attention is not worth the same as a month of a registrar's.
+ * Deliberately well under a second visit, because the point is that she asks
+ * the small question instead of saving it up or going without.
+ */
+function chatMonthFee(doctor) {
+  return Math.round((consultationFee(doctor) * 0.6) / 50) * 50;
+}
+
+/** Days of messaging a 'visit-plus-chat' booking buys. */
+const CHAT_DAYS = 30;
+
+/** The two things she can buy, priced for this clinician. */
+function plansFor(doctor) {
+  const visit = consultationFee(doctor);
+  const chat = chatMonthFee(doctor);
+  return {
+    visit: {
+      key: 'visit',
+      label: 'The visit',
+      priceBdt: visit,
+      blurb: 'One consultation, on call, at the time you pick.',
+    },
+    'visit-plus-chat': {
+      key: 'visit-plus-chat',
+      label: 'Visit + a month of chat',
+      priceBdt: visit + chat,
+      addOnBdt: chat,
+      blurb: `The visit, plus ${CHAT_DAYS} days of messaging — they answer between appointments and can read the reports you upload in that time.`,
+    },
+  };
+}
+
+/**
  * How a mother's need maps onto a specialty. Anything unmatched still ranks —
  * it simply gets no bonus, rather than being hidden.
  */
@@ -117,6 +153,8 @@ function toDTO(d) {
     queue,
     /** what one paid visit costs, in taka */
     feeBdt: consultationFee(d),
+    /** what a month of messaging adds on top */
+    chatFeeBdt: chatMonthFee(d),
     /** 0–1, how full the list is */
     load: Math.round(load * 100) / 100,
     /** open | busy | full | away */
@@ -128,7 +166,10 @@ function toDTO(d) {
 
 module.exports = {
   SLOT_TIMES,
+  CHAT_DAYS,
   consultationFee,
+  chatMonthFee,
+  plansFor,
 
   async all() {
     const rows = await db.sql(`${WITH_COUNTS} ORDER BY d.id`);

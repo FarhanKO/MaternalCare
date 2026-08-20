@@ -1,0 +1,25 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "1 · What ships now", "x": 0, "y": 0, "w": 1040, "h": 720 },
+    { "file": "Directions.dc.html", "title": "2 · Two treatments", "x": 1120, "y": 0, "w": 1040, "h": 920 },
+    { "file": "Set.dc.html", "title": "3 · All ten redrawn", "x": 2240, "y": 0, "w": 1040, "h": 1740 },
+    { "file": "InSitu.dc.html", "title": "4 · In the modal", "x": 0, "y": 800, "w": 1160, "h": 840 }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -250,
+      "w": 460,
+      "text": "THE DIAGRAMS AT THE TOP OF AN OPEN ARTICLE\n\nTen of them. Four try to draw a human body out of thin bezier curves on graph paper, and those are the four that look wrong — the side-sleep figure reads as a blob with a circle stuck to it.\n\nBoard 2 offers two ways out. Board 3 is the whole set drawn the way I would do it. Board 4 puts one back in the real modal, which is the comparison that counts."
+    },
+    {
+      "id": "mixed",
+      "x": 2240,
+      "y": -210,
+      "w": 460,
+      "text": "MIXED ON PURPOSE\n\nSilhouette for the two where the subject is a person doing something — sleeping, tummy time. Schematic for the other eight, including the latch, where drawing a body buys nothing and costs comfort.\n\nThree of these have no drawing at all today and fall through to the generic squiggle: sickness, the dating scan, and movements."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

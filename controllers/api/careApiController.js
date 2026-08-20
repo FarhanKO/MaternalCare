@@ -41,6 +41,18 @@ exports.slots = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/** What this clinician charges: the visit alone, or the visit plus a month. */
+exports.plans = async (req, res, next) => {
+  try {
+    const doctor = await doctorModel.find(req.params.id);
+    if (!doctor) return res.status(404).json({ error: 'Clinician not found' });
+    return res.json({
+      data: doctorModel.plansFor(doctor),
+      meta: { chatDays: doctorModel.CHAT_DAYS },
+    });
+  } catch (err) { return next(err); }
+};
+
 /** The doctor's request inbox. */
 exports.doctorAppointments = async (req, res, next) => {
   try {
@@ -80,10 +92,12 @@ exports.requestAppointment = async (req, res) => {
  * takes it from the clinician — so the client cannot name its own price.
  */
 exports.payAndBook = async (req, res) => {
-  const { doctorId, date, time, reason, method } = req.body || {};
+  const { doctorId, date, time, reason, method, plan } = req.body || {};
   try {
     const user = await userModel.current();
-    const booked = await appointmentModel.bookPaid(user.id, doctorId, { date, time, reason, method });
+    const booked = await appointmentModel.bookPaid(user.id, doctorId, {
+      date, time, reason, method, plan,
+    });
     res.status(201).json({ data: booked });
   } catch (err) {
     if (err.code === 'SLOT_TAKEN') {

@@ -11,6 +11,7 @@ const messageModel = require('../../models/messageModel');
 const doctorModel = require('../../models/doctorModel');
 const patientModel = require('../../models/patientModel');
 const userModel = require('../../models/userModel');
+const appointmentModel = require('../../models/appointmentModel');
 
 /**
  * Doctors this mother is entitled to message.
@@ -45,13 +46,20 @@ async function careTeamFor(userId) {
 
   const unreadBy = new Map(threads.map((t) => [String(t.doctorId), t.unread ?? 0]));
 
-  return rows.map((r) => ({
+  // whether her month of messaging with each of them is still running
+  const chat = await Promise.all(
+    rows.map((r) => appointmentModel.chatOpen(userId, r.id)),
+  );
+
+  return rows.map((r, i) => ({
     doctorId: String(r.id),
     doctorName: r.name,
     specialty: r.specialty,
     hospital: r.hospital,
     qualification: r.qualification || '',
     unread: unreadBy.get(String(r.id)) ?? 0,
+    chatOpen: chat[i].open,
+    chatUntil: chat[i].until ?? undefined,
   }));
 }
 
@@ -92,7 +100,7 @@ exports.thread = async (req, res, next) => {
 };
 
 exports.send = async (req, res) => {
-  const { doctorId, body } = req.body || {};
+  const { doctorId, body, kind, image } = req.body || {};
   try {
     const user = await userModel.current();
     if (!(await doctorModel.exists(doctorId))) {
@@ -103,10 +111,30 @@ exports.send = async (req, res) => {
         error: 'You can only message a doctor you have an appointment with',
       });
     }
-    return res.status(201).json({ data: await messageModel.send(user.id, doctorId, 'mother', body) });
+    // a mother never sends 'call-link' — that is the clinician's to give
+    const asked = kind === 'image' || kind === 'call-request' ? kind : 'text';
+    const sent = await messageModel.send(user.id, doctorId, 'mother', body, { kind: asked, image });
+    return res.status(201).json({ data: sent });
   } catch (err) {
+    // the link rule is a rule, not a validation failure — the client shows a
+    // dialog explaining who arranges calls, so it needs to tell them apart
+    if (err.code === 'LINK_NOT_ALLOWED') {
+      return res.status(422).json({
+        error: 'Send failed — links cannot be sent from here.',
+        code: err.code,
+        hint: 'Schedule a meeting with your doctor first. They will send the joining link into this chat.',
+      });
+    }
     return res.status(400).json({ error: err.message });
   }
+};
+
+/** The photograph itself, streamed from disk rather than inlined in the list. */
+exports.attachment = (req, res) => {
+  const full = messageModel.attachmentPath(req.params.file);
+  if (!full) return res.status(404).json({ error: 'Attachment not found' });
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  return require('fs').createReadStream(full).pipe(res);
 };
 
 /* ---------------------------------------------------------- clinician side */
@@ -135,17 +163,37 @@ exports.doctorThread = async (req, res, next) => {
   } catch (err) { return next(err); }
 };
 
-/** A clinician may open a conversation with anyone on their caseload. */
+/**
+ * A clinician may open a conversation with anyone on their caseload — and,
+ * unlike the mother, may send a joining link, because arranging the call is
+ * their end of the deal.
+ */
 exports.doctorSend = async (req, res) => {
   const { id } = req.params;
-  const { patientId, body } = req.body || {};
+  const { patientId, body, kind, image } = req.body || {};
   try {
     if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
     if (!(await patientModel.exists(patientId))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
-    return res.status(201).json({ data: await messageModel.send(patientId, id, 'doctor', body) });
+    const asked = ['image', 'call-link'].includes(kind) ? kind : 'text';
+    const sent = await messageModel.send(patientId, id, 'doctor', body, { kind: asked, image });
+    return res.status(201).json({ data: sent });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+/**
+ * Visits about to start, so the clinician can be told to post a link before
+ * the patient is sitting there waiting. Computed on read: no scheduler, and
+ * nothing written into the conversation that the mother would see as noise.
+ */
+exports.doctorUpcoming = async (req, res, next) => {
+  const { id } = req.params;
+  try {
+    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    const minutes = Math.min(720, Math.max(5, Number(req.query.within) || 60));
+    return res.json({ data: await appointmentModel.imminentForDoctor(id, minutes), meta: { minutes } });
+  } catch (err) { return next(err); }
 };
