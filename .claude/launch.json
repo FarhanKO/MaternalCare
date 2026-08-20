@@ -12,12 +12,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3000
-    },
-    {
-      "name": "guardian",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "../Guardian MaternityCare+", "run", "dev"],
-      "port": 5174
     }
   ]
 }
