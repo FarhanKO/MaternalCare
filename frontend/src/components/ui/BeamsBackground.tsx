@@ -28,7 +28,7 @@ interface BeamsBackgroundProps {
 }
 
 const OPACITY: Record<NonNullable<BeamsBackgroundProps['intensity']>, number> = {
-  subtle: 0.6, medium: 0.85, strong: 1, vivid: 1.5,
+  subtle: 0.6, medium: 0.85, strong: 1, vivid: 1.2,
 };
 
 /* brand-blue → aqua band so it matches the MaternalCare+ palette */
