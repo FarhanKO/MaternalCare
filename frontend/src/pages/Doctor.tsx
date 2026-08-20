@@ -38,7 +38,7 @@ const TABS: DockItem<DocTab>[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard, hint: 'Clinic at a glance' },
   { key: 'patients', label: 'Patients', icon: Users, hint: 'Your caseload' },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays, hint: 'Today’s clinic' },
-  { key: 'requests', label: 'Requests', icon: Inbox, hint: 'Mothers asking to be seen' },
+  { key: 'requests', label: 'Inbox', icon: Inbox, hint: 'Requests to be seen, and your conversations' },
   { key: 'reports', label: 'Reports', icon: ClipboardList, hint: 'Practice analytics' },
 ];
 
