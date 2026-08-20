@@ -287,8 +287,8 @@ function ClinicianCard({ doctor, picked, level, onPick }: {
         <div className="flex flex-none items-stretch gap-3 text-right">
           <div>
             <div className="text-lg font-bold tracking-tight text-ink">{taka(doctor.feeBdt)}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
-              per visit
+            <div className="max-w-[5.5rem] text-[10px] font-bold uppercase leading-tight tracking-wider text-ink-faint">
+              Video consultation fee
             </div>
           </div>
           <span className="w-px self-stretch bg-ink/10" />

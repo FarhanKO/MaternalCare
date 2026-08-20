@@ -19,6 +19,8 @@ import { DoctorProfile } from '@/components/doctor/DoctorProfile';
 import { AssignModal } from '@/components/doctor/AssignModal';
 import { RequestInbox } from '@/components/doctor/RequestInbox';
 import { MessageThreads } from '@/components/doctor/MessageThreads';
+import { KpiModal, type KpiKey } from '@/components/doctor/KpiModal';
+import { BackgroundPaths } from '@/components/ui/BackgroundPaths';
 import { PatientFiles } from '@/components/doctor/PatientFiles';
 import { SosBanner } from '@/components/doctor/SosBanner';
 import { cn } from '@/lib/cn';
@@ -264,6 +266,8 @@ export function Doctor() {
   const [riskFilter, setRiskFilter] = useState<'all' | RiskLevel>('all');
   const [selected, setSelected] = useState<Patient | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  /** which overview number is expanded, if any */
+  const [kpi, setKpi] = useState<KpiKey | null>(null);
   const [assigning, setAssigning] = useState<Patient | null>(null);
 
   // the caseload comes from the database — each patient is a real account
@@ -303,11 +307,11 @@ export function Doctor() {
     );
   }, [query, riskFilter, roster]);
 
-  const KPIS = [
-    { label: 'Under your care', value: roster.length, icon: Users, tint: P.peach, note: 'active pregnancies' },
-    { label: 'High risk', value: riskCount('high'), icon: ShieldAlert, tint: P.rose, note: 'need close follow-up' },
-    { label: 'Clinic today', value: TODAY_SLOTS.length, icon: CalendarDays, tint: P.aqua, note: `${pending} still to see` },
-    { label: 'Open alerts', value: ALERTS.length, icon: BellRing, tint: P.violet, note: `${critical} critical` },
+  const KPIS: { key: KpiKey; label: string; value: number; icon: typeof Users; tint: string; note: string }[] = [
+    { key: 'caseload', label: 'Under your care', value: roster.length, icon: Users, tint: P.peach, note: 'active pregnancies' },
+    { key: 'high-risk', label: 'High risk', value: riskCount('high'), icon: ShieldAlert, tint: P.rose, note: 'need close follow-up' },
+    { key: 'today', label: 'Today’s appointments', value: TODAY_SLOTS.length, icon: CalendarDays, tint: P.aqua, note: `${pending} still to see` },
+    { key: 'alerts', label: 'Open alerts', value: ALERTS.length, icon: BellRing, tint: P.violet, note: `${critical} critical` },
   ];
 
   return (
@@ -319,8 +323,11 @@ export function Doctor() {
 
       <main className="mx-auto max-w-6xl px-4 pb-36 pt-28 sm:pt-32">
         {meId && <SosBanner doctorId={meId} />}
-        {/* greeting */}
-        <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        {/* greeting — flowing paths behind it, clipped to this band */}
+        <Reveal className="relative mb-6 overflow-hidden rounded-4xl px-5 py-6 sm:px-7 sm:py-8">
+          <div className="absolute inset-0 rounded-4xl bg-gradient-to-br from-white/60 via-white/30 to-transparent" />
+          <BackgroundPaths />
+          <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-peach-600">Clinician portal</span>
             <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
@@ -351,6 +358,7 @@ export function Doctor() {
               LO
             </motion.button>
           </div>
+          </div>
         </Reveal>
 
         {/* ============================== OVERVIEW ============================== */}
@@ -360,7 +368,17 @@ export function Doctor() {
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {KPIS.map((k, i) => (
                 <Reveal key={k.label} delay={i * 0.05}>
-                  <GlassCard interactive className="h-full p-5">
+                  <GlassCard
+                    interactive
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${k.label} — open details`}
+                    onClick={() => setKpi(k.key)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setKpi(k.key); }
+                    }}
+                    className="h-full cursor-pointer p-5"
+                  >
                     <div className="flex items-center justify-between">
                       <span className="grid h-10 w-10 place-items-center rounded-2xl" style={{ background: `${k.tint}1f`, color: k.tint }}>
                         <k.icon className="h-5 w-5" />
@@ -742,6 +760,13 @@ export function Doctor() {
       <Footer />
       <PatientDrawer patient={selected} onClose={() => setSelected(null)}
         onAssign={(p) => { setSelected(null); setAssigning(p); }} />
+      <KpiModal
+        which={kpi}
+        roster={roster}
+        onClose={() => setKpi(null)}
+        onOpenPatient={setSelected}
+      />
+
       <DoctorProfile open={profileOpen} onClose={() => setProfileOpen(false)} />
       <AssignModal patient={assigning} clinician="Dr. Lena Ortiz" onClose={() => setAssigning(null)} />
     </>
