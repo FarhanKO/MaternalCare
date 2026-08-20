@@ -28,8 +28,14 @@ export function Journey() {
             viewport={{ once: true, margin: '-80px' }}
             className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
           >
+            {/*
+              Each step is a column, so the card takes the space the icon
+              leaves. `h-full` on the card measured the whole grid cell —
+              including the 68px icon above it — so every card overhung its
+              own cell by exactly the icon's height and sat on the next row.
+            */}
             {journey.map((step, i) => (
-              <motion.li key={step.title} variants={revealVariants} className="relative">
+              <motion.li key={step.title} variants={revealVariants} className="relative flex flex-col">
                 <div className="mb-6 flex justify-center lg:justify-start">
                   <span className="relative grid h-[68px] w-[68px] place-items-center rounded-3xl glass-strong ring-gradient">
                     <step.icon className="h-6 w-6 text-brand-600" strokeWidth={2} />
@@ -38,7 +44,7 @@ export function Journey() {
                     </span>
                   </span>
                 </div>
-                <GlassCard className="h-full p-6 text-center lg:text-left" ring={false}>
+                <GlassCard className="flex-1 p-6 text-center lg:text-left" ring={false}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-brand-500">{step.phase}</div>
                   <h3 className="mt-1.5 text-lg font-bold tracking-tight text-ink">{step.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-ink-soft">{step.description}</p>
