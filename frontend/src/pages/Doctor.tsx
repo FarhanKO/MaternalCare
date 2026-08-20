@@ -325,7 +325,7 @@ export function Doctor() {
         {meId && <SosBanner doctorId={meId} />}
         {/* greeting — flowing paths behind it, clipped to this band */}
         <Reveal className="relative mb-6 overflow-hidden rounded-4xl px-5 py-6 sm:px-7 sm:py-8">
-          <div className="absolute inset-0 rounded-4xl bg-gradient-to-br from-white/60 via-white/30 to-transparent" />
+          <div className="absolute inset-0 rounded-4xl bg-gradient-to-br from-white/40 via-white/10 to-transparent" />
           <BackgroundPaths />
           <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -62,18 +62,25 @@ function aestheticPath(index: number, position: number, band: Band): string {
     .join(' ');
 }
 
+/**
+ * The viewBox is 4800 wide and gets sliced into a band a fraction of that, so
+ * a stroke of 4 lands at well under a pixel. Widths are multiplied up to
+ * compensate — without this the whole effect renders as invisible hairlines.
+ */
+const STROKE_SCALE = 4800 / 1120;
+
 const band = (count: number, position: number, kind: Band, baseOpacity: number, step: number) =>
   Array.from({ length: count }, (_, i) => ({
     id: `${kind}-${i}`,
     d: aestheticPath(i, position, kind),
     opacity: baseOpacity + i * step,
-    width: (kind === 'primary' ? 4 : kind === 'secondary' ? 3 : 2) + i * 0.3,
+    width: ((kind === 'primary' ? 2.4 : kind === 'secondary' ? 1.8 : 1.2) + i * 0.18) * STROKE_SCALE,
   })) as PathData[];
 
 const FloatingPaths = memo(function FloatingPaths({ position }: { position: number }) {
-  const primary = useMemo(() => band(8, position, 'primary', 0.15, 0.02), [position]);
-  const secondary = useMemo(() => band(10, position, 'secondary', 0.12, 0.015), [position]);
-  const accent = useMemo(() => band(6, position, 'accent', 0.1, 0.03), [position]);
+  const primary = useMemo(() => band(8, position, 'primary', 0.34, 0.03), [position]);
+  const secondary = useMemo(() => band(10, position, 'secondary', 0.26, 0.02), [position]);
+  const accent = useMemo(() => band(6, position, 'accent', 0.2, 0.03), [position]);
 
   const groups: { paths: PathData[]; drift: number; seconds: number; opacity: number }[] = [
     { paths: primary, drift: -15, seconds: 8, opacity: 1 },
@@ -92,9 +99,9 @@ const FloatingPaths = memo(function FloatingPaths({ position }: { position: numb
       >
         <defs>
           <linearGradient id="mcPathGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-            <stop offset="0%" stopColor="rgba(91, 131, 251, 0.55)" />
-            <stop offset="50%" stopColor="rgba(69, 205, 214, 0.5)" />
-            <stop offset="100%" stopColor="rgba(255, 145, 89, 0.45)" />
+            <stop offset="0%" stopColor="rgba(91, 131, 251, 0.85)" />
+            <stop offset="50%" stopColor="rgba(69, 205, 214, 0.8)" />
+            <stop offset="100%" stopColor="rgba(255, 145, 89, 0.75)" />
           </linearGradient>
         </defs>
 
