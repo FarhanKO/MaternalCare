@@ -378,15 +378,17 @@ export function Doctor() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setKpi(k.key); }
                     }}
-                    className="relative h-full cursor-pointer overflow-hidden p-5"
+                    className={cn(
+                      'relative h-full cursor-pointer p-5',
+                      k.key === 'high-risk' && 'overflow-hidden',
+                    )}
                   >
                     {/*
-                      The drifting beams from the symptom logger. Six per card
-                      rather than the logger's twelve: there are four of these
-                      on screen at once, each its own canvas, on a page that
-                      already runs charts.
+                      The symptom logger's drifting beams, on the high-risk card
+                      alone. It is the one number a clinician should be drawn to
+                      first; putting it behind all four would say nothing.
                     */}
-                    <BeamsBackground intensity="subtle" count={6} />
+                    {k.key === 'high-risk' && <BeamsBackground intensity="subtle" count={6} />}
 
                     <div className="relative flex items-center justify-between">
                       <span className="grid h-10 w-10 place-items-center rounded-2xl" style={{ background: `${k.tint}1f`, color: k.tint }}>
