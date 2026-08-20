@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Award, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock,
-  Hourglass, Info, MapPin, SearchX, Send, ShieldQuestion, Star, Stethoscope, Users, X, XCircle,
+  Hourglass, Info, MapPin, SearchX, Send, ShieldQuestion, Sparkles, Star, Stethoscope,
+  Users, X, XCircle,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -403,27 +404,45 @@ export function FindDoctorSection({ stage }: Props) {
         </div>
       </Reveal>
 
-      {/* the paid route out of the queue — the request flow below stays free */}
+      {/*
+        The paid route out of the queue — the request flow below stays free.
+
+        Two doors, not two products: Book now picks the clinician herself,
+        Auto Assign has the ranking pick three for her. Both land in the same
+        slot-and-payment flow, so the card is no longer one big link.
+      */}
       <Reveal>
-        <Link to="/appoint" className="block">
-          <GlassCard interactive className="group overflow-hidden p-0">
-            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-5">
-              <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow">
-                <CalendarPlus className="h-[22px] w-[22px]" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-extrabold text-ink">Appoint a doctor</div>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
-                  Skip the queue — pay the consultation fee and your slot is confirmed straight
-                  away, with no one to wait on.
-                </p>
-              </div>
-              <span className="flex flex-none items-center gap-1.5 rounded-2xl bg-brand-500 px-4 py-2.5 text-[12px] font-bold text-white transition group-hover:bg-brand-600">
-                Book now <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </span>
+        <GlassCard className="overflow-hidden p-0">
+          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-5">
+            <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow">
+              <CalendarPlus className="h-[22px] w-[22px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-extrabold text-ink">Appoint a doctor</div>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
+                Skip the queue — pay the consultation fee and your slot is confirmed straight
+                away, with no one to wait on.
+              </p>
             </div>
-          </GlassCard>
-        </Link>
+            <div className="flex flex-none gap-2">
+              <Link
+                to="/appoint"
+                className="group/book flex items-center gap-1.5 rounded-2xl bg-brand-500 px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-brand-600"
+              >
+                Book now
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/book:translate-x-0.5" />
+              </Link>
+              <Link
+                to="/appoint?mode=auto"
+                className="group/auto flex items-center gap-1.5 rounded-2xl px-4 py-2.5 text-[12px] font-bold text-white transition"
+                style={{ background: C.mint }}
+              >
+                <Sparkles className="h-3.5 w-3.5 transition-transform group-hover/auto:rotate-12" />
+                Auto Assign
+              </Link>
+            </div>
+          </div>
+        </GlassCard>
       </Reveal>
 
       <DoctorChat />

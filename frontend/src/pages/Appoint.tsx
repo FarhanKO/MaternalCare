@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarDays, CheckCircle2, Clock,
-  Info, Lock, MapPin, ReceiptText, SearchX, ShieldQuestion, Star, Stethoscope,
+  Info, Lock, MapPin, ReceiptText, SearchX, ShieldQuestion, Star, Stethoscope, Users,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { LiquidButton } from '@/components/ui/LiquidButton';
@@ -14,6 +14,9 @@ import {
   PAY_METHODS, prettyDate, prettyTime, RequestRefused, taka,
   type Appointment, type PayMethod, type RankedDoctor, type SlotOffer,
 } from '@/data/care';
+
+/** Auto Assign's accent — the same mint the green button on her Doctor tab uses. */
+const C = { mint: '#2fbf9b' };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -37,13 +40,33 @@ const REASONS = [
   'Something is worrying me',
 ];
 
-type Step = 'clinician' | 'slot' | 'pay' | 'done';
+type Step = 'finding' | 'clinician' | 'slot' | 'pay' | 'done';
 
 const STEPS: { key: Step; label: string }[] = [
   { key: 'clinician', label: 'Clinician' },
   { key: 'slot', label: 'Time' },
   { key: 'pay', label: 'Payment' },
 ];
+
+/** How many suggestions Auto Assign narrows to. */
+const SUGGEST = 3;
+
+/**
+ * Long enough that the ranking reads as work rather than a flicker, short
+ * enough that it never feels like a stall. The list is usually already here.
+ */
+const FINDING_MS = 1600;
+
+/** What the ranking weighs, in the order the model applies it. */
+const CRITERIA = [
+  'Matching your stage and specialty',
+  'Weighing their qualifications',
+  'Checking how full each list is',
+  'Rating and distance from you',
+];
+
+/** Best first. Says the order out loud without printing "worst" on anyone. */
+const LEVEL = ['Best match', 'Close second', 'Third choice'];
 
 /* ------------------------------------------------------------------ hero */
 
@@ -187,8 +210,10 @@ function Stepper({ step }: { step: Step }) {
 
 /* -------------------------------------------------------- clinician cards */
 
-function ClinicianCard({ doctor, picked, onPick }: {
+function ClinicianCard({ doctor, picked, level, onPick }: {
   doctor: RankedDoctor; picked: boolean; onPick: () => void;
+  /** "Best match" and friends — set only when Auto Assign is ranking them */
+  level?: string;
 }) {
   const initials = doctor.name.replace(/^Dr\.?\s*/i, '').split(' ').map((w) => w[0]).slice(0, 2).join('');
 
@@ -202,6 +227,17 @@ function ClinicianCard({ doctor, picked, onPick }: {
           : 'border-white/60 bg-white/60 hover:bg-white',
       )}
     >
+      {level && (
+        <div className="mb-3 flex items-center gap-2">
+          <span
+            className="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+            style={{ background: C.mint }}
+          >
+            {level}
+          </span>
+          <span className="text-[11px] font-bold text-ink-faint">match {doctor.score}</span>
+        </div>
+      )}
       <div className="flex items-start gap-3">
         <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-extrabold text-white">
           {initials}
@@ -238,7 +274,12 @@ export function Appoint() {
   const [doctors, setDoctors] = useState<RankedDoctor[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'offline'>('loading');
 
-  const [step, setStep] = useState<Step>('clinician');
+  // ?mode=auto is the green button on her Doctor tab: same flow, but the
+  // ranking narrows to three instead of handing her the whole list
+  const [params] = useSearchParams();
+  const auto = params.get('mode') === 'auto';
+
+  const [step, setStep] = useState<Step>(auto ? 'finding' : 'clinician');
   const [doctor, setDoctor] = useState<RankedDoctor | null>(null);
 
   const days = useMemo(() => clinicDays(), []);
@@ -264,6 +305,17 @@ export function Appoint() {
     return () => { cancelled = true; };
   }, []);
 
+  /**
+   * Hold the "finding" screen for its own beat, then move on. It waits for
+   * the list AND the timer, so a slow network extends it rather than showing
+   * an empty result, and a warm cache does not flash it for 40ms.
+   */
+  useEffect(() => {
+    if (step !== 'finding' || state === 'loading') return undefined;
+    const id = window.setTimeout(() => setStep('clinician'), FINDING_MS);
+    return () => window.clearTimeout(id);
+  }, [step, state]);
+
   // free times for whichever clinician and day are currently chosen
   useEffect(() => {
     if (!doctor) return undefined;
@@ -277,6 +329,13 @@ export function Appoint() {
   }, [doctor, date]);
 
   const cheapest = doctors.length ? Math.min(...doctors.map((d) => d.feeBdt)) : null;
+
+  /**
+   * Auto Assign narrows to the top three. The server already ordered them —
+   * tier before score, so a paediatrician never outranks an obstetrician for
+   * an antenatal visit however well they score — so this only slices.
+   */
+  const shortlist = auto ? doctors.slice(0, SUGGEST) : doctors;
 
   const toFlow = useCallback(() => {
     flowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -315,7 +374,52 @@ export function Appoint() {
             </div>
           )}
 
-          {state === 'loading' && (
+          {/* Auto Assign's own waiting screen — it says what it is weighing */}
+          {step === 'finding' && (
+            <motion.div
+              key="finding"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="py-6 text-center"
+            >
+              <div className="relative mx-auto grid h-32 w-32 place-items-center">
+                <span
+                  className="absolute inset-0 animate-ping rounded-full opacity-30 motion-reduce:animate-none"
+                  style={{ background: C.mint }}
+                />
+                <span className="absolute inset-4 rounded-full" style={{ background: `${C.mint}29` }} />
+                <Stethoscope className="relative h-9 w-9" style={{ color: '#1fa383' }} />
+              </div>
+
+              <h2 className="mt-6 text-balance text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+                Finding the most suitable doctor for you…
+              </h2>
+              <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-ink-muted">
+                Ranking every clinician who can take you against your record.
+              </p>
+
+              <div className="mx-auto mt-7 max-w-sm space-y-2 text-left">
+                {CRITERIA.map((c, i) => (
+                  <motion.div
+                    key={c}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.15 + i * 0.28, duration: 0.3 }}
+                    className="flex items-center gap-2.5 rounded-2xl bg-white/60 px-3.5 py-2.5"
+                  >
+                    <CheckCircle2 className="h-4 w-4 flex-none" style={{ color: C.mint }} />
+                    <span className="text-[12px] font-semibold text-ink-soft">{c}</span>
+                  </motion.div>
+                ))}
+              </div>
+
+              <p className="mt-5 text-[11px] font-semibold text-ink-faint">
+                Nothing is booked or charged until you choose.
+              </p>
+            </motion.div>
+          )}
+
+          {step !== 'finding' && state === 'loading' && (
             <div className="rounded-3xl border border-dashed border-ink/15 px-4 py-14 text-center text-sm font-semibold text-ink-faint">
               Checking which clinicians can take you…
             </div>
@@ -364,23 +468,39 @@ export function Appoint() {
                       <Stethoscope className="h-[18px] w-[18px]" />
                     </span>
                     <div>
-                      <div className="text-sm font-bold text-ink">Who would you like to see?</div>
+                      <div className="text-sm font-bold text-ink">
+                        {auto ? 'Three we would suggest' : 'Who would you like to see?'}
+                      </div>
                       <div className="text-[11px] text-ink-muted">
-                        {doctors.length} clinician{doctors.length === 1 ? '' : 's'} can take you, best match first
+                        {auto
+                          ? `In order, best first — out of ${doctors.length} who can take you`
+                          : `${doctors.length} clinician${doctors.length === 1 ? '' : 's'} can take you, best match first`}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-3">
-                    {doctors.map((d) => (
+                    {shortlist.map((d, i) => (
                       <ClinicianCard
                         key={d.id}
                         doctor={d}
                         picked={doctor?.id === d.id}
+                        level={auto ? LEVEL[i] : undefined}
                         onPick={() => { setDoctor(d); setStep('slot'); }}
                       />
                     ))}
                   </div>
+
+                  {/* the shortlist is a suggestion, never a cage */}
+                  {auto && doctors.length > shortlist.length && (
+                    <button
+                      onClick={() => navigate('/appoint')}
+                      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/70 bg-white/60 py-2.5 text-[12px] font-bold text-ink-soft transition hover:bg-white hover:text-ink"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      See all {doctors.length} instead
+                    </button>
+                  )}
                 </motion.div>
               )}
 
