@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: Manrope, system-ui, sans-serif; }
+    a { color: #3f66f0; } a:hover { color: #3352d4; }
+  </style>
+</helmet>
+
+<div style="width: 440px; min-height: 880px; box-sizing: border-box; padding: 24px 20px 32px; background: #f4f7fe; color: #0d1526;">
+
+  <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">Your doctor</h2>
+  <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #6b7590;">
+    Message the doctors looking after you, and request an appointment yourself.
+  </p>
+
+  <!--
+    The card that already ships, untouched: same gradient tile, same copy,
+    same blue Book now pill. The only new thing on this screen is the green
+    button sitting next to it.
+  -->
+  <div style="margin-top: 20px; border-radius: 28px; background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.6); padding: 20px; box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.6), 0 8px 24px -8px rgba(29,54,120,0.16), 0 24px 60px -20px rgba(29,54,120,0.2);">
+
+    <div style="display: flex; align-items: flex-start; gap: 14px;">
+      <span style="display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 16px; background: linear-gradient(140deg, #5b83fb, #3352d4); color: #ffffff; box-shadow: 0 0 0 1px rgba(91,131,251,0.15), 0 12px 40px -8px rgba(91,131,251,0.45);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px;">
+          <rect x="3" y="5" width="18" height="16" rx="3" /><path d="M8 3v4M16 3v4M3 10h18M12 14v4M10 16h4" />
+        </svg>
+      </span>
+      <div style="min-width: 0; flex-grow: 1;">
+        <div style="font-size: 15px; font-weight: 800;">Appoint a doctor</div>
+        <p style="margin: 3px 0 0; font-size: 12px; line-height: 1.55; color: #6b7590;">
+          Skip the queue &#8212; pay the consultation fee and your slot is confirmed straight away,
+          with no one to wait on.
+        </p>
+      </div>
+    </div>
+
+    <!-- the two ways in, side by side -->
+    <div style="margin-top: 16px; display: flex; gap: 10px;">
+      <button style="display: flex; align-items: center; justify-content: center; gap: 7px; flex-grow: 1; min-height: 46px; border: 0; border-radius: 16px; background: #3f66f0; color: #ffffff; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;">
+        Book now
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+      </button>
+
+      <button style="display: flex; align-items: center; justify-content: center; gap: 7px; flex-grow: 1; min-height: 46px; border: 0; border-radius: 16px; background: #2fbf9b; color: #ffffff; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+          <path d="m12 3 2.1 4.9 5.4.5-4.1 3.5 1.2 5.3L12 14.6 7.4 17.2l1.2-5.3-4.1-3.5 5.4-.5Z" />
+        </svg>
+        Auto Assign
+      </button>
+    </div>
+
+    <div style="margin-top: 11px; font-size: 11px; font-weight: 600; line-height: 1.5; color: #9aa3ba;">
+      Book now to choose the clinician yourself. Auto Assign picks the three best matches for you.
+    </div>
+  </div>
+
+  <!-- everything below is the tab as it already is -->
+  <div style="margin-top: 22px; display: flex; align-items: center; gap: 8px;">
+    <div style="font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa3ba;">Already looking after you</div>
+    <div style="height: 1px; flex-grow: 1; background: rgba(13,21,38,0.08);"></div>
+  </div>
+
+  <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 11px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.6); padding: 12px 14px;">
+      <span style="display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 14px; background: linear-gradient(140deg, #3f66f0, #8b7bf3); color: #ffffff; font-size: 13px; font-weight: 800;">LO</span>
+      <div style="min-width: 0; flex-grow: 1;">
+        <div style="font-size: 13px; font-weight: 800;">Dr. Lena Ortiz</div>
+        <div style="font-size: 11.5px; font-weight: 600; color: #6b7590;">Obstetrics &amp; Maternal Medicine</div>
+      </div>
+      <span style="display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #f2789f; color: #ffffff; font-size: 10.5px; font-weight: 800;">1</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 11px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.6); padding: 12px 14px;">
+      <span style="display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 14px; background: linear-gradient(140deg, #3f66f0, #8b7bf3); color: #ffffff; font-size: 13px; font-weight: 800;">KH</span>
+      <div style="min-width: 0; flex-grow: 1;">
+        <div style="font-size: 13px; font-weight: 800;">Dr. Kamal Hossain</div>
+        <div style="font-size: 11.5px; font-weight: 600; color: #6b7590;">Paediatrics</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

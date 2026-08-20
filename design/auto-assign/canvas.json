@@ -1,0 +1,33 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "1 · Doctor tab", "x": 0, "y": 0, "w": 440, "h": 900 },
+    { "file": "Finding.dc.html", "title": "2 · Finding", "x": 520, "y": 0, "w": 440, "h": 900 },
+    { "file": "Ranked.dc.html", "title": "3 · All five, ranked", "x": 1040, "y": 0, "w": 440, "h": 900 },
+    { "file": "Choice.dc.html", "title": "4 · The three", "x": 1560, "y": 0, "w": 440, "h": 1000 },
+    { "file": "Payment.dc.html", "title": "5 · Time and payment", "x": 2080, "y": 0, "w": 440, "h": 1000 }
+  ],
+  "annotations": [
+    {
+      "id": "the-clash",
+      "x": 0,
+      "y": -290,
+      "w": 440,
+      "text": "THE CLASH, AND WHAT THIS DOES ABOUT IT\n\nAuto Assign is not a third route. It is a second door on the card that already exists — Book now to choose the clinician yourself, Auto Assign to have the three best picked for you. Same slots, same fee, same confirmation.\n\nThe card is otherwise untouched, and green appears exactly once, on that button. Everything after it is the app's ordinary blue."
+    },
+    {
+      "id": "why-three",
+      "x": 1560,
+      "y": -230,
+      "w": 440,
+      "text": "WHY THESE THREE, AND THE WORDING\n\nRanked by your real doctorModel.recommend() — tier first, then score. Every number here is live: Lena 80, Nusrat 58, Farzana 47, fees ৳1,000 / ৳950 / ৳600.\n\nYou asked for best-to-worst labels. I used \"Best match / Close second / Third choice\" — the order is unmissable without printing \"worst\" next to a named clinician's photograph. Say the word if you want it blunter.\n\nEach card carries a strength AND a trade-off. A set where only the top one has a case made for it is not a choice."
+    },
+    {
+      "id": "auto-slot",
+      "x": 2080,
+      "y": -180,
+      "w": 440,
+      "text": "The earliest free slot is pre-picked — that is what \"auto\" is actually worth here — with Change next to it. Without this the flow would drop her into the same manual day-and-time grid the Appoint page already has, which is the browsing she just chose to skip.\n\nThe pay panel below it is the Appoint page's, unchanged."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

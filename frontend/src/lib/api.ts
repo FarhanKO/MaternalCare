@@ -13,7 +13,7 @@ import {
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
-  ChildState, DailyLogState, Milestone, ServerPost, ServerProfile,
+  ChildState, DailyLogState, Milestone, Pregnancy, ServerPost, ServerProfile,
   Vaccination, VaccinationStats, VitalAlert, VitalReading, WeightGain,
 } from '@/data/records';
 
@@ -50,6 +50,14 @@ export type LifeStage = 'pregnant' | 'new-mother' | 'parent' | 'planning' | 'gen
 export const api = {
   /* the signed-in user */
   getMe: () => request<Envelope<{ user: { name: string; stage: LifeStage } }>>('/me').then((r) => r.data.user),
+
+  /**
+   * Her pregnancy, derived server-side from her LMP. The same endpoint has
+   * always carried this; the client used to throw it away, which is why the
+   * dashboard was quoting a week number written into the markup by hand.
+   */
+  getPregnancy: () =>
+    request<Envelope<{ pregnancy: Pregnancy | null }>>('/me').then((r) => r.data.pregnancy),
 
   setStage: (stage: LifeStage) =>
     request<Envelope<{ stage: LifeStage }>>('/me', {

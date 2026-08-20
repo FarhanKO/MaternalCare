@@ -1,6 +1,8 @@
 export type LifeStage = 'planning' | 'pregnant' | 'new-mother' | 'parent';
 
-export type DiagramKind = 'side-sleep' | 'iron' | 'glucose' | 'latch' | 'tummy-time' | 'cycle' | 'generic';
+export type DiagramKind =
+  | 'side-sleep' | 'iron' | 'glucose' | 'latch' | 'tummy-time' | 'cycle'
+  | 'nausea' | 'scan' | 'movements' | 'generic';
 
 export interface Article {
   id: string;
@@ -11,6 +13,13 @@ export interface Article {
   why: string;
   steps: { label: string; detail: string }[];
   caution?: string;
+  /**
+   * The gestational weeks this is written for, inclusive. Omitted on articles
+   * that hold at any point in the stage — those always stay in the list.
+   */
+  weeks?: [number, number];
+  /** Shown on the card when the week is what put it there. */
+  timing?: string;
 }
 
 /** Picks the generated thumbnail drawn beside each headline. */
@@ -47,7 +56,46 @@ export interface NewsItem {
 
 const PREGNANT: Article[] = [
   {
+    id: 'a-nausea', title: 'Sickness that will not wait for morning', readMins: 3, diagram: 'nausea',
+    weeks: [4, 16], timing: 'Usually eases by 14 weeks',
+    hook: 'It peaks around week 9 and is the one symptom that reliably improves on its own.',
+    why: 'Nausea tracks the hormone hCG, which rises steeply in the first weeks and then falls away — which is why most people turn a corner somewhere between weeks 12 and 16. It is unpleasant rather than dangerous, and it is not a sign anything is wrong. What matters is keeping fluids down.',
+    steps: [
+      { label: 'Eat before you get up', detail: 'Keep dry crackers by the bed. An empty stomach makes it worse, and the dip is deepest overnight.' },
+      { label: 'Small and often beats three meals', detail: 'Something every two hours, even a few bites, keeps blood sugar from swinging.' },
+      { label: 'Sip, do not gulp', detail: 'Large drinks fill the stomach and come back. Small mouthfuls through the day add up to more.' },
+      { label: 'Ginger genuinely helps some people', detail: 'Tea, biscuits or capsules — worth trying before anything stronger.' },
+    ],
+    caution: 'If you cannot keep fluids down for a day, are losing weight, or your urine is dark and scant, that is hyperemesis and it needs treating — go to your clinic rather than waiting it out.',
+  },
+  {
+    id: 'a-scan', title: 'What the dating scan actually checks', readMins: 3, diagram: 'scan',
+    weeks: [8, 16], timing: 'Offered at 11–14 weeks',
+    hook: 'It is the measurement that fixes your due date — and every date after it is counted from this one.',
+    why: 'Cycle length varies, so the date worked out from your last period can be off by a week or more. The scan measures the baby crown to rump, which is remarkably consistent between pregnancies at this stage, and the due date is reset to that. It also confirms how many babies there are and where the placenta has settled.',
+    steps: [
+      { label: 'Come with a full bladder', detail: 'It lifts the uterus into view. Your clinic will say how much to drink and when.' },
+      { label: 'Expect the date to move', detail: 'A shift of a few days either way is normal and is not a sign of a problem.' },
+      { label: 'Nuchal translucency is optional', detail: 'A screening measurement at the back of the neck, usually offered alongside a blood test. You can decline it.' },
+      { label: 'Ask for the report, not just the photo', detail: 'The measurements go in your notes and are what later scans are compared against.' },
+    ],
+  },
+  {
+    id: 'a-movements', title: 'Counting movements, and what actually matters', readMins: 3, diagram: 'movements',
+    weeks: [24, 42], timing: 'From 24 weeks',
+    hook: 'There is no magic number. What matters is your baby’s own pattern, and a change to it.',
+    why: 'Advice used to be "ten kicks a day", and it was dropped because it is not what the evidence supports. Babies establish an individual rhythm by around 24 to 28 weeks. A reduction in that rhythm can be the earliest sign the placenta is not working as well as it should, which is why it is the one thing worth calling about the same day.',
+    steps: [
+      { label: 'Learn the pattern, not a target', detail: 'Notice when your baby is usually busy. For most people it is evening and after meals.' },
+      { label: 'Lie on your side to check', detail: 'If you are unsure, lie down on your left and focus for a while. Movements are easier to feel than to see.' },
+      { label: 'Do not use cold drinks or sugar to provoke a kick', detail: 'It does not reliably work, and it delays the call that does.' },
+      { label: 'Call the same day, every time', detail: 'Never wait until morning, and never feel it is a fuss. Repeated checks are expected and welcomed.' },
+    ],
+    caution: 'Reduced movement is always worth a same-day call to your maternity unit — no matter how many times you have already rung.',
+  },
+  {
     id: 'a-sleep', title: 'Sleeping safely in the third trimester', readMins: 3, diagram: 'side-sleep',
+    weeks: [26, 42], timing: 'From 28 weeks',
     hook: 'From 28 weeks, the position you fall asleep in matters more than any other habit you can change tonight.',
     why: 'Lying flat on your back lets the weight of the uterus press on the vena cava, the large vein returning blood to your heart. That reduces blood flow to the placenta. Large studies link going to sleep on your back after 28 weeks with a higher stillbirth risk — and it is one of the few risks you can change for free, tonight.',
     steps: [
@@ -60,6 +108,7 @@ const PREGNANT: Article[] = [
   },
   {
     id: 'a-iron', title: 'Iron, and why it peaks from here', readMins: 4, diagram: 'iron',
+    weeks: [16, 42], timing: 'Second half',
     hook: 'Your baby stockpiles enough iron in the final weeks to last their first six months of life.',
     why: 'Blood volume rises by almost half during pregnancy, so the same iron is spread thinner. At the same time your baby is drawing iron across the placenta to build their own stores. Low iron is easy to miss because the symptoms — tiredness, breathlessness, feeling cold — look like ordinary pregnancy.',
     steps: [
@@ -72,6 +121,7 @@ const PREGNANT: Article[] = [
   },
   {
     id: 'a-glucose', title: 'Understanding your glucose screening', readMins: 3, diagram: 'glucose',
+    weeks: [22, 30], timing: 'Offered at 24–28 weeks',
     hook: 'It is offered between 24 and 28 weeks, and a raised result is common, manageable and not your fault.',
     why: 'Pregnancy hormones make your body less responsive to insulin so more sugar reaches the baby. For most people the pancreas compensates. When it cannot, blood sugar rises — gestational diabetes. Untreated it can grow the baby larger than is safe for birth, so it is screened for routinely.',
     steps: [
@@ -137,17 +187,52 @@ const PARENT: Article[] = [
   },
 ];
 
+/** How far outside its window an article sits, in weeks. 0 = in range. */
+function weeksAway(article: Article, week: number): number {
+  if (!article.weeks) return 0;
+  const [from, to] = article.weeks;
+  if (week < from) return from - week;
+  if (week > to) return week - to;
+  return 0;
+}
+
+/**
+ * The reading list for where she actually is.
+ *
+ * This used to take `week` and spend it only on the heading — the article
+ * list was the same constant at week 6 and week 40, under a title promising
+ * otherwise. Now the week selects: articles written for this week come first,
+ * ordered by how squarely they land on it.
+ *
+ * Nothing in range is not an empty screen. The nearest articles are shown
+ * instead, so the very first weeks — before anything is really due — still
+ * have something to read.
+ */
 export function readingFor(stage: LifeStage, week: number): { heading: string; sub: string; items: Article[] } {
-  switch (stage) {
-    case 'new-mother':
-      return { heading: `Reading for baby week ${week}`, sub: 'Written for these first weeks', items: NEW_MOTHER };
-    case 'planning':
-      return { heading: 'Reading for planning', sub: 'Before you start trying', items: PLANNING };
-    case 'parent':
-      return { heading: 'Reading for early childhood', sub: 'Toddler years', items: PARENT };
-    default:
-      return { heading: `Reading for week ${week}`, sub: 'Matched to where you are now', items: PREGNANT };
+  if (stage === 'planning') {
+    return { heading: 'Reading for planning', sub: 'Before you start trying', items: PLANNING };
   }
+  if (stage === 'parent') {
+    return { heading: 'Reading for early childhood', sub: 'Toddler years', items: PARENT };
+  }
+  if (stage === 'new-mother') {
+    return { heading: `Reading for baby week ${week}`, sub: 'Written for these first weeks', items: NEW_MOTHER };
+  }
+
+  const ranked = PREGNANT
+    .map((article, order) => ({ article, away: weeksAway(article, week), order }))
+    .sort((a, b) => a.away - b.away || a.order - b.order);
+
+  const inRange = ranked.filter((r) => r.away === 0);
+  const chosen = inRange.length > 0 ? inRange : ranked.slice(0, 2);
+
+  return {
+    heading: `Reading for week ${week}`,
+    sub: inRange.length > 0
+      ? 'Written for the week you are in'
+      : 'Nothing is due yet — here is what comes first',
+    items: chosen.map((r) => r.article),
+  };
 }
 
 /* --------------------------------------------------------------------- news */

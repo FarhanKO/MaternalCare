@@ -138,6 +138,25 @@ export interface VaccinationStats {
 /* -------------------------------------------------------- weight gain */
 
 /** Why booking records a pre-pregnancy weight and a height. */
+/**
+ * Her pregnancy as the server derives it from her LMP — the single source of
+ * "what week is she in". Every screen that mentions a week reads this rather
+ * than carrying its own number.
+ */
+export interface Pregnancy {
+  lmp: string;
+  week: number;
+  dayOfWeek: number;
+  trimester: number;
+  /** 0–100, how far through the 40 weeks */
+  progress: number;
+  daysLeft: number;
+  edd: string;
+  eddPretty: string;
+  babySize: { fruit: string; length: string; weight: string; emoji: string };
+  weekNote: string;
+}
+
 /** One logged set of measurements. Every field but the date is optional. */
 export interface VitalReading {
   id: string;

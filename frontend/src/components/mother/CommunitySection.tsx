@@ -704,7 +704,16 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12px] font-bold text-ink-soft group-hover:text-ink">{a.title}</span>
-                      <span className="text-[10px] font-semibold text-ink-faint">{a.readMins} min read</span>
+                      <span className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-semibold text-ink-faint">
+                        {a.readMins} min read
+                        {/* why the week put this here, when the week is the reason */}
+                        {a.timing && (
+                          <>
+                            <span aria-hidden>&middot;</span>
+                            <span className="text-brand-600">{a.timing}</span>
+                          </>
+                        )}
+                      </span>
                     </span>
                     <ChevronRight className="h-4 w-4 flex-none text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
                   </button>

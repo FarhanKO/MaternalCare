@@ -32,7 +32,8 @@ export function waterStatus(l: number): { tone: Tone; text: string } {
 export function kickStatus(n: number): { tone: Tone; text: string } {
   if (n === 0) return { tone: 'danger', text: 'No movements logged. If you feel none in 2 hours, contact your care team.' };
   if (n < 10) return { tone: 'warn', text: `${n} so far — below the usual daily pattern. Rest on your left side and recount.` };
-  if (n <= 15) return { tone: 'info', text: `${n} kicks — right in the normal range for week 26.` };
+  // deliberately no target number: what matters is her baby's own pattern
+  if (n <= 15) return { tone: 'info', text: `${n} kicks — in line with a usual day. Watch for a change in the pattern, not a count.` };
   return { tone: 'good', text: `${n} kicks — baby is active and responsive today.` };
 }
 
@@ -156,7 +157,7 @@ export function buildForecast(week: number, dueLabel = 'Apr 2'): Forecast {
   const wk = (n: number) => (n === 0 ? 'this week' : n === 1 ? 'in 1 week' : `in ${n} weeks`);
 
   const predictions: Prediction[] = [
-    { label: 'Estimated birth weight', value: '3.1 – 3.6 kg', note: 'Projected from your growth curve — most babies triple their current weight from week 26.' },
+    { label: 'Estimated birth weight', value: '3.1 – 3.6 kg', note: `Projected from your growth curve — most babies roughly triple their current weight between week ${week} and birth.` },
     { label: 'Third trimester', value: wk(toThird), note: `Week 28 — from then, movement patterns matter more than counts.` },
     { label: 'Full term', value: wk(toTerm), note: `Week 37. Due ${dueLabel} — only about 1 in 20 babies arrive on the exact date.` },
   ];
@@ -290,7 +291,7 @@ export function buildReport({
 
   /* --- effect on baby --- */
   const baby: Insight[] = [];
-  if (movementScore >= 65) baby.push({ tone: 'good', title: 'Healthy activity pattern', detail: `${kicks} movements is consistent with a well-oxygenated, responsive baby at week 26.` });
+  if (movementScore >= 65) baby.push({ tone: 'good', title: 'Healthy activity pattern', detail: `${kicks} movements is consistent with a well-oxygenated, responsive baby.` });
   else baby.push({ tone: kicks === 0 ? 'danger' : 'warn', title: 'Movement below pattern', detail: 'Fetal movement is the clearest day-to-day signal of wellbeing. If reduced, seek review the same day.' });
 
   if (hydrationScore < 60) baby.push({ tone: 'warn', title: 'Amniotic fluid depends on your intake', detail: 'Maternal dehydration can lower amniotic fluid volume, which babies need for cushioning and lung development.' });

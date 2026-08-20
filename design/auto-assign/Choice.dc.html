@@ -1,0 +1,236 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: Manrope, system-ui, sans-serif; }
+    a { color: #3f66f0; } a:hover { color: #3352d4; }
+  </style>
+</helmet>
+
+<div style="width: 440px; min-height: 980px; box-sizing: border-box; padding: 24px 20px 32px; background: #f4f7fe; color: #0d1526;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #3352d4;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+        <path d="m12 3 2.1 4.9 5.4.5-4.1 3.5 1.2 5.3L12 14.6 7.4 17.2l1.2-5.3-4.1-3.5 5.4-.5Z" />
+      </svg>
+      Auto Assign
+    </div>
+    <button style="display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 14px; background: rgba(255,255,255,0.7); color: #6b7590; cursor: pointer;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 17px; height: 17px;"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <h1 style="margin: 18px 0 0; font-size: 21px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25;">
+    Three we would suggest
+  </h1>
+  <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: #6b7590; text-wrap: pretty;">
+    In order, best first. They differ in more than rank &#8212; the trade&#8209;off is written on each one.
+  </p>
+
+  <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 12px;">
+    <sc-for list="{{ doctors }}" as="d" hint-placeholder-count="3">
+      <div style="{{ d.cardStyle }}" onClick="{{ d.pick }}">
+
+        <!-- rank ribbon -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="{{ d.badgeStyle }}">{{ d.level }}</span>
+          <span style="font-size: 11px; font-weight: 700; color: #9aa3ba;">match {{ d.score }}</span>
+          <span style="flex-grow: 1;"></span>
+          <span style="{{ d.tickStyle }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;"><path d="m5 13 4 4L19 7" /></svg>
+          </span>
+        </div>
+
+        <!-- identity -->
+        <div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 12px;">
+          <span style="display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 16px; background: linear-gradient(140deg, #3f66f0, #8b7bf3); color: #ffffff; font-size: 14px; font-weight: 800;">{{ d.initials }}</span>
+          <div style="min-width: 0; flex-grow: 1;">
+            <div style="font-size: 15px; font-weight: 800; letter-spacing: -0.01em;">{{ d.name }}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #6b7590;">{{ d.specialty }}</div>
+            <div style="font-size: 11.5px; font-weight: 600; color: #9aa3ba;">{{ d.hospital }}</div>
+          </div>
+          <div style="flex: none; text-align: right;">
+            <div style="font-size: 19px; font-weight: 800; letter-spacing: -0.02em;">{{ d.fee }}</div>
+            <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #9aa3ba;">per visit</div>
+          </div>
+        </div>
+
+        <!-- the facts the ranking used -->
+        <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+          <span style="display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: rgba(13,21,38,0.05); padding: 4px 9px; font-size: 11px; font-weight: 700; color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px;"><circle cx="12" cy="8" r="5" /><path d="M8.5 12.5 7 22l5-3 5 3-1.5-9.5" /></svg>
+            {{ d.qualification }}
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: rgba(13,21,38,0.05); padding: 4px 9px; font-size: 11px; font-weight: 700; color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px;"><path d="m12 3 2.6 5.6 5.9.7-4.4 4 1.2 5.9L12 16.3 6.7 19.2l1.2-5.9-4.4-4 5.9-.7Z" /></svg>
+            {{ d.rating }}
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: rgba(13,21,38,0.05); padding: 4px 9px; font-size: 11px; font-weight: 700; color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="2.6" /></svg>
+            {{ d.distance }}
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: rgba(13,21,38,0.05); padding: 4px 9px; font-size: 11px; font-weight: 700; color: #3d4763;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px;"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="3.5" /><path d="M21 20v-2a4 4 0 0 0-3-3.8" /></svg>
+            {{ d.room }}
+          </span>
+        </div>
+
+        <!-- why it ranks here, and what it costs you -->
+        <div style="margin-top: 12px; border-radius: 14px; background: rgba(255,255,255,0.65); padding: 10px 12px;">
+          <div style="display: flex; gap: 7px; font-size: 11.5px; font-weight: 700; line-height: 1.5; color: #3352d4;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px; flex: none; margin-top: 2px;"><path d="m5 13 4 4L19 7" /></svg>
+            <span>{{ d.strength }}</span>
+          </div>
+          <div style="margin-top: 6px; display: flex; gap: 7px; font-size: 11.5px; font-weight: 600; line-height: 1.5; color: #6b7590;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px; flex: none; margin-top: 2px;"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+            <span>{{ d.tradeoff }}</span>
+          </div>
+        </div>
+
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- sticky-feeling footer action -->
+  <div style="margin-top: 20px; border-radius: 22px; background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.6); padding: 14px 16px; box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.6), 0 8px 24px -8px rgba(29,54,120,0.16);">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+      <span style="font-size: 12px; font-weight: 700; color: #6b7590;">{{ chosenName }}</span>
+      <span style="font-size: 17px; font-weight: 800; letter-spacing: -0.02em;">{{ chosenFee }}</span>
+    </div>
+    <button style="margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; border: 0; border-radius: 18px; background: linear-gradient(135deg, #5b83fb 0%, #3352d4 100%); color: #ffffff; font-family: inherit; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 26px -10px rgba(63,102,240,0.55);">
+      Choose a time and pay
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 17px; height: 17px;"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+    </button>
+    <div style="margin-top: 9px; text-align: center; font-size: 11px; font-weight: 600; color: #9aa3ba;">
+      Nothing is charged until you confirm.
+    </div>
+  </div>
+
+  <button style="margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 44px; border: 0; border-radius: 14px; background: transparent; color: #6b7590; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 15px; height: 15px;"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
+    See all five again
+  </button>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+const CARD_BASE =
+  'border-radius: 22px; padding: 16px; cursor: pointer;'
+  + ' transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;';
+
+const BADGE_BASE =
+  'display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px;'
+  + ' font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;';
+
+const TICK_BASE =
+  'display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px;';
+
+/**
+ * The three the ranking picked, with the numbers it actually used. Ordered
+ * best first; each carries the reason it ranks there AND the thing it costs
+ * you, because a list where only the top one has a case made for it is not
+ * a choice.
+ */
+const SUGGESTED = [
+  {
+    id: 'lena',
+    level: 'Best match',
+    score: 80,
+    initials: 'LO',
+    name: 'Dr. Lena Ortiz',
+    specialty: 'Obstetrics & Maternal Medicine',
+    hospital: 'MaternalCare+ Clinic · Room 204',
+    fee: '৳1,000',
+    qualification: 'MRCOG, MD',
+    rating: '4.9',
+    distance: '0.8 km',
+    room: '7 places left',
+    strength: 'Highest maternal-medicine qualification of anyone free, and the closest to you.',
+    tradeoff: 'The dearest of the three, and one person is already waiting.',
+    accent: '#5b83fb',
+  },
+  {
+    id: 'nusrat',
+    level: 'Close second',
+    score: 58,
+    initials: 'NK',
+    name: 'Dr. Nusrat Kabir',
+    specialty: 'Obstetrics & Gynaecology',
+    hospital: 'City Maternity Hospital',
+    fee: '৳950',
+    qualification: 'FCPS',
+    rating: '4.9',
+    distance: '1.2 km',
+    room: '2 places left',
+    strength: 'Equally senior and equally well rated, with nobody ahead of you in the queue.',
+    tradeoff: 'Her list is 93% full, so later weeks may be hard to book.',
+    accent: '#3f66f0',
+  },
+  {
+    id: 'farzana',
+    level: 'Third choice',
+    score: 47,
+    initials: 'FK',
+    name: 'Dr. Farzana Karim',
+    specialty: 'Obstetrics & Gynaecology',
+    hospital: 'Popular Diagnostic Centre',
+    fee: '৳600',
+    qualification: 'DGO',
+    rating: '4.5',
+    distance: '4.2 km',
+    room: '21 places left',
+    strength: 'Barely half booked and the cheapest by ৳350 — easiest to see again and again.',
+    tradeoff: 'Less senior than the other two, and the furthest to travel.',
+    accent: '#8b7bf3',
+  },
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: 'lena' };
+  }
+
+  renderVals() {
+    const picked = this.state.picked;
+
+    const doctors = SUGGESTED.map((d) => {
+      const on = d.id === picked;
+      return Object.assign({}, d, {
+        pick: () => this.setState({ picked: d.id }),
+        cardStyle: CARD_BASE
+          + (on
+            ? ` border: 2px solid ${d.accent}; background: rgba(255,255,255,0.9);`
+              + ` box-shadow: 0 12px 30px -12px ${d.accent}99;`
+            : ' border: 2px solid rgba(255,255,255,0.7); background: rgba(255,255,255,0.5);'),
+        badgeStyle: BADGE_BASE
+          + (on
+            ? ` background: ${d.accent}; color: #ffffff;`
+            : ` background: ${d.accent}1f; color: ${d.accent};`),
+        tickStyle: TICK_BASE
+          + (on
+            ? ` background: ${d.accent}; color: #ffffff;`
+            : ' background: rgba(13,21,38,0.06); color: rgba(13,21,38,0.18);'),
+      });
+    });
+
+    const chosen = doctors.find((d) => d.id === picked) || doctors[0];
+
+    return {
+      doctors,
+      chosenName: chosen.name,
+      chosenFee: chosen.fee,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -25,6 +25,7 @@ import { WeightGainCard } from '@/components/mother/WeightGainCard';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useVitalSeries } from '@/hooks/useVitalSeries';
+import { usePregnancy } from '@/hooks/usePregnancy';
 import { useProfile } from '@/context/ProfileContext';
 import { INTENSITY_LABEL, URGENT_LABELS, type Symptom } from '@/data/symptoms';
 import { countdown, formatTime, KIND_COLOR, upcoming } from '@/data/reminders';
@@ -72,7 +73,7 @@ const MOODS = [
   { name: 'Calm', face: '😌', note: 'Calm and rested. Keep that gentle rhythm.', tint: '#3f66f0' },
   { name: 'Loved', face: '🥰', note: 'Feeling supported makes a real difference.', tint: '#f2789f' },
   { name: 'Neutral', face: '🙂', note: 'A steady, ordinary day — that’s perfectly fine.', tint: '#8b7bf3' },
-  { name: 'Tired', face: '😴', note: 'Rest when you can — week 26 fatigue is normal.', tint: '#22b8c4' },
+  { name: 'Tired', face: '😴', note: 'Rest when you can — fatigue is normal at every stage.', tint: '#22b8c4' },
   { name: 'Anxiety', face: '😰', note: 'Try slow breathing. Your care team is one tap away.', tint: '#fb7534' },
   { name: 'Sad', face: '😢', note: 'Be gentle with yourself. Talk to someone you trust.', tint: '#5b83fb' },
   { name: 'Stress', face: '😣', note: 'Pause and stretch. Tell your doctor if it persists.', tint: '#e5484d' },
@@ -406,6 +407,9 @@ function CounterCard({
   );
 }
 
+/** "an avocado", "a banana" — the size comparison reads as a phrase, not a label. */
+const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+
 /* ---------------- the wide pregnancy arc (spans the full card) ---------------- */
 const MILESTONES = [
   { wk: 8, label: 'Heartbeat' },
@@ -587,6 +591,10 @@ export function Mother() {
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
   // the trend charts, built from her stored readings rather than fixtures
   const vitals = useVitalSeries();
+  // one source for "what week is she in" — every mention below reads this
+  const { pregnancy } = usePregnancy();
+  const week = pregnancy?.week ?? 0;
+  const weeksToGo = pregnancy ? Math.max(0, Math.round(pregnancy.daysLeft / 7)) : 0;
 
   /** Her logged moods as a share of the days she logged one, biggest first. */
   const moodSlices = useMemo(() => {
@@ -607,7 +615,7 @@ export function Mother() {
   const moodName = MOODS[moodIdx].name;
   const report = buildReport({ water, kicks, moodName, symptoms, sleepAvg: 7.5 });
   const advice = buildAdvice(symptoms);
-  const forecast = buildForecast(26, 'Apr 2');
+  const forecast = buildForecast(week, pregnancy?.eddPretty ?? 'your due date');
 
   // greeting follows the viewer's own local clock, refreshed each minute
   const [now, setNow] = useState(() => new Date());
@@ -726,7 +734,7 @@ export function Mother() {
 
               {/* the wide pregnancy arc — spans the full card */}
               <div className="mt-6">
-                <PregnancyArc week={26} total={40} />
+                <PregnancyArc week={week} total={40} />
               </div>
 
               {/* facts */}
@@ -1014,7 +1022,7 @@ export function Mother() {
                   <Lightbulb className="h-[18px] w-[18px]" />
                 </span>
                 <div>
-                  <div className="text-sm font-bold text-ink">Good to know at week 26</div>
+                  <div className="text-sm font-bold text-ink">Good to know at week {week}</div>
                   <div className="text-xs text-ink-muted">Guidance for the stage you’re entering — not from what you logged.</div>
                 </div>
               </div>
@@ -1031,7 +1039,7 @@ export function Mother() {
 
           <Reveal>
             <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-              Projections are population estimates for week 26, not predictions about your individual pregnancy.
+              Projections are population estimates for week {week}, not predictions about your individual pregnancy.
               These insights support conversations with your care team — they are not a medical diagnosis.
             </p>
           </Reveal>
@@ -1191,27 +1199,41 @@ export function Mother() {
           <Reveal className="lg:col-span-2">
             <GlassCard className="flex h-full flex-col gap-6 p-6 sm:flex-row sm:items-center sm:p-8">
               <div className="flex flex-none flex-col items-center">
-                <ProgressRing value={65} size={148} label="65%" sublabel="Week 26 / 40" />
+                <ProgressRing
+                  value={pregnancy?.progress ?? 0}
+                  size={148}
+                  label={`${pregnancy?.progress ?? 0}%`}
+                  sublabel={`Week ${week} / 40`}
+                />
                 <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-[11px] font-bold text-brand-600">
-                  <Baby className="h-3.5 w-3.5" /> 14 weeks to go
+                  <Baby className="h-3.5 w-3.5" /> {weeksToGo} weeks to go
                 </span>
               </div>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Baby development · this week</span>
                 <h3 className="mt-2 text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
-                  Your baby is <span className="font-serif italic text-brand-600">listening</span>
+                  About the size of{' '}
+                  <span className="font-serif italic text-brand-600">
+                    {pregnancy ? `${article(pregnancy.babySize.fruit)} ${pregnancy.babySize.fruit.toLowerCase()}` : 'a growing baby'}
+                  </span>
                 </h3>
+                {/*
+                  Measurements and the note both come from her record. The three
+                  chips that used to sit here asserted week-26 milestones
+                  ("Eyes opening") on every week of the pregnancy, so they are
+                  gone until there is per-week data behind them.
+                */}
                 <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                  At 26 weeks your baby is about <b>35.6 cm</b> and <b>760 g</b>. Their hearing is sharpening —
-                  they can now recognise your voice and may startle at loud sounds. The eyes are beginning to
-                  open, and the lungs are practising breathing movements.
+                  At {week} weeks your baby is about <b>{pregnancy?.babySize.length}</b> and{' '}
+                  <b>{pregnancy?.babySize.weight}</b>. {pregnancy?.weekNote}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {['Hearing develops', 'Eyes opening', 'Lungs maturing'].map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/60 px-3 py-1 text-xs font-semibold text-ink-soft">
-                      <Check className="h-3.5 w-3.5 text-brand-500" /> {t}
-                    </span>
-                  ))}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/60 px-3 py-1 text-xs font-semibold text-ink-soft">
+                    <Check className="h-3.5 w-3.5 text-brand-500" /> Trimester {pregnancy?.trimester}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/60 px-3 py-1 text-xs font-semibold text-ink-soft">
+                    <Check className="h-3.5 w-3.5 text-brand-500" /> Due {pregnancy?.eddPretty}
+                  </span>
                 </div>
               </div>
             </GlassCard>
@@ -1447,7 +1469,7 @@ export function Mother() {
         <motion.div key="tab-community" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
           <CommunitySection
-            week={26}
+            week={week}
             stage={communityStage}
             symptoms={symptoms.map((s) => s.name)}
             lowHydration={water < WATER_GOAL}
