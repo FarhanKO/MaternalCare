@@ -215,6 +215,33 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   }
   const answered = await appointmentModel.respond(req.id, 'accepted', 'See reception first');
   check('appointmentModel.respond', answered.status === 'accepted', answered.note);
+
+  // paid booking: confirmed on the spot, priced from the clinician
+  const lenaDoc = await doctorModel.find(lenaId);
+  const paid = await appointmentModel.bookPaid(me.id, lenaId, {
+    date: tISO, time: '14:40', reason: '__probe__', method: 'bkash',
+  });
+  check('appointmentModel.bookPaid confirms outright',
+    paid.status === 'accepted' && paid.queuePosition === 0, `${paid.status}`);
+  check('  fee comes from the clinician, not the caller',
+    paid.payment.feeBdt === lenaDoc.feeBdt, `৳${paid.payment.feeBdt}`);
+  check('  reference issued', /^MC-[0-9A-F]{8}$/.test(paid.payment.reference), paid.payment.reference);
+  check('  the slot is now taken',
+    !(await appointmentModel.freeSlots(lenaId, tISO)).includes('14:40'));
+  try {
+    await appointmentModel.bookPaid(me.id, lenaId, { date: tISO, time: '15:20', method: 'cash' });
+    bad('  unknown payment method refused');
+  } catch (e) {
+    check('  unknown payment method refused', /how you want to pay/.test(e.message), e.message);
+  }
+  try {
+    await appointmentModel.bookPaid(me.id, lenaId, { date: tISO, time: '14:40', method: 'card' });
+    bad('  double-booking the same slot refused');
+  } catch (e) {
+    check('  double-booking the same slot refused', e.code === 'SLOT_TAKEN',
+      `${e.alternatives.length} alternatives offered`);
+  }
+
   await db.run('DELETE FROM appointments WHERE reason = $1', ['__probe__']);
 
   console.log('\n  --- SOS ---');

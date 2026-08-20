@@ -10,14 +10,19 @@ const vaccinationModel = require('../../models/vaccinationModel');
 const userModel = require('../../models/userModel');
 
 /** Everything the child section needs, in one round trip. */
-exports.show = (req, res) => {
-  const user = userModel.current();
-  const child = childModel.forUser(user.id);
+exports.show = async (req, res, next) => {
+  try {
+  const user = await userModel.current();
+  const child = await childModel.forUser(user.id);
   if (!child) return res.json({ data: null });
 
-  const growth = childModel.growth(child.id);
+  const [growth, percentile, milestones] = await Promise.all([
+    childModel.growth(child.id),
+    childModel.percentileSummary(child.id),
+    childModel.milestones(child.id),
+  ]);
 
-  res.json({
+  return res.json({
     data: {
       child: {
         id: String(child.id),
@@ -35,9 +40,9 @@ exports.show = (req, res) => {
         heightCm: g.height_cm,
         headCm: g.head_cm,
       })),
-      percentile: childModel.percentileSummary(child.id),
+      percentile,
       reference: childModel.WHO_WEIGHT_GIRLS,
-      milestones: childModel.milestones(child.id).map((m) => ({
+      milestones: milestones.map((m) => ({
         id: String(m.id),
         title: m.title,
         typical: m.typical,
@@ -47,19 +52,22 @@ exports.show = (req, res) => {
       })),
     },
   });
+  } catch (err) { return next(err); }
 };
 
-exports.toggleMilestone = (req, res) => {
-  const user = userModel.current();
-  const child = childModel.forUser(user.id);
+exports.toggleMilestone = async (req, res, next) => {
+  try {
+  const user = await userModel.current();
+  const child = await childModel.forUser(user.id);
   if (!child) return res.status(404).json({ error: 'No child on this account' });
 
-  const owned = childModel.milestones(child.id).some((m) => String(m.id) === String(req.params.id));
+  const owned = (await childModel.milestones(child.id))
+    .some((m) => String(m.id) === String(req.params.id));
   if (!owned) return res.status(404).json({ error: 'Milestone not found' });
 
-  childModel.toggleMilestone(req.params.id);
-  res.json({
-    data: childModel.milestones(child.id).map((m) => ({
+  await childModel.toggleMilestone(req.params.id);
+  return res.json({
+    data: (await childModel.milestones(child.id)).map((m) => ({
       id: String(m.id),
       title: m.title,
       typical: m.typical,
@@ -68,25 +76,28 @@ exports.toggleMilestone = (req, res) => {
       achievedOn: m.achieved_on || undefined,
     })),
   });
+  } catch (err) { return next(err); }
 };
 
-exports.addGrowth = (req, res) => {
-  const user = userModel.current();
-  const child = childModel.forUser(user.id);
+exports.addGrowth = async (req, res, next) => {
+  try {
+  const user = await userModel.current();
+  const child = await childModel.forUser(user.id);
   if (!child) return res.status(404).json({ error: 'No child on this account' });
 
   const { date, ageMonths, weightKg, heightCm, headCm } = req.body || {};
   if (!date || !Number.isFinite(Number(weightKg))) {
     return res.status(400).json({ error: 'A date and a weight are required' });
   }
-  childModel.addGrowth(child.id, {
+  await childModel.addGrowth(child.id, {
     date,
     age_months: Number(ageMonths) || child.ageMonths,
     weight_kg: Number(weightKg),
     height_cm: heightCm != null ? Number(heightCm) : null,
     head_cm: headCm != null ? Number(headCm) : null,
   });
-  res.status(201).json({ data: childModel.growth(child.id) });
+  return res.status(201).json({ data: await childModel.growth(child.id) });
+  } catch (err) { return next(err); }
 };
 
 /* ------------------------------------------------------- vaccinations */
@@ -101,17 +112,17 @@ const toVax = (v) => ({
   completedOn: v.completed_on || undefined,
 });
 
-exports.vaccinations = (req, res) => {
-  res.json({
-    data: vaccinationModel.all().map(toVax),
-    meta: vaccinationModel.stats(),
-  });
+exports.vaccinations = async (req, res, next) => {
+  try {
+    const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
+    res.json({ data: rows.map(toVax), meta });
+  } catch (err) { next(err); }
 };
 
-exports.markVaccinationDone = (req, res) => {
-  vaccinationModel.markDone(req.params.id);
-  res.json({
-    data: vaccinationModel.all().map(toVax),
-    meta: vaccinationModel.stats(),
-  });
+exports.markVaccinationDone = async (req, res, next) => {
+  try {
+    await vaccinationModel.markDone(req.params.id);
+    const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
+    res.json({ data: rows.map(toVax), meta });
+  } catch (err) { next(err); }
 };

@@ -9,7 +9,7 @@ import type { Patient } from '@/data/doctor';
 import {
   RequestRefused, type Appointment, type CareDocument, type CareTeamMember,
   type DocumentKind, type DoctorThread, type Message, type MotherThread,
-  type RankedDoctor, type SlotOffer,
+  type PayMethod, type RankedDoctor, type SlotOffer,
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
@@ -126,6 +126,30 @@ export const api = {
         (json.alternatives ?? []) as SlotOffer[]);
     }
     if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+    return json.data as Appointment;
+  },
+
+  /**
+   * Buy a slot outright. Refuses the same way {@link requestAppointment} does,
+   * so the booking page can offer the alternatives rather than a dead end.
+   *
+   * No card details are sent — `method` is the rail the mother chose, and the
+   * fee is decided by the server from the clinician.
+   */
+  async payAndBook(body: {
+    doctorId: string; date: string; time: string; reason?: string; method: PayMethod;
+  }) {
+    const res = await fetch(`${BASE}/appointments/paid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 409) {
+      throw new RequestRefused(json.error ?? 'That slot could not be booked', json.code ?? 'NOT_BOOKABLE',
+        (json.alternatives ?? []) as SlotOffer[]);
+    }
+    if (!res.ok) throw new Error(json.error ?? `Booking failed (${res.status})`);
     return json.data as Appointment;
   },
 

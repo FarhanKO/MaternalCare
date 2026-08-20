@@ -9,6 +9,7 @@
  *                     → cancelled (by the mother, before an answer)
  *            accepted → completed
  */
+const crypto = require('crypto');
 const db = require('../config/db');
 const doctorModel = require('./doctorModel');
 
@@ -100,6 +101,24 @@ async function nextOpenings(doctorId, fromDate, days = 14, limit = 6) {
   return out;
 }
 
+/**
+ * Everything that has to be true before a slot can be taken, whether it is
+ * being requested or paid for. Returns the clinician so the caller does not
+ * look them up again.
+ */
+async function ensureSlotFree(doctorId, date, time) {
+  const doctor = await doctorModel.find(doctorId);
+  if (!doctor) throw new NotBookableError('That clinician is no longer listed');
+  if (doctor.status === 'away') throw new NotBookableError(`${doctor.name} is on leave right now`);
+  if (!doctor.bookable) throw new NotBookableError(`${doctor.name}'s list is full`);
+  if (!date || !time) throw new Error('A booking needs a date and a time');
+  if (date < todayISO()) throw new Error('That date has passed');
+
+  const free = await freeSlots(doctorId, date);
+  if (!free.includes(time)) throw new SlotTakenError(await nextOpenings(doctorId, date));
+  return doctor;
+}
+
 /** How many unanswered requests this doctor received before this one. */
 async function queuePosition(row) {
   if (row.status !== 'requested') return 0;
@@ -149,7 +168,26 @@ function toDTO(row) {
     respondedAt: row.responded_at || undefined,
     queuePosition: row.queue_position ?? 0,
     waitingDays: waitingDays(row),
+    payment: row.paid_at
+      ? {
+        feeBdt: row.fee_bdt,
+        method: row.payment_method,
+        reference: row.payment_ref,
+        paidAt: row.paid_at,
+      }
+      : undefined,
   };
+}
+
+/** Payment rails a Bangladeshi clinic actually takes. */
+const PAY_METHODS = ['bkash', 'nagad', 'card'];
+
+/**
+ * A reference the mother can quote back to the clinic. Deliberately not
+ * sequential — a guessable one would let anybody name somebody else's receipt.
+ */
+function paymentReference() {
+  return `MC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 module.exports = {
@@ -247,17 +285,7 @@ module.exports = {
    * next, because a bare error leaves her stuck.
    */
   async request(userId, doctorId, { date, time, reason }) {
-    const doctor = await doctorModel.find(doctorId);
-    if (!doctor) throw new NotBookableError('That clinician is no longer listed');
-    if (doctor.status === 'away') throw new NotBookableError(`${doctor.name} is on leave right now`);
-    if (!doctor.bookable) throw new NotBookableError(`${doctor.name}'s list is full`);
-    if (!date || !time) throw new Error('A request needs a date and a time');
-    if (date < todayISO()) throw new Error('That date has passed');
-
-    const free = await freeSlots(doctorId, date);
-    if (!free.includes(time)) {
-      throw new SlotTakenError(await nextOpenings(doctorId, date));
-    }
+    const doctor = await ensureSlotFree(doctorId, date, time);
 
     // one open request per doctor keeps the queue honest
     const dup = await db.one(
@@ -270,6 +298,42 @@ module.exports = {
       `INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
        VALUES ($1,$2,$3,$4,$5,'requested',$6) RETURNING id`,
       [userId, doctorId, date, time, reason || 'Antenatal appointment', new Date().toISOString()],
+    );
+    return this.find(row.id);
+  },
+
+  /**
+   * A paid booking. Unlike {@link request}, this comes back confirmed: the
+   * consultation fee buys the slot outright, so there is no queue to sit in
+   * and no acceptance to wait for.
+   *
+   * NOTE: no payment gateway is connected. This records the method and issues
+   * a reference so the appointment and the clinician's diary are real, but no
+   * money moves and no card details are taken anywhere in this flow. The fee
+   * is read from the clinician rather than from the request, so a tampered
+   * body cannot buy a consultant's slot at a junior's price.
+   */
+  async bookPaid(userId, doctorId, { date, time, reason, method }) {
+    const pay = String(method || '').toLowerCase();
+    if (!PAY_METHODS.includes(pay)) throw new Error('Choose how you want to pay');
+
+    const doctor = await ensureSlotFree(doctorId, date, time);
+    const fee = doctorModel.consultationFee({
+      qualification: doctor.qualification,
+      years: doctor.years,
+    });
+    const now = new Date().toISOString();
+
+    const row = await db.insert(
+      `INSERT INTO appointments
+         (user_id, doctor_id, date, time, reason, status,
+          requested_at, responded_at, note,
+          fee_bdt, payment_method, payment_ref, paid_at)
+       VALUES ($1,$2,$3,$4,$5,'accepted',$6,$6,$7,$8,$9,$10,$6)
+       RETURNING id`,
+      [userId, doctorId, date, time, reason || 'Paid consultation', now,
+        'Confirmed on payment of the consultation fee',
+        fee, pay, paymentReference()],
     );
     return this.find(row.id);
   },

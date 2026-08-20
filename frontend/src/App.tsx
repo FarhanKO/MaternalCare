@@ -12,6 +12,7 @@ const Onboarding = lazy(() => import('@/pages/Onboarding').then((m) => ({ defaul
 const About = lazy(() => import('@/pages/About').then((m) => ({ default: m.About })));
 const Mother = lazy(() => import('@/pages/Mother').then((m) => ({ default: m.Mother })));
 const Doctor = lazy(() => import('@/pages/Doctor').then((m) => ({ default: m.Doctor })));
+const Appoint = lazy(() => import('@/pages/Appoint').then((m) => ({ default: m.Appoint })));
 
 const LOADER_COPY: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Welcome to MaternalCare+', subtitle: 'Setting up a calmer way to care' },
@@ -21,6 +22,7 @@ const LOADER_COPY: Record<string, { title: string; subtitle: string }> = {
   '/about': { title: 'Opening our story', subtitle: 'Loading the journey of care' },
   '/mother': { title: 'Loading your dashboard', subtitle: 'Gathering your latest health insights' },
   '/doctor': { title: 'Opening the clinician portal', subtitle: 'Loading your caseload and today’s clinic' },
+  '/appoint': { title: 'Opening the booking desk', subtitle: 'Finding the clinicians who can see you' },
 };
 
 export default function App() {
@@ -43,6 +45,7 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/mother" element={<Mother />} />
           <Route path="/doctor" element={<Doctor />} />
+          <Route path="/appoint" element={<Appoint />} />
         </Routes>
       </Suspense>
       </div>

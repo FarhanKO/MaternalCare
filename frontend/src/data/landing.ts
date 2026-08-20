@@ -62,6 +62,58 @@ export const features: Feature[] = [
   },
 ];
 
+export interface CareStage {
+  /** rendered on two lines, the way the panel is laid out */
+  title: [string, string];
+  /** the features this stage actually covers — shown at rest */
+  meta: string;
+  /** revealed as the panel expands */
+  description: string;
+  image: string;
+  /** the little status dot in the corner */
+  dot: string;
+}
+
+/**
+ * The four stretches of the journey the app covers, as expanding photo
+ * panels. Each `meta` line names features that genuinely exist — the panels
+ * are an invitation, not a prospectus.
+ */
+export const careStages: CareStage[] = [
+  {
+    title: ['Pregnancy &', 'Antenatal Care'],
+    meta: 'Vitals · Risk insight · Reminders',
+    description:
+      'Gestational age and due date worked out from your own history, with blood pressure, glucose and weight turned into trends your doctor can read at a glance.',
+    image: '/hero/slide2.jpg',
+    dot: 'bg-aqua-400',
+  },
+  {
+    title: ['Birth &', 'Newborn Days'],
+    meta: 'Due-date countdown · Records · Recovery',
+    description:
+      'A countdown that gets practical as you near full term, somewhere to keep every report and prescription, and readings that carry straight through into recovery.',
+    image: '/hero/slide1.jpg',
+    dot: 'bg-brand-400',
+  },
+  {
+    title: ['Child Growth &', 'Immunisation'],
+    meta: 'WHO curves · Milestones · Vaccines',
+    description:
+      'Height and weight plotted against WHO growth standards, milestones you can tick off as they happen, and an immunisation schedule that never lets a dose slip quietly past.',
+    image: '/hero/slide3.jpg',
+    dot: 'bg-brand-300',
+  },
+  {
+    title: ['Family &', 'Emergency Support'],
+    meta: 'SOS · Guardians · Your care team',
+    description:
+      'One press alerts the people beside you and the clinicians looking after you, with your location attached — and your guardians get an app that tells them what to actually do.',
+    image: '/hero/slide4.jpg',
+    dot: 'bg-peach-400',
+  },
+];
+
 export interface Stat {
   value: string;
   label: string;

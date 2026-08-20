@@ -56,6 +56,28 @@ function availabilityScore(load) {
   return Math.round(Math.max(0, 1 - load) * 30);
 }
 
+/** What every clinic visit costs before seniority is added, in taka. */
+const BASE_FEE_BDT = 400;
+
+/**
+ * The consultation fee for a paid booking, in taka.
+ *
+ * Derived from the same two things the ranking already reads — what they are
+ * qualified in and how long they have practised — rather than stored as a
+ * number somebody has to remember to update. That also makes "varies by
+ * clinician" on the booking page a description of the list rather than a
+ * disclaimer covering a single hardcoded price.
+ */
+function consultationFee(doctor) {
+  const q = (doctor.qualification || '').toUpperCase();
+  let fee = BASE_FEE_BDT;
+  if (/FCPS|MRCOG|FRCOG/.test(q)) fee += 350;
+  else if (/\bMD\b|\bMS\b|MRCPCH/.test(q)) fee += 200;
+  else if (/DGO|DCH|MPH/.test(q)) fee += 100;
+  fee += Math.min(20, doctor.years || 0) * 15;
+  return Math.round(fee / 50) * 50;               // clinics quote round numbers
+}
+
 /**
  * How a mother's need maps onto a specialty. Anything unmatched still ranks —
  * it simply gets no bonus, rather than being hidden.
@@ -93,6 +115,8 @@ function toDTO(d) {
     capacity,
     openings,
     queue,
+    /** what one paid visit costs, in taka */
+    feeBdt: consultationFee(d),
     /** 0–1, how full the list is */
     load: Math.round(load * 100) / 100,
     /** open | busy | full | away */
@@ -104,6 +128,7 @@ function toDTO(d) {
 
 module.exports = {
   SLOT_TIMES,
+  consultationFee,
 
   async all() {
     const rows = await db.sql(`${WITH_COUNTS} ORDER BY d.id`);

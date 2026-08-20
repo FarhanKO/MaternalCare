@@ -8,23 +8,26 @@ const userModel = require('../../models/userModel');
 const dailyLogModel = require('../../models/dailyLogModel');
 const pregnancyModel = require('../../models/pregnancyModel');
 
-exports.show = (req, res) => {
-  res.json({ data: userModel.profile(userModel.current().id) });
+exports.show = async (req, res, next) => {
+  try {
+    const me = await userModel.current();
+    res.json({ data: await userModel.profile(me.id) });
+  } catch (err) { next(err); }
 };
 
 /** One PATCH handles whichever fields the panel changed. */
-exports.update = (req, res) => {
-  const id = userModel.current().id;
+exports.update = async (req, res) => {
   const { name, bio, avatar, bloodGroup, age, stage } = req.body || {};
   try {
-    if (name !== undefined) userModel.setName(id, name);
-    if (bio !== undefined) userModel.setBio(id, bio);
-    if (avatar !== undefined) userModel.setAvatar(id, avatar);
-    if (stage !== undefined) userModel.setStage(id, stage);
+    const { id } = await userModel.current();
+    if (name !== undefined) await userModel.setName(id, name);
+    if (bio !== undefined) await userModel.setBio(id, bio);
+    if (avatar !== undefined) await userModel.setAvatar(id, avatar);
+    if (stage !== undefined) await userModel.setStage(id, stage);
     if (bloodGroup !== undefined || age !== undefined) {
-      userModel.setDetails(id, { bloodGroup, age });
+      await userModel.setDetails(id, { bloodGroup, age });
     }
-    res.json({ data: userModel.profile(id) });
+    res.json({ data: await userModel.profile(id) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -34,10 +37,14 @@ exports.update = (req, res) => {
  * Weight gain against the range recommended for her starting BMI — the
  * reason pre-pregnancy weight and height are recorded at booking.
  */
-exports.weightGain = (req, res) => {
-  res.json({ data: pregnancyModel.weightGain(userModel.current().id) });
+exports.weightGain = async (req, res, next) => {
+  try {
+    const me = await userModel.current();
+    res.json({ data: await pregnancyModel.weightGain(me.id) });
+  } catch (err) { next(err); }
 };
 
+/** Serving bytes off disk stayed synchronous — there is no query behind it. */
 exports.avatar = (req, res) => {
   const full = userModel.avatarPath(req.params.file);
   if (!full) return res.status(404).json({ error: 'Photo not found' });
@@ -47,29 +54,31 @@ exports.avatar = (req, res) => {
 
 /* ------------------------------------------------- daily self-reporting */
 
-exports.dailyLog = (req, res) => {
-  const id = userModel.current().id;
-  res.json({
-    data: {
-      today: dailyLogModel.forDate(id),
-      history: dailyLogModel.history(id, 14),
-      summary: dailyLogModel.summary(id, 7),
-    },
-  });
+exports.dailyLog = async (req, res, next) => {
+  try {
+    const { id } = await userModel.current();
+    const [today, history, summary] = await Promise.all([
+      dailyLogModel.forDate(id),
+      dailyLogModel.history(id, 14),
+      dailyLogModel.summary(id, 7),
+    ]);
+    res.json({ data: { today, history, summary } });
+  } catch (err) { next(err); }
 };
 
-exports.saveDailyLog = (req, res) => {
-  const id = userModel.current().id;
+exports.saveDailyLog = async (req, res) => {
   try {
-    const saved = dailyLogModel.save(id, {
+    const { id } = await userModel.current();
+    const saved = await dailyLogModel.save(id, {
       mood: req.body?.mood,
       kicks: req.body?.kicks,
       waterLitres: req.body?.waterLitres,
     });
-    res.json({
-      data: { today: saved, history: dailyLogModel.history(id, 14),
-        summary: dailyLogModel.summary(id, 7) },
-    });
+    const [history, summary] = await Promise.all([
+      dailyLogModel.history(id, 14),
+      dailyLogModel.summary(id, 7),
+    ]);
+    res.json({ data: { today: saved, history, summary } });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

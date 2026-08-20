@@ -52,6 +52,8 @@ router.get('/doctors/:id/appointments', careApi.doctorAppointments);
 /* appointment requests — the mother asks, the doctor answers */
 router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
+/* paid booking — the fee confirms the slot, so there is nothing to answer */
+router.post('/appointments/paid', careApi.payAndBook);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
 

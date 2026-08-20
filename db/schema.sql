@@ -139,7 +139,13 @@ CREATE TABLE appointments (
                                            'cancelled', 'completed')),
   requested_at TIMESTAMPTZ,
   responded_at TIMESTAMPTZ,
-  note         TEXT
+  note         TEXT,
+  -- A paid booking skips the queue: the fee confirms the slot outright.
+  -- NULL on every request-flow appointment, which is most of them.
+  fee_bdt        INTEGER,
+  payment_method TEXT CHECK (payment_method IN ('bkash', 'nagad', 'card')),
+  payment_ref    TEXT,
+  paid_at        TIMESTAMPTZ
 );
 CREATE INDEX appointments_user_idx   ON appointments (user_id, date);
 CREATE INDEX appointments_doctor_idx ON appointments (doctor_id, status);

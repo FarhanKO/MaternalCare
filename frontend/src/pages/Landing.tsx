@@ -2,6 +2,7 @@ import { motion, useScroll, useSpring } from 'framer-motion';
 import { Navbar } from '@/components/landing/Navbar';
 import { Hero } from '@/components/landing/Hero';
 import { TrustBar } from '@/components/landing/TrustBar';
+import { CareStages } from '@/components/landing/CareStages';
 import { Features } from '@/components/landing/Features';
 import { Showcase } from '@/components/landing/Showcase';
 import { Journey } from '@/components/landing/Journey';
@@ -26,6 +27,7 @@ export function Landing() {
       <main>
         <Hero />
         <TrustBar />
+        <CareStages />
         <Features />
         <Showcase />
         <Journey />

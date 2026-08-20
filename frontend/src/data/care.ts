@@ -17,6 +17,8 @@ export interface Doctor {
   openings: number;
   /** unanswered requests already sitting with them */
   queue: number;
+  /** what one paid visit with them costs, in taka */
+  feeBdt: number;
   /** 0–1 */
   load: number;
   status: DoctorStatus;
@@ -54,7 +56,28 @@ export interface Appointment {
   /** how many unanswered requests sit ahead of hers */
   queuePosition: number;
   waitingDays: number;
+  /** present only on appointments bought outright from the booking page */
+  payment?: Payment;
 }
+
+export type PayMethod = 'bkash' | 'nagad' | 'card';
+
+export interface Payment {
+  feeBdt: number;
+  method: PayMethod;
+  /** the reference the clinic can be asked about */
+  reference: string;
+  paidAt: string;
+}
+
+export const PAY_METHODS: { key: PayMethod; label: string; tint: string }[] = [
+  { key: 'bkash', label: 'bKash', tint: '#e2136e' },
+  { key: 'nagad', label: 'Nagad', tint: '#ec1c24' },
+  { key: 'card', label: 'Card', tint: '#3f66f0' },
+];
+
+/** Taka, grouped the way a Bangladeshi clinic writes a fee. */
+export const taka = (n: number) => `৳${n.toLocaleString('en-BD')}`;
 
 export interface SlotOffer { date: string; time: string }
 

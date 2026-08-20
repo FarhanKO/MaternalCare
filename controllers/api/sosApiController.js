@@ -7,74 +7,85 @@ const userModel = require('../../models/userModel');
 
 /* --------------------------------------------------------------- mother */
 
-exports.state = (req, res) => {
-  const user = userModel.current();
-  res.json({
-    data: {
-      active: sosModel.active(user.id),
-      contacts: sosModel.contacts(user.id),
-      history: sosModel.history(user.id),
-      emergencyNumber: sosModel.emergencyNumber(user.id),
-    },
-  });
+exports.state = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    // four independent reads — no reason for the panel to wait on them in turn
+    const [active, contacts, history, emergencyNumber] = await Promise.all([
+      sosModel.active(user.id),
+      sosModel.contacts(user.id),
+      sosModel.history(user.id),
+      sosModel.emergencyNumber(user.id),
+    ]);
+    res.json({ data: { active, contacts, history, emergencyNumber } });
+  } catch (err) { next(err); }
 };
 
-exports.setEmergencyNumber = (req, res) => {
-  const user = userModel.current();
+exports.setEmergencyNumber = async (req, res) => {
   try {
-    res.json({ data: { emergencyNumber: sosModel.setEmergencyNumber(user.id, req.body?.number) } });
+    const user = await userModel.current();
+    const emergencyNumber = await sosModel.setEmergencyNumber(user.id, req.body?.number);
+    res.json({ data: { emergencyNumber } });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-exports.trigger = (req, res) => {
-  const user = userModel.current();
+exports.trigger = async (req, res, next) => {
   const { lat, lng, accuracy, locationNote } = req.body || {};
-  res.status(201).json({
-    data: sosModel.trigger(user.id, {
+  try {
+    const user = await userModel.current();
+    const alert = await sosModel.trigger(user.id, {
       lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy), locationNote,
-    }),
-  });
+    });
+    res.status(201).json({ data: alert });
+  } catch (err) { next(err); }
 };
 
 /** Stand down: 'safe' after the fact, 'cancelled' during the countdown. */
-exports.close = (req, res) => {
-  const user = userModel.current();
+exports.close = async (req, res) => {
   try {
-    const closed = sosModel.close(req.params.id, user.id, req.body?.status ?? 'safe', 'mother');
+    const user = await userModel.current();
+    const closed = await sosModel.close(req.params.id, user.id, req.body?.status ?? 'safe', 'mother');
     if (!closed) return res.status(404).json({ error: 'Alert not found' });
-    res.json({ data: closed });
+    return res.json({ data: closed });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 };
 
-exports.contacts = (req, res) => {
-  res.json({ data: sosModel.contacts(userModel.current().id) });
-};
-
-exports.addContact = (req, res) => {
-  const user = userModel.current();
+exports.contacts = async (req, res, next) => {
   try {
-    res.status(201).json({ data: sosModel.addContact(user.id, req.body || {}) });
+    const user = await userModel.current();
+    res.json({ data: await sosModel.contacts(user.id) });
+  } catch (err) { next(err); }
+};
+
+exports.addContact = async (req, res) => {
+  try {
+    const user = await userModel.current();
+    res.status(201).json({ data: await sosModel.addContact(user.id, req.body || {}) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-exports.removeContact = (req, res) => {
-  const user = userModel.current();
-  if (!sosModel.removeContact(req.params.id, user.id)) {
-    return res.status(404).json({ error: 'Guardian not found' });
-  }
-  res.status(204).end();
+exports.removeContact = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    if (!(await sosModel.removeContact(req.params.id, user.id))) {
+      return res.status(404).json({ error: 'Guardian not found' });
+    }
+    return res.status(204).end();
+  } catch (err) { return next(err); }
 };
 
 /* ------------------------------------------------------------ clinician */
 
-exports.forDoctor = (req, res) => {
+exports.forDoctor = async (req, res, next) => {
   const { id } = req.params;
-  if (!doctorModel.exists(id)) return res.status(404).json({ error: 'Clinician not found' });
-  res.json({ data: sosModel.openForDoctor(id) });
+  try {
+    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    return res.json({ data: await sosModel.openForDoctor(id) });
+  } catch (err) { return next(err); }
 };

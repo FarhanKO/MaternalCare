@@ -7,23 +7,26 @@ const postModel = require('../../models/postModel');
 const userModel = require('../../models/userModel');
 const pregnancyModel = require('../../models/pregnancyModel');
 
-exports.index = (req, res) => {
+exports.index = async (req, res, next) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
   const offset = Math.max(0, Number(req.query.offset) || 0);
   const topic = req.query.topic;
 
-  res.json({
-    data: postModel.all({ limit, offset, topic }),
-    meta: { total: postModel.count(topic), limit, offset },
-  });
+  try {
+    const [data, total] = await Promise.all([
+      postModel.all({ limit, offset, topic }),
+      postModel.count(topic),
+    ]);
+    res.json({ data, meta: { total, limit, offset } });
+  } catch (err) { next(err); }
 };
 
 /** She posts as herself, at whatever week she is currently in. */
-exports.create = (req, res) => {
-  const user = userModel.current();
-  const pregnancy = pregnancyModel.forUser(user.id);
+exports.create = async (req, res, next) => {
   try {
-    const created = postModel.create(user.id, {
+    const user = await userModel.current();
+    const pregnancy = await pregnancyModel.forUser(user.id);
+    const created = await postModel.create(user.id, {
       author: req.body?.author || user.name,
       role: 'mother',
       week: pregnancy ? pregnancy.week : undefined,
@@ -37,15 +40,15 @@ exports.create = (req, res) => {
     if (err instanceof postModel.PostError) {
       return res.status(400).json({ error: err.message, code: err.code });
     }
-    throw err;
+    return next(err);
   }
 };
 
-exports.comment = (req, res) => {
-  const user = userModel.current();
+exports.comment = async (req, res, next) => {
   try {
+    const user = await userModel.current();
     res.status(201).json({
-      data: postModel.comment(req.params.id, user.id, {
+      data: await postModel.comment(req.params.id, user.id, {
         author: req.body?.author || user.name,
         role: req.body?.role === 'doctor' ? 'doctor' : 'mother',
         body: req.body?.body,
@@ -56,15 +59,17 @@ exports.comment = (req, res) => {
       const status = err.code === 'NOT_FOUND' ? 404 : 400;
       return res.status(status).json({ error: err.message, code: err.code });
     }
-    throw err;
+    return next(err);
   }
 };
 
-exports.heart = (req, res) => {
+exports.heart = async (req, res, next) => {
   const delta = req.body?.delta === -1 ? -1 : 1;
-  const updated = postModel.heart(req.params.id, delta);
-  if (!updated) return res.status(404).json({ error: 'Post not found' });
-  res.json({ data: updated });
+  try {
+    const updated = await postModel.heart(req.params.id, delta);
+    if (!updated) return res.status(404).json({ error: 'Post not found' });
+    return res.json({ data: updated });
+  } catch (err) { return next(err); }
 };
 
 /** Post images, streamed from disk so list payloads stay small. */
