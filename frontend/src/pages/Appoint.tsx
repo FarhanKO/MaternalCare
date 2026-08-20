@@ -279,9 +279,29 @@ function ClinicianCard({ doctor, picked, level, onPick }: {
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{doctor.distanceKm} km</span>
           </div>
         </div>
-        <div className="flex-none text-right">
-          <div className="text-lg font-bold tracking-tight text-ink">{taka(doctor.feeBdt)}</div>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">per visit</div>
+        {/*
+          Both prices here, not only at checkout. What a clinician costs for a
+          month of answering questions is part of choosing them — finding it
+          two steps later means comparing on the wrong number.
+        */}
+        <div className="flex flex-none items-stretch gap-3 text-right">
+          <div>
+            <div className="text-lg font-bold tracking-tight text-ink">{taka(doctor.feeBdt)}</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+              per visit
+            </div>
+          </div>
+          <span className="w-px self-stretch bg-ink/10" />
+          <div>
+            <div className="text-lg font-bold tracking-tight text-brand-700">
+              {taka(doctor.feeBdt + doctor.chatFeeBdt)}
+            </div>
+            <div className="text-[10px] font-bold uppercase leading-tight tracking-wider text-brand-600">
+              + 1 month
+              <br />
+              chat
+            </div>
+          </div>
         </div>
       </div>
 
