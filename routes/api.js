@@ -16,25 +16,14 @@ const guardianApi = require('../controllers/api/guardianApiController');
 const communityApi = require('../controllers/api/communityApiController');
 const profileApi = require('../controllers/api/profileApiController');
 const childApi = require('../controllers/api/childApiController');
-const userModel = require('../models/userModel');
-const pregnancyModel = require('../models/pregnancyModel');
+const sessionApi = require('../controllers/api/sessionApiController');
+const vitalApi = require('../controllers/api/vitalApiController');
 
 /* current demo session user + pregnancy summary */
-router.get('/me', (req, res) => {
-  const user = userModel.current();
-  const pregnancy = pregnancyModel.forUser(user.id);
-  res.json({ data: { user, pregnancy } });
-});
+router.get('/me', sessionApi.show);
 
 /* update the signed-in user's life stage (set at the end of onboarding) */
-router.patch('/me', (req, res) => {
-  const user = userModel.current();
-  try {
-    res.json({ data: userModel.setStage(user.id, req.body?.stage) });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+router.patch('/me', sessionApi.setStage);
 
 /* patients — the clinician's caseload */
 router.get('/patients', patientApi.index);
@@ -64,6 +53,10 @@ router.get('/profile/avatar/:file', profileApi.avatar);
 
 /* weight gain vs the range recommended for her starting BMI */
 router.get('/weight-gain', profileApi.weightGain);
+
+/* vitals — the readings behind the trend charts */
+router.get('/vitals', vitalApi.index);
+router.post('/vitals', vitalApi.create);
 
 /* mood, kicks and hydration she reports each day */
 router.get('/daily-log', profileApi.dailyLog);

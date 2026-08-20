@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, Apple, ArrowRight, Baby, Bell, CalendarDays, Check, ChevronLeft, ChevronRight,
@@ -24,6 +24,7 @@ import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useVitalSeries } from '@/hooks/useVitalSeries';
 import { useProfile } from '@/context/ProfileContext';
 import { INTENSITY_LABEL, URGENT_LABELS, type Symptom } from '@/data/symptoms';
 import { countdown, formatTime, KIND_COLOR, upcoming } from '@/data/reminders';
@@ -202,6 +203,37 @@ function ChartCard({
         <div className="mt-4 flex-1">{children}</div>
       </GlassCard>
     </Reveal>
+  );
+}
+
+/**
+ * Stands in for a chart that has nothing to draw yet. A chart axis with no
+ * series on it reads as a bug; saying there is nothing logged does not.
+ */
+function NoReadings({ what, height = 190 }: { what: string; height?: number }) {
+  return (
+    <div
+      style={{ height }}
+      className="grid place-items-center rounded-2xl border border-dashed border-ink/12 px-4 text-center"
+    >
+      <div>
+        <div className="text-[13px] font-bold text-ink-soft">No {what} logged yet</div>
+        <div className="mt-0.5 text-[11px] text-ink-faint">This fills in as you record readings.</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Marks a chart the database cannot yet back. These are real antenatal
+ * measurements with no column behind them — better to say so on the card than
+ * to let a demo series pass for her own readings.
+ */
+function SampleTag() {
+  return (
+    <span className="rounded-full bg-ink/6 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-faint">
+      Sample
+    </span>
   );
 }
 
@@ -551,8 +583,25 @@ export function Mother() {
   // 'general' has no reading set of its own — fall back to the pregnancy one
   const communityStage = profile.stage === 'general' ? 'pregnant' : profile.stage;
 
-  // persisted state lives in the Express/SQLite Model layer
+  // persisted state lives in the Express/Postgres Model layer
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
+  // the trend charts, built from her stored readings rather than fixtures
+  const vitals = useVitalSeries();
+
+  /** Her logged moods as a share of the days she logged one, biggest first. */
+  const moodSlices = useMemo(() => {
+    const logged = vitals.moods.filter((m) => m.mood);
+    const counts = new Map<string, number>();
+    for (const { mood } of logged) counts.set(mood!, (counts.get(mood!) ?? 0) + 1);
+    const slices: { name: string; value: number; color: string }[] = [...counts.entries()]
+      .map(([name, n]) => ({
+        name,
+        value: Math.round((n / logged.length) * 100),
+        color: MOODS.find((m) => m.name === name)?.tint ?? C.brand,
+      }))
+      .sort((a, b) => b.value - a.value);
+    return { slices, days: logged.length };
+  }, [vitals.moods]);
   const nextUp = upcoming(reminders);
 
   const moodName = MOODS[moodIdx].name;
@@ -1011,9 +1060,14 @@ export function Mother() {
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {/* weight gain */}
             <ChartCard title="Weight gain" sub="You vs recommended range" icon={Scale} tint={C.brand}
-              right={<span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">+8.3 kg</span>}>
+              right={vitals.weightGain && (
+                <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                  {vitals.weightGain.gainedKg >= 0 ? '+' : ''}{vitals.weightGain.gainedKg} kg
+                </span>
+              )}>
+              {vitals.loaded && vitals.weight.length === 0 ? <NoReadings what="weights" /> : (
               <ResponsiveContainer width="100%" height={190}>
-                <ComposedChart data={WEIGHT} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <ComposedChart data={vitals.weight} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
                     <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.brand} stopOpacity={0.28} />
@@ -1028,6 +1082,7 @@ export function Mother() {
                   <Area type="monotone" dataKey="kg" name="You" stroke={C.brand} strokeWidth={2.6} fill="url(#wg)" dot={false} activeDot={{ r: 4.5, strokeWidth: 2, stroke: '#fff' }} animationDuration={1400} />
                 </ComposedChart>
               </ResponsiveContainer>
+              )}
               <Legend items={[{ label: 'You', color: C.brand }, { label: 'Max', color: C.aqua, dash: true }, { label: 'Min', color: C.peach, dash: true }]} />
             </ChartCard>
 
@@ -1048,9 +1103,23 @@ export function Mother() {
 
             {/* blood pressure */}
             <ChartCard title="Blood pressure" sub="Systolic / diastolic" icon={Stethoscope} tint={C.aqua}
-              right={<span className="rounded-full bg-mint/10 px-2.5 py-1 text-[11px] font-bold" style={{ color: C.mint, background: `${C.mint}1a` }}>Normal</span>}>
+              right={(() => {
+                // the badge reads the same alerts the care team sees, so it
+                // can never say "Normal" over a reading that is not
+                const flagged = vitals.alerts.some((a) => /pressure/i.test(a.metric));
+                if (!vitals.loaded || !vitals.latest) return null;
+                return (
+                  <span className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={flagged
+                      ? { color: '#c0392b', background: 'rgba(220,80,60,0.12)' }
+                      : { color: C.mint, background: `${C.mint}1a` }}>
+                    {flagged ? 'Check with your doctor' : 'Normal'}
+                  </span>
+                );
+              })()}>
+              {vitals.loaded && vitals.bp.length === 0 ? <NoReadings what="blood pressure" /> : (
               <ResponsiveContainer width="100%" height={190}>
-                <LineChart data={BP} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <LineChart data={vitals.bp} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="rgba(63,102,240,0.07)" />
                   <XAxis dataKey="d" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
                   <YAxis tickLine={false} axisLine={false} tick={axisTick} width={30} domain={[60, 130]} />
@@ -1059,12 +1128,13 @@ export function Mother() {
                   <Line type="monotone" dataKey="dia" name="Diastolic" stroke={C.aqua} strokeWidth={2.6} dot={{ r: 3, fill: C.aqua }} animationDuration={1400} />
                 </LineChart>
               </ResponsiveContainer>
+              )}
               <Legend items={[{ label: 'Systolic', color: C.brand }, { label: 'Diastolic', color: C.aqua }]} />
             </ChartCard>
 
-            {/* fetal heart rate */}
+            {/* fetal heart rate — no column behind this one yet */}
             <ChartCard title="Fetal heart rate" sub="Beats per minute" icon={HeartPulse} tint={C.rose}
-              right={<span className="text-lg font-extrabold text-ink">148<span className="text-xs font-semibold text-ink-muted"> bpm</span></span>}>
+              right={<SampleTag />}>
               <ResponsiveContainer width="100%" height={190}>
                 <AreaChart data={HR} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
@@ -1081,21 +1151,23 @@ export function Mother() {
               </ResponsiveContainer>
             </ChartCard>
 
-            {/* baby kicks */}
+            {/* baby kicks — straight from her daily log */}
             <ChartCard title="Baby kicks" sub="Movements this week" icon={Activity} tint={C.violet}>
+              {vitals.loaded && vitals.kicks.length === 0 ? <NoReadings what="kicks" /> : (
               <ResponsiveContainer width="100%" height={190}>
-                <BarChart data={KICKS} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <BarChart data={vitals.kicks} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <XAxis dataKey="d" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
                   <YAxis tickLine={false} axisLine={false} tick={axisTick} width={26} />
                   <Tooltip content={<Tip />} cursor={{ fill: 'rgba(139,123,243,0.08)' }} />
                   <Bar dataKey="n" name="Kicks" radius={[6, 6, 0, 0]} fill={C.violet} animationDuration={1200} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
-            {/* sleep */}
+            {/* sleep — daily_logs has no sleep column yet */}
             <ChartCard title="Sleep quality" sub="Hours per night" icon={Moon} tint={C.brand2}
-              right={<span className="text-sm font-bold text-ink">7.5h avg</span>}>
+              right={<SampleTag />}>
               <ResponsiveContainer width="100%" height={190}>
                 <BarChart data={SLEEP} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
@@ -1183,7 +1255,9 @@ export function Mother() {
 
         {/* fundal height + mood + hydration */}
         <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <ChartCard title="Fundal height" sub="Belly measurement (cm)" icon={Ruler} tint={C.aqua}>
+          {/* fundal height — no column behind this one yet */}
+          <ChartCard title="Fundal height" sub="Belly measurement (cm)" icon={Ruler} tint={C.aqua}
+            right={<SampleTag />}>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={FUNDAL} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                 <defs>
@@ -1200,27 +1274,30 @@ export function Mother() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* mood donut */}
-          <ChartCard title="Mood this month" sub="How you've been feeling" icon={Smile} tint={C.gold}>
+          {/* mood donut — counted from the moods she actually logged */}
+          <ChartCard title="Mood recently" sub={`Last ${moodSlices.days} logged days`} icon={Smile} tint={C.gold}>
+            {vitals.loaded && moodSlices.slices.length === 0 ? <NoReadings what="moods" height={170} /> : (
             <div className="flex items-center gap-4">
               <div className="relative h-[150px] w-[150px] flex-none">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={MOOD} dataKey="value" nameKey="name" innerRadius={46} outerRadius={68} paddingAngle={3} stroke="none" animationDuration={1200}>
-                      {MOOD.map((m) => <Cell key={m.name} fill={m.color} />)}
+                    <Pie data={moodSlices.slices} dataKey="value" nameKey="name" innerRadius={46} outerRadius={68} paddingAngle={3} stroke="none" animationDuration={1200}>
+                      {moodSlices.slices.map((m) => <Cell key={m.name} fill={m.color} />)}
                     </Pie>
                     <Tooltip content={<Tip unit="%" />} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
                   <div>
-                    <div className="text-2xl font-extrabold text-ink">42%</div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Calm</div>
+                    <div className="text-2xl font-extrabold text-ink">{moodSlices.slices[0]?.value ?? 0}%</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
+                      {moodSlices.slices[0]?.name ?? '—'}
+                    </div>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
-                {MOOD.map((m) => (
+                {moodSlices.slices.map((m) => (
                   <div key={m.name} className="flex items-center gap-2 text-xs font-semibold text-ink-soft">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} /> {m.name}
                     <span className="ml-auto text-ink">{m.value}%</span>
@@ -1228,6 +1305,7 @@ export function Mother() {
                 ))}
               </div>
             </div>
+            )}
           </ChartCard>
 
           {/* hydration radial */}

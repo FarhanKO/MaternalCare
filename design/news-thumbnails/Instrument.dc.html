@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap">
+  <style>
+    body { margin: 0; font-family: Manrope, system-ui, sans-serif; }
+    a { color: #3f66f0; } a:hover { color: #3352d4; }
+  </style>
+</helmet>
+
+<div style="width: 1040px; min-height: 900px; box-sizing: border-box; padding: 44px 48px; background: #f4f7fe; color: #0d1526;">
+
+  <div style="display: flex; align-items: baseline; gap: 12px;">
+    <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #22b8c4;">Direction B</div>
+    <div style="height: 1px; flex-grow: 1; background: rgba(13,21,38,0.08);"></div>
+  </div>
+
+  <h1 style="margin: 14px 0 0; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;">
+    Instrument &#8212; every tile is a reading
+  </h1>
+  <p style="margin: 10px 0 0; max-width: 640px; font-size: 14px; line-height: 1.65; color: #3d4763;">
+    Ink on faint graph paper. The app is built on measurements, so each thumbnail is drawn as
+    the measurement its story is about &#8212; a trace, a schedule, a curve.
+  </p>
+
+  <!-- ---------------------------------------------- real size: 86x74 -->
+  <div style="margin-top: 32px; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa3ba;">At the size it ships</div>
+
+  <div style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 20px;">
+
+    <!-- sleep: hypnogram -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#eef2fb" />
+        <g stroke="#0d1526" stroke-opacity="0.07" stroke-width="2">
+          <path d="M0 38 H172 M0 74 H172 M0 110 H172" />
+        </g>
+        <path d="M12 38 H48 V74 H80 V110 H116 V74 H144 V38 H160" fill="none" stroke="#293e87" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">sleep</div>
+    </div>
+
+    <!-- bp: paired bars over a threshold band -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#fdeef3" />
+        <rect x="0" y="30" width="172" height="26" fill="#f2789f" fill-opacity="0.18" />
+        <g stroke-linecap="round" stroke-width="13">
+          <path d="M26 122 V78" stroke="#b52e60" /><path d="M26 122 V78" stroke="#b52e60" />
+          <path d="M62 122 V64" stroke="#b52e60" />
+          <path d="M98 122 V50" stroke="#b52e60" />
+          <path d="M134 122 V36" stroke="#f2789f" />
+        </g>
+        <path d="M0 43 H172" stroke="#b52e60" stroke-width="3" stroke-dasharray="6 6" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">bp</div>
+    </div>
+
+    <!-- nutrition: iron gauge -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#e8f6f1" />
+        <rect x="20" y="26" width="132" height="26" rx="13" fill="#ffffff" />
+        <rect x="20" y="26" width="88" height="26" rx="13" fill="#11836b" />
+        <rect x="20" y="66" width="132" height="26" rx="13" fill="#ffffff" />
+        <rect x="20" y="66" width="52" height="26" rx="13" fill="#3fd1a8" />
+        <rect x="20" y="106" width="132" height="26" rx="13" fill="#ffffff" />
+        <rect x="20" y="106" width="112" height="26" rx="13" fill="#54d3b0" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">nutrition</div>
+    </div>
+
+    <!-- vaccine: dose schedule -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#e6f6f8" />
+        <path d="M22 74 H150" stroke="#0d6f7c" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round" />
+        <circle cx="30" cy="74" r="16" fill="#0d6f7c" />
+        <circle cx="72" cy="74" r="16" fill="#0d6f7c" />
+        <circle cx="114" cy="74" r="16" fill="#ffffff" stroke="#0d6f7c" stroke-width="6" />
+        <circle cx="152" cy="74" r="11" fill="#ffffff" stroke="#0d6f7c" stroke-width="5" stroke-opacity="0.4" />
+        <path d="M24 74 l5 6 l9 -12" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M66 74 l5 6 l9 -12" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">vaccine</div>
+    </div>
+
+    <!-- mind: mood scatter -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#f0ecff" />
+        <path d="M18 104 Q60 96 100 70 T156 40" fill="none" stroke="#a08cf7" stroke-width="5" stroke-dasharray="8 8" stroke-linecap="round" />
+        <circle cx="26" cy="112" r="10" fill="#5b45c9" />
+        <circle cx="60" cy="94" r="10" fill="#5b45c9" />
+        <circle cx="92" cy="102" r="10" fill="#5b45c9" />
+        <circle cx="124" cy="64" r="10" fill="#5b45c9" />
+        <circle cx="152" cy="38" r="13" fill="#a08cf7" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">mind</div>
+    </div>
+
+    <!-- child: percentile curve -->
+    <div style="display: flex; flex-direction: column; gap: 7px; align-items: center;">
+      <svg viewBox="0 0 172 148" style="width: 86px; height: 74px; border-radius: 16px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#fff3e6" />
+        <path d="M8 128 Q66 116 110 76 T166 20" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round" />
+        <path d="M8 140 Q66 132 110 100 T166 48" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round" stroke-opacity="0.5" />
+        <path d="M8 118 Q66 100 110 56 T166 6" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round" stroke-opacity="0.5" />
+        <circle cx="110" cy="78" r="14" fill="#ea5c1d" />
+        <circle cx="110" cy="78" r="5" fill="#fff3e6" />
+      </svg>
+      <div style="font-size: 10px; font-weight: 700; color: #6b7590;">child</div>
+    </div>
+
+  </div>
+
+  <!-- ------------------------------------------------------ enlarged -->
+  <div style="margin-top: 44px; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa3ba;">Enlarged, to read the drawing</div>
+
+  <div style="margin-top: 14px; display: flex; gap: 26px;">
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <svg viewBox="0 0 172 148" style="width: 232px; height: 200px; border-radius: 26px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#eef2fb" />
+        <g stroke="#0d1526" stroke-opacity="0.07" stroke-width="2">
+          <path d="M0 38 H172 M0 74 H172 M0 110 H172" />
+        </g>
+        <path d="M12 38 H48 V74 H80 V110 H116 V74 H144 V38 H160" fill="none" stroke="#293e87" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" />
+      </svg>
+      <div style="font-size: 13px; font-weight: 800;">Sleep</div>
+      <div style="max-width: 232px; font-size: 12px; line-height: 1.55; color: #6b7590;">A hypnogram &#8212; the stepped shape of a night, deep to light and back.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <svg viewBox="0 0 172 148" style="width: 232px; height: 200px; border-radius: 26px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#fdeef3" />
+        <rect x="0" y="30" width="172" height="26" fill="#f2789f" fill-opacity="0.18" />
+        <g stroke-linecap="round" stroke-width="13">
+          <path d="M26 122 V78" stroke="#b52e60" />
+          <path d="M62 122 V64" stroke="#b52e60" />
+          <path d="M98 122 V50" stroke="#b52e60" />
+          <path d="M134 122 V36" stroke="#f2789f" />
+        </g>
+        <path d="M0 43 H172" stroke="#b52e60" stroke-width="3" stroke-dasharray="6 6" />
+      </svg>
+      <div style="font-size: 13px; font-weight: 800;">Blood pressure</div>
+      <div style="max-width: 232px; font-size: 12px; line-height: 1.55; color: #6b7590;">Four readings walking up into the band they should not enter.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <svg viewBox="0 0 172 148" style="width: 232px; height: 200px; border-radius: 26px; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); display: block;">
+        <rect width="172" height="148" fill="#e6f6f8" />
+        <path d="M22 74 H150" stroke="#0d6f7c" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round" />
+        <circle cx="30" cy="74" r="16" fill="#0d6f7c" />
+        <circle cx="72" cy="74" r="16" fill="#0d6f7c" />
+        <circle cx="114" cy="74" r="16" fill="#ffffff" stroke="#0d6f7c" stroke-width="6" />
+        <circle cx="152" cy="74" r="11" fill="#ffffff" stroke="#0d6f7c" stroke-width="5" stroke-opacity="0.4" />
+        <path d="M24 74 l5 6 l9 -12" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M66 74 l5 6 l9 -12" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <div style="font-size: 13px; font-weight: 800;">Vaccine</div>
+      <div style="max-width: 232px; font-size: 12px; line-height: 1.55; color: #6b7590;">Two doses given, one due, one further out. The schedule is the picture.</div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+    <div style="background: #fbfcff; border: 1px solid rgba(13,21,38,0.07); border-radius: 18px; padding: 20px;">
+      <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2fbf9b;">Why it works</div>
+      <p style="margin: 9px 0 0; font-size: 13px; line-height: 1.6; color: #3d4763;">
+        It speaks the dashboard's own language &#8212; the same traces, bands and thresholds the
+        vitals charts use two tabs away. Shapes carry the meaning, so the tiles stay distinct in
+        greyscale and for a colour-blind reader.
+      </p>
+    </div>
+    <div style="background: #fbfcff; border: 1px solid rgba(13,21,38,0.07); border-radius: 18px; padding: 20px;">
+      <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fb7534;">The tradeoff</div>
+      <p style="margin: 9px 0 0; font-size: 13px; line-height: 1.6; color: #3d4763;">
+        Cooler and more clinical than the feed's tone. And a drawn chart can imply it is
+        <em>her</em> data when it is decoration &#8212; the shapes must stay clearly generic, or the
+        thumbnail lies.
+      </p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

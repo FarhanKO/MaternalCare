@@ -25,11 +25,16 @@ module.exports = {
     );
   },
 
+  /**
+   * Log a reading. Returns the stored row, so a caller can answer with what
+   * was actually saved rather than echoing back what it was sent.
+   */
   async add(userId, { date, systolic, diastolic, sugar, weight_kg, temp_c }) {
-    await db.run(
+    return db.insert(
       `INSERT INTO vitals (user_id, date, systolic, diastolic, sugar, weight_kg, temp_c)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [userId, date, systolic, diastolic, sugar, weight_kg, temp_c],
+       VALUES ($1, COALESCE($2, CURRENT_DATE), $3,$4,$5,$6,$7)
+       RETURNING *`,
+      [userId, date || null, systolic, diastolic, sugar, weight_kg, temp_c],
     );
   },
 

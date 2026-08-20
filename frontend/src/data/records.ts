@@ -138,6 +138,31 @@ export interface VaccinationStats {
 /* -------------------------------------------------------- weight gain */
 
 /** Why booking records a pre-pregnancy weight and a height. */
+/** One logged set of measurements. Every field but the date is optional. */
+export interface VitalReading {
+  id: string;
+  date: string;
+  systolic: number | null;
+  diastolic: number | null;
+  sugar: number | null;
+  weightKg: number | null;
+  tempC: number | null;
+}
+
+export interface VitalAlert {
+  metric: string;
+  value: number;
+  level: string;
+  message?: string;
+}
+
+export interface VitalState {
+  /** oldest first, ready to chart */
+  readings: VitalReading[];
+  latest: VitalReading | null;
+  alerts: VitalAlert[];
+}
+
 export interface WeightGain {
   preWeightKg: number;
   currentWeightKg: number;

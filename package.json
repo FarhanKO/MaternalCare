@@ -11,7 +11,8 @@
     "db:seed": "node db/seed.js",
     "db:latency": "node db/latency.js",
     "db:test": "node db/test-models.js",
-    "db:bench": "node db/bench.js"
+    "db:bench": "node db/bench.js",
+    "api:audit": "node db/audit-api.js"
   },
   "dependencies": {
     "chart.js": "^4.4.9",

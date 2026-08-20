@@ -1,0 +1,26 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Now — the baseline", "x": 0, "y": 0, "w": 1040, "h": 790 },
+    { "file": "Scene.dc.html", "title": "A · Scene", "x": 1140, "y": 0, "w": 1040, "h": 910 },
+    { "file": "Instrument.dc.html", "title": "B · Instrument", "x": 2280, "y": 0, "w": 1040, "h": 910 },
+    { "file": "Emblem.dc.html", "title": "C · Emblem", "x": 3420, "y": 0, "w": 1040, "h": 910 },
+    { "file": "InContext.dc.html", "title": "Side by side, true size", "x": 0, "y": 1010, "w": 1040, "h": 730 }
+  ],
+  "annotations": [
+    {
+      "id": "start-here",
+      "x": 0,
+      "y": -150,
+      "w": 420,
+      "text": "Start here, then read left to right.\n\nThe three directions each draw the same six topics, so they compare like for like — and each shows the real 86×74 size before anything enlarged."
+    },
+    {
+      "id": "decides-it",
+      "x": 1140,
+      "y": 1010,
+      "w": 380,
+      "text": "The board below-left is the one that decides it: real card, real size, real story copy pulled from data/reading.ts."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

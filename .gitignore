@@ -36,3 +36,7 @@ guardian-app/android/app/build/
 guardian-app/android/.gradle/
 guardian-app/android/local.properties
 guardian-app/dist/
+
+# seeded design canvases are published artifacts, not source
+design/**/*.html
+!design/**/*.dc.html

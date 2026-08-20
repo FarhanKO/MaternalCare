@@ -14,7 +14,7 @@ import {
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
   ChildState, DailyLogState, Milestone, ServerPost, ServerProfile,
-  Vaccination, VaccinationStats, WeightGain,
+  Vaccination, VaccinationStats, VitalAlert, VitalReading, WeightGain,
 } from '@/data/records';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
@@ -181,6 +181,24 @@ export const api = {
 
   /** Weight gain against the range recommended for her starting BMI. */
   getWeightGain: () => request<Envelope<WeightGain | null>>('/weight-gain').then((r) => r.data),
+
+  /* --------------------------------------------------- vitals */
+
+  /** Every stored reading, oldest first, plus the latest and any alerts. */
+  getVitals: () =>
+    request<Envelope<VitalReading[]> & { meta: { latest: VitalReading | null; alerts: VitalAlert[] } }>(
+      '/vitals',
+    ).then((r) => ({ readings: r.data, latest: r.meta.latest, alerts: r.meta.alerts })),
+
+  /** Log a reading. Send only the measurements actually taken. */
+  addVital: (reading: {
+    date?: string; systolic?: number; diastolic?: number;
+    sugar?: number; weightKg?: number; tempC?: number;
+  }) =>
+    request<Envelope<VitalReading>>('/vitals', {
+      method: 'POST',
+      body: JSON.stringify(reading),
+    }).then((r) => r.data),
 
   /* ------------------------------ mood, kicks, hydration by day */
 

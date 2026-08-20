@@ -43,9 +43,16 @@ public class SosWatchService extends Service {
     private static final int WATCH_ID = 4710;
     private static final long PERIOD_SECONDS = 20;
 
+    /** After this many failed checks in a row, stop claiming the watch works. */
+    private static final int FAILURES_BEFORE_WARNING = 3;
+    /** Long enough for one HTTP round trip, short enough to never leak. */
+    private static final long WAKE_MS = 30_000;
+
     private ScheduledExecutorService pool;
-    private PowerManager.WakeLock wakeLock;
+    private PowerManager power;
     private String lastAlertId = null;
+    private int consecutiveFailures = 0;
+    private boolean warningShown = false;
 
     public static void start(Context context) {
         Intent intent = new Intent(context, SosWatchService.class);
@@ -63,15 +70,33 @@ public class SosWatchService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        startForeground(WATCH_ID, watchNotification());
+        startForeground(WATCH_ID, watchNotification(true));
 
-        PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "guardian:watch");
-        wakeLock.setReferenceCounted(false);
-        wakeLock.acquire();
+        // The wake lock is taken per poll, not held for the life of the
+        // service. Holding a PARTIAL_WAKE_LOCK permanently keeps the CPU out
+        // of deep sleep around the clock and flattens the battery in a day —
+        // which ends the watch far more surely than dozing between checks does.
+        power = (PowerManager) getSystemService(Context.POWER_SERVICE);
 
         pool = Executors.newSingleThreadScheduledExecutor();
-        pool.scheduleWithFixedDelay(this::poll, 0, PERIOD_SECONDS, TimeUnit.SECONDS);
+        pool.scheduleWithFixedDelay(this::tick, 0, PERIOD_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /** Wakes the CPU just long enough for one check, then lets it sleep again. */
+    private void tick() {
+        PowerManager.WakeLock lock = null;
+        try {
+            if (power != null) {
+                lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "guardian:poll");
+                lock.setReferenceCounted(false);
+                lock.acquire(WAKE_MS);
+            }
+            poll();
+        } finally {
+            if (lock != null && lock.isHeld()) {
+                try { lock.release(); } catch (Exception ignored) { }
+            }
+        }
     }
 
     @Override
@@ -80,7 +105,16 @@ public class SosWatchService extends Service {
         return START_STICKY;
     }
 
-    private Notification watchNotification() {
+    /**
+     * The permanent notice.
+     *
+     * `healthy` is not decoration. A watch that cannot reach the server will
+     * never alarm, and a guardian reading "You will be alarmed if she needs
+     * help" would have no way of knowing. On an SOS app that reassurance is
+     * the most dangerous thing on the screen if it is not true, so the text
+     * changes the moment the checks start failing.
+     */
+    private Notification watchNotification(boolean healthy) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager.getNotificationChannel(WATCH_CHANNEL) == null) {
@@ -98,13 +132,25 @@ public class SosWatchService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, WATCH_CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_menu_view)
-                .setContentTitle("Guardian is watching")
-                .setContentText("You will be alarmed if she needs help.")
-                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setSmallIcon(healthy
+                        ? android.R.drawable.ic_menu_view
+                        : android.R.drawable.stat_notify_error)
+                .setContentTitle(healthy
+                        ? "Guardian is watching"
+                        : "Guardian cannot reach her account")
+                .setContentText(healthy
+                        ? "You will be alarmed if she needs help."
+                        : "Checks are failing — you may not be alerted. Tap to fix.")
+                .setPriority(healthy ? NotificationCompat.PRIORITY_MIN : NotificationCompat.PRIORITY_DEFAULT)
                 .setOngoing(true)
                 .setContentIntent(open)
                 .build();
+    }
+
+    /** Swap the permanent notice between the healthy and unreachable wording. */
+    private void showWatchState(boolean healthy) {
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager != null) manager.notify(WATCH_ID, watchNotification(healthy));
     }
 
     /** One check against the API. Failures are silent — the next tick retries. */
@@ -122,7 +168,7 @@ public class SosWatchService extends Service {
             conn.setReadTimeout(8000);
             conn.setRequestProperty("Accept", "application/json");
 
-            if (conn.getResponseCode() != 200) return;
+            if (conn.getResponseCode() != 200) { onCheckFailed(); return; }
 
             StringBuilder body = new StringBuilder();
             try (BufferedReader reader =
@@ -133,6 +179,7 @@ public class SosWatchService extends Service {
 
             JSONObject data = new JSONObject(body.toString()).getJSONObject("data");
             JSONObject alert = data.isNull("alert") ? null : data.getJSONObject("alert");
+            onCheckSucceeded();
 
             if (alert != null) {
                 String id = alert.getString("id");
@@ -148,17 +195,38 @@ public class SosWatchService extends Service {
                 lastAlertId = null;
                 SosAlarm.standDown(getApplicationContext());
             }
-        } catch (Exception ignored) {
-            // no connection, server down, malformed reply — try again next tick
+        } catch (Exception e) {
+            // no connection, server down, malformed reply — retry next tick,
+            // but stop promising the guardian something that is not happening
+            onCheckFailed();
         } finally {
             if (conn != null) conn.disconnect();
+        }
+    }
+
+    private void onCheckSucceeded() {
+        consecutiveFailures = 0;
+        if (warningShown) {
+            warningShown = false;
+            showWatchState(true);
+        }
+    }
+
+    /**
+     * One failure is a tunnel or a dropped packet, not a broken watch. Only a
+     * run of them is worth worrying a guardian about.
+     */
+    private void onCheckFailed() {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= FAILURES_BEFORE_WARNING && !warningShown) {
+            warningShown = true;
+            showWatchState(false);
         }
     }
 
     @Override
     public void onDestroy() {
         if (pool != null) pool.shutdownNow();
-        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         SosAlarm.stopNoise();
         super.onDestroy();
     }
