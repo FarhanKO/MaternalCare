@@ -408,3 +408,14 @@ export interface DemoAccount {
   conditions: string;
   active: boolean;
 }
+
+
+/** The signed-in account, as the auth endpoints return it. Never a password. */
+export interface AuthUser {
+  id: string;
+  name: string;
+  role: 'mother' | 'clinician' | 'admin';
+  stage: string;
+  email: string;
+  language: 'en' | 'bn';
+}

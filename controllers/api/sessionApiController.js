@@ -60,38 +60,10 @@ exports.setLanguage = async (req, res) => {
   }
 };
 
-/* ---------------------------------------------------- demo account switch */
-
-/**
- * The accounts the demo can be viewed as, and which one is active.
- *
- * This whole pair disappears the day authentication lands. It exists because
- * the dashboard, the care plan, the vitals guidance and the daily check-in all
- * branch on life stage, and without a way to switch accounts three of those
- * four paths could not be seen at all.
+/*
+ * A demo account switcher lived here — GET /accounts and POST /accounts/use,
+ * backed by a module-level variable in userModel. It existed because there
+ * was no way to sign in. There is now: authApiController handles login, the
+ * session middleware resolves who is asking, and userModel.current() reads
+ * that instead of the first mother by id.
  */
-exports.accounts = async (req, res, next) => {
-  try {
-    const [all, active] = await Promise.all([userModel.mothers(), userModel.current()]);
-    return res.json({
-      data: all.map((u) => ({
-        id: String(u.id),
-        name: u.name,
-        stage: u.stage,
-        age: u.age,
-        conditions: u.conditions || '',
-        active: String(u.id) === String(active.id),
-      })),
-      meta: { note: 'Demo account switching. Authentication replaces this.' },
-    });
-  } catch (err) { return next(err); }
-};
-
-exports.useAccount = async (req, res) => {
-  try {
-    const user = await userModel.useDemoUser(req.body?.userId);
-    return res.json({ data: { id: String(user.id), name: user.name, stage: user.stage } });
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
-};

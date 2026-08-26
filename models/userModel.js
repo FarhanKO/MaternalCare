@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('../config/db');
+const context = require('../config/context');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -23,43 +24,34 @@ module.exports = {
     return db.one('SELECT * FROM users WHERE id = $1', [id]);
   },
 
-  /*
-   * Which account the app is "signed in" as.
+  /**
+   * The signed-in user.
    *
-   * There is no authentication yet — this is the shim standing in for it, and
-   * it is deliberately a single module-level variable rather than anything
-   * that looks like a session, so it cannot be mistaken for one. Replacing
-   * this with a real session lookup is the first item on the production list.
+   * Was `SELECT * FROM users WHERE role='mother' ORDER BY id LIMIT 1` — every
+   * request was the same woman, and there was nothing to sign in to. It reads
+   * the session context now, which the session middleware populates per
+   * request.
    *
-   * It exists so the four seeded life stages can each be looked at. Without
-   * it `current()` always returned the lowest mother id and three of the four
-   * dashboards were unreachable without editing the database by hand.
+   * Outside a request — a seed script, a test, the model suite — there is no
+   * context, and it falls back to the first mother so those keep working.
+   * That fallback is explicitly *not* reachable from an HTTP request: the
+   * middleware always establishes a context, so a browser with no cookie gets
+   * a null user and a 401, not somebody else's records.
    */
-  _demoUserId: null,
-
   async current() {
-    if (this._demoUserId) {
-      const chosen = await this.find(this._demoUserId);
-      if (chosen) return chosen;
-      this._demoUserId = null;      // deleted since it was chosen
-    }
+    const signedIn = context.user();
+    if (signedIn) return signedIn;
+
+    if (process.env.NODE_ENV === 'production') return null;
     return db.one("SELECT * FROM users WHERE role = 'mother' ORDER BY id LIMIT 1");
   },
 
-  /** Every mother on the platform, for the demo account switcher. */
+  /** Every mother on the platform. */
   async mothers() {
     return db.sql(
-      `SELECT id, name, stage, age, conditions FROM users
+      `SELECT id, name, stage, age, conditions, email FROM users
         WHERE role = 'mother' ORDER BY id`,
     );
-  },
-
-  async useDemoUser(id) {
-    const user = await this.find(id);
-    if (!user) throw new Error('No such account');
-    if (user.role !== 'mother') throw new Error('The mother portal needs a mother account');
-    this._demoUserId = user.id;
-    return user;
   },
 
   /** Life stage drives which reading and news the client shows. */

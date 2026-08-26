@@ -13,6 +13,8 @@ const path = require('path');
 const routes = require('./routes/web');
 const apiRoutes = require('./routes/api');
 
+const session = require('./middleware/session');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 // Vite dev origins: the mother/clinician client (5173) and the guardian
@@ -48,6 +50,9 @@ app.use('/api', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
   }
+  // the session lives in a cookie, and a cross-origin fetch will neither send
+  // nor store one without this — the dev server is a different origin
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   // the report download reads the filename off this header; without exposing it
@@ -56,6 +61,13 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+/*
+ * Resolve the session before anything else looks at a request. It never
+ * rejects — it only answers "who is this" — so the sign-in page and the
+ * marketing site still render for nobody in particular.
+ */
+app.use(session.attach());
 
 app.use('/api', apiRoutes);
 app.use(routes);

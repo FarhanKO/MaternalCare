@@ -1,23 +1,51 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, ArrowLeft, ArrowRight, Check, Mail, Lock, ShieldCheck, KeyRound } from 'lucide-react';
+import { Activity, AlertCircle, ArrowLeft, ArrowRight, Check, Mail, Lock, ShieldCheck, KeyRound } from 'lucide-react';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { FloatingInput } from '@/components/ui/FloatingInput';
 import { spring, fadeUp, staggerContainer } from '@/lib/motion';
+import { useAuth } from '@/lib/auth';
 
 export function SignIn() {
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signIn, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation() as { state?: { from?: string } };
   // a clinician arrives here straight from a registration that really did
   // write their row; landing them on a blank form with no acknowledgement
   // reads as though it failed
   const [params] = useSearchParams();
   const justRegistered = params.get('registered') === '1';
 
-  const onSubmit = (e: FormEvent) => {
+  /** Already signed in and arriving here — send her where she was going. */
+  useEffect(() => {
+    if (user) navigate(user.role === 'mother' ? '/mother' : '/doctor', { replace: true });
+  }, [user, navigate]);
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
     setSubmitting(true);
-    setTimeout(() => setSubmitting(false), 1400); // demo — no backend yet
+
+    const form = new FormData(e.currentTarget);
+    try {
+      const signed = await signIn(
+        String(form.get('email') || ''),
+        String(form.get('password') || ''),
+      );
+      /*
+       * Back to whatever she was trying to open, if the guard sent her here.
+       * Otherwise the portal her role belongs to — a clinician landing on the
+       * mother's dashboard would only bounce off its guard.
+       */
+      const back = location.state?.from;
+      navigate(back || (signed.role === 'mother' ? '/mother' : '/doctor'), { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That did not work — try again');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -112,6 +140,13 @@ export function SignIn() {
                 required
                 icon={<Lock className="h-[18px] w-[18px]" />}
               />
+
+              {error && (
+                <div className="flex items-start gap-2 rounded-2xl bg-rose-500/10 px-3.5 py-2.5 ring-1 ring-rose-500/25">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-none text-rose-600" />
+                  <span className="text-[12.5px] font-semibold text-ink-soft">{error}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-1">
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-soft">

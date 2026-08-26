@@ -745,6 +745,67 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   check('sosModel.close', closed.status === 'safe', `closed by ${closed.closedBy}`);
   await db.run('DELETE FROM messages WHERE body LIKE $1 OR body LIKE $2', ['%EMERGENCY%', '%Stood down%']);
 
+  /* ------------------------------------------ authentication */
+  console.log('\n  --- authentication ---');
+  const authModel = require('../models/authModel');
+
+  const pw = 'a-demo-password-2026';
+  const h1 = await authModel.hash(pw);
+  const h2 = await authModel.hash(pw);
+
+  check('authModel.hash never stores the plaintext', !h1.includes(pw), h1.slice(0, 26) + '…');
+  check('  and salts, so the same password hashes differently', h1 !== h2,
+    `${authModel.fingerprint(h1)} vs ${authModel.fingerprint(h2)}`);
+  check('  at the parameters it says it used',
+    h1.startsWith(`scrypt$${authModel.PARAMS.N}$${authModel.PARAMS.r}$${authModel.PARAMS.p}$`),
+    h1.split('$').slice(0, 4).join('$'));
+
+  check('authModel.verify accepts the right password', await authModel.verify(pw, h1));
+  check('  rejects a wrong one', !(await authModel.verify(pw + 'x', h1)));
+  check('  rejects an empty one', !(await authModel.verify('', h1)));
+  check('  rejects a hash it cannot read', !(await authModel.verify(pw, 'nonsense')));
+
+  let weak = null;
+  try { await authModel.hash('short'); } catch (e) { weak = e; }
+  check('  refuses a password under eight characters', weak?.code === 'WEAK', weak?.message);
+
+  /*
+   * The same message for a wrong password and a missing account. Telling them
+   * apart turns the login form into a way of asking whether a particular
+   * woman is a patient here.
+   */
+  let noAccount = null;
+  let wrongPw = null;
+  try {
+    await authModel.authenticate('nobody@nowhere.invalid', 'whatever12');
+  } catch (e) { noAccount = e; }
+  try {
+    await authModel.authenticate(me.email, 'definitely-not-it');
+  } catch (e) { wrongPw = e; }
+  check('authModel.authenticate does not reveal which accounts exist',
+    noAccount?.message === wrongPw?.message, noAccount?.message);
+
+  /* sessions */
+  const sessionToken = await authModel.startSession(me.id, 'model tests');
+  check('authModel.startSession issues a long random token', sessionToken.length >= 40,
+    `${sessionToken.length} chars`);
+  const resolved = await authModel.userForSession(sessionToken);
+  check('  and it resolves to the right account', resolved?.id === me.id, resolved?.name);
+  check('  a token nobody issued resolves to nobody',
+    (await authModel.userForSession('made-up')) === null);
+  await authModel.endSession(sessionToken);
+  check('  ending it takes effect immediately',
+    (await authModel.userForSession(sessionToken)) === null);
+
+  const expired = await authModel.startSession(me.id, 'model tests');
+  await db.run("UPDATE sessions SET expires_at = now() - interval '1 day' WHERE id = $1", [expired]);
+  check('  an expired session resolves to nobody',
+    (await authModel.userForSession(expired)) === null);
+  await db.run('DELETE FROM sessions WHERE id = $1', [expired]);
+
+  check('  every probe session cleaned up',
+    (await db.one("SELECT count(*) AS c FROM sessions WHERE user_agent = 'model tests'")).c === 0);
+
   console.log('\n  --- risk ---');
   const risk = await riskModel.fromLatestVitals(me, preg);
   check('riskModel.fromLatestVitals', risk && risk.level, `${risk?.label} (${risk?.score})`);

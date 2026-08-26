@@ -15,7 +15,7 @@ import {
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
-  CarePlan, ChildLogState, ChildState, DailyLogState, DemoAccount, FetalSizePoint,
+  AuthUser, CarePlan, ChildLogState, ChildState, DailyLogState, FetalSizePoint,
   Milestone, Pregnancy, ReportGroup, ReportReason,
   RiskView, ServerPost, ServerProfile, Vaccination, VaccinationStats, VitalAlert,
   VitalReading, WeightGain,
@@ -25,6 +25,14 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
 /** Absolute URL for a document's bytes — the API host is a different origin in dev. */
 export const fileUrl = (path: string) => `${BASE.replace(/\/api$/, '')}${path}`;
+
+/** Raised on any 401 — the session is missing or has expired. */
+export class NotSignedIn extends Error {
+  constructor() {
+    super('Please sign in');
+    this.name = 'NotSignedIn';
+  }
+}
 
 /** An error the server blamed on one named answer. */
 export class FieldError extends Error {
@@ -40,8 +48,24 @@ export class FieldError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    /*
+     * The session is an httpOnly cookie, and the API is a different origin
+     * from the dev server. Without this the browser neither sends it nor
+     * stores the one the login response sets, and every request arrives
+     * anonymous.
+     */
+    credentials: 'include',
     ...init,
   });
+
+  /*
+   * An expired or missing session is not an error the calling screen can do
+   * anything about — it needs the sign-in page. Thrown as its own type so a
+   * component can tell "you are signed out" from "that failed".
+   */
+  if (res.status === 401) {
+    throw new NotSignedIn();
+  }
   if (!res.ok) {
     // the server explains itself ("That is not a dialable number"); showing
     // "PATCH /sos/emergency-number failed (400)" instead helps nobody
@@ -67,6 +91,32 @@ interface Envelope<T> { data: T }
 export type LifeStage = 'pregnant' | 'new-mother' | 'parent' | 'planning' | 'general';
 
 export const api = {
+  /* ----------------------------------------------------------- auth */
+
+  /** Who is signed in, or null. Never 401s — the app asks this on load. */
+  getSession: () =>
+    request<Envelope<{ user: AuthUser | null }>>('/auth/session').then((r) => r.data.user),
+
+  login: (email: string, password: string) =>
+    request<Envelope<{ user: AuthUser }>>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }).then((r) => r.data.user),
+
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<Envelope<{ changed: boolean }>>('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }).then((r) => r.data),
+
+  /** Names and emails for the sign-in screen. Never the passwords. */
+  getDemoAccounts: () =>
+    request<Envelope<{ name: string; email: string; stage: string; conditions: string }[]>>(
+      '/auth/demo-accounts',
+    ).then((r) => r.data),
+
   /* the signed-in user */
   getMe: () => request<Envelope<{ user: { name: string; stage: LifeStage } }>>('/me').then((r) => r.data.user),
 
@@ -96,21 +146,6 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ language }),
     }).then((r) => r.data.language),
-
-  /**
-   * The demo accounts, and which one the app is viewing as.
-   *
-   * Standing in for authentication. Four screens branch on life stage, and
-   * without this only one of the four could be reached.
-   */
-  getAccounts: () =>
-    request<Envelope<DemoAccount[]>>('/accounts').then((r) => r.data),
-
-  useAccount: (userId: string) =>
-    request<Envelope<{ id: string; name: string; stage: string }>>('/accounts/use', {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }).then((r) => r.data),
 
   setStage: (stage: LifeStage) =>
     request<Envelope<{ stage: LifeStage }>>('/me', {

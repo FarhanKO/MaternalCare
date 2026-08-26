@@ -48,32 +48,79 @@ MaternityCare+/
 
 ## Running the project
 
-Requires **Node.js 22+** (uses the built-in `node:sqlite` module).
+Requires **Node.js 22+** and a PostgreSQL connection string in `.env`
+(see `.env.example`). Python 3.11+ is optional — only the risk model needs it.
 
-### 1. Backend — Express MVC API + EJS pages
+### 1. Database
 
 ```bash
-npm install
+npm run db:reset && npm run db:seed && npm run db:stages && npm run db:passwords
+```
+
+`db:reset` rebuilds the schema from `db/migrations`, `db:seed` fills it,
+`db:stages` adds the three life-stage accounts the main seed does not cover,
+and `db:passwords` gives every account a password.
+
+### 2. Backend — Express MVC API + EJS pages
+
+```bash
 npm start
 ```
 
-Runs at **http://localhost:3000**. The SQLite database is created and seeded
-automatically on first run. Delete `data/maternitycare.db` to reseed.
+Runs at **http://localhost:3000**.
 
-### 2. Frontend — React dashboard
-
-In a second terminal:
+### 3. Frontend — React dashboard
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm --prefix frontend install && npm --prefix frontend run dev
 ```
 
-Runs at **http://localhost:5173**
+Runs at **http://localhost:5173**. Start the backend first — the API needs a
+session, so the React app will send you to the sign-in page without one.
 
-> Start the backend **first**. If it is not running the React app still loads with local
-> demo data and reports an offline state — it just will not persist anything.
+### 4. Risk model — optional
+
+```bash
+npm run ml:serve
+```
+
+Runs at **http://localhost:8000**. The app works without it: the risk screen
+falls back to the rule engine and says the model is not running. See
+[`ml-service/README.md`](ml-service/README.md).
+
+---
+
+## Signing in
+
+Every account is stored with a **scrypt** hash (N=2^17, r=8, p=1 — OWASP's
+recommended minimum). The plaintext below exists only in `db/seed-passwords.js`
+and here; nothing in the application stores, logs or returns it.
+
+| Account | Email | Stage / role | What it shows |
+|---|---|---|---|
+| Ayesha Rahman | `ayesha@example.com` | pregnant | Week 29. The fullest record — appointments, messages, documents, SOS contacts. |
+| Tonima Haque | `tonima@stage.demo` | planning | Pre-conception. No pregnancy, no countdown. |
+| Nabila Karim | `nabila@stage.demo` | new mother | Ayaan at seven weeks, with his own daily log. |
+| Orpa Das | `orpa@stage.demo` | parent | Rehnuma at two and a half, growth and milestones. |
+
+Passwords by role:
+
+| Role | Password |
+|---|---|
+| mother | `demo-mother-2026` |
+| clinician | `demo-clinician-2026` |
+| admin | `demo-admin-2026` |
+
+The other seeded mothers — Nusrat, Farhana, Priya, Maria, Shirin — use the same
+mother password and their `firstname.lastname@example.com` address. They exist
+to populate a clinician's caseload.
+
+> These are demo credentials for a database of invented people. If this is ever
+> pointed at real records, every one of these accounts has to go first — a known
+> password on a medical record is the whole problem.
+
+Each of the four dashboards is different, so signing in as each is the fastest
+way to see what the app actually does. Sign out from the account menu, top right.
 
 ---
 

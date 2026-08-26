@@ -24,7 +24,7 @@ import { CarePlan } from '@/components/mother/CarePlan';
 import { RiskPanel } from '@/components/mother/RiskPanel';
 import { StageHero } from '@/components/mother/StageHero';
 import { ChildVitals } from '@/components/mother/ChildVitals';
-import { AccountSwitcher } from '@/components/mother/AccountSwitcher';
+import { AccountMenu } from '@/components/mother/AccountMenu';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
@@ -53,6 +53,7 @@ import { api } from '@/lib/api';
 import type { SosAlert } from '@/data/sos';
 import type { ChildState, FetalSizePoint, Vaccination } from '@/data/records';
 import { useT } from '@/i18n';
+import { useAuth } from '@/lib/auth';
 
 /* ---------------- palette for charts ---------------- */
 const C = {
@@ -495,6 +496,8 @@ export function Mother() {
   const vitals = useVitalSeries();
   // dates and month names follow her chosen language
   const { locale } = useT();
+  // who is signed in — the route guard has already established there is somebody
+  const { user: account } = useAuth();
   /** the daily check-in sheet — opened from the bell or from "View all" */
   const [checkInOpen, setCheckInOpen] = useState(false);
   // one source for "what week is she in" — every mention below reads this
@@ -584,8 +587,7 @@ export function Mother() {
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            {/* demo only — see AccountSwitcher */}
-            <AccountSwitcher />
+            {account && <AccountMenu user={account} />}
             <NotificationBell
               sosActive={!!liveAlert}
               vitalAlerts={vitals.alerts}

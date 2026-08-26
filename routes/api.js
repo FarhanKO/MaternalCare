@@ -24,16 +24,47 @@ const guidanceApi = require('../controllers/api/guidanceApiController');
 const moderationApi = require('../controllers/api/moderationApiController');
 const careEndingApi = require('../controllers/api/careEndingApiController');
 const riskApi = require('../controllers/api/riskApiController');
+const authApi = require('../controllers/api/authApiController');
+const session = require('../middleware/session');
 
-/* current demo session user + pregnancy summary */
+/*
+ * Everything below this line needs a signed-in account.
+ *
+ * Listed as exceptions rather than applied route by route, because the
+ * failure mode of the other arrangement is silent: a new endpoint added
+ * without its guard serves patient records to anybody, and nothing complains.
+ * This way a new route is protected by default and has to be argued out of it.
+ *
+ * The exceptions:
+ *   /auth/*      you cannot sign in while signed in
+ *   /guardian/*  carries its own capability token, held by a family member
+ *                who has no account here
+ *   /network     the LAN address the guardian pairing link is built from
+ *   /community/images  <img> tags cannot send credentials in every context,
+ *                and these are already unguessable UUID filenames
+ */
+const PUBLIC = [/^\/auth\//, /^\/guardian\//, /^\/network$/, /^\/community\/images\//];
+
+router.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  if (PUBLIC.some((rx) => rx.test(req.path))) return next();
+  return session.requireUser(req, res, next);
+});
+
+/* the signed-in user + her pregnancy summary */
 router.get('/me', sessionApi.show);
 
 /* update the signed-in user's life stage (set at the end of onboarding) */
 router.patch('/me', sessionApi.setStage);
 router.get('/me/language', sessionApi.language);
-/* demo account switching — goes away when authentication arrives */
-router.get('/accounts', sessionApi.accounts);
-router.post('/accounts/use', sessionApi.useAccount);
+
+/* ------------------------------------------------------------ auth */
+router.post('/auth/login', authApi.login);
+router.post('/auth/logout', authApi.logout);
+router.get('/auth/session', authApi.session);
+router.post('/auth/password', session.requireUser, authApi.changePassword);
+/* names and emails for the sign-in screen; never the passwords */
+router.get('/auth/demo-accounts', authApi.demoAccounts);
 router.patch('/me/language', sessionApi.setLanguage);
 
 /* patients — the clinician's caseload */

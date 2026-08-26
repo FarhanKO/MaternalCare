@@ -17,7 +17,8 @@
     "ml:train": "node ml-service/run.js train.py",
     "ml:serve": "node ml-service/run.js -m uvicorn app:app --port 8000",
     "ml:test": "node ml-service/run.js -m pytest test_service.py -q",
-    "db:stages": "node db/seed-stages.js"
+    "db:stages": "node db/seed-stages.js",
+    "db:passwords": "node db/seed-passwords.js"
   },
   "dependencies": {
     "chart.js": "^4.4.9",

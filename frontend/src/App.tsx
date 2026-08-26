@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
+import { RequireAuth } from '@/lib/auth';
 import { Background } from '@/components/landing/Background';
 import { PageLoader } from '@/components/ui/Loader';
 import { ProfileProvider } from '@/context/ProfileContext';
@@ -52,8 +53,15 @@ export default function App() {
           <Route path="/health-plan" element={<HealthPlan />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/consultants" element={<Consultants />} />
-          <Route path="/mother" element={<Mother />} />
-          <Route path="/doctor" element={<Doctor />} />
+          {/* the two portals hold medical records and need an account */}
+          <Route
+            path="/mother"
+            element={<RequireAuth role="mother"><Mother /></RequireAuth>}
+          />
+          <Route
+            path="/doctor"
+            element={<RequireAuth role={['clinician', 'admin']}><Doctor /></RequireAuth>}
+          />
           <Route path="/appoint" element={<Appoint />} />
         </Routes>
       </Suspense>

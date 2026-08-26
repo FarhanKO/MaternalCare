@@ -25,16 +25,57 @@ const bad = (label, detail = '') => {
 };
 const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(label, detail));
 
+/*
+ * The audit signs in like a browser does.
+ *
+ * Every endpoint below /api now needs a session, so the cookie has to be
+ * carried between requests. Node's fetch has no cookie jar, and one variable
+ * is smaller than a dependency.
+ */
+let cookie = null;
+
 async function call(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+  const set = res.headers.getSetCookie?.() ?? [];
+  for (const c of set) {
+    const [pair] = c.split(';');
+    if (pair.startsWith('mc_session=')) {
+      cookie = pair.endsWith('=') ? null : pair;   // cleared on logout
+    }
+  }
+
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
   return { status: res.status, json, text };
+}
+
+/**
+ * A raw fetch that still carries the session.
+ *
+ * `call` is for JSON; the endpoints that stream bytes — a document, a post
+ * image, the PDF — need the response object itself. They still need the
+ * cookie, which was the one thing that broke when the API stopped being open.
+ */
+function authed(url, init) {
+  return fetch(url, {
+    ...init,
+    headers: { ...(init?.headers || {}), ...(cookie ? { Cookie: cookie } : {}) },
+  });
+}
+
+/** Sign in as one of the seeded accounts. */
+async function signIn(email, password = 'demo-mother-2026') {
+  const r = await call('POST', '/auth/login', { email, password });
+  return r.status === 200 ? r.json.data.user : null;
 }
 
 const GET = (p) => call('GET', p);
@@ -113,9 +154,26 @@ const filled = (v) => {
    * would fail with "week undefined" because somebody had been looking at the
    * planning dashboard an hour earlier.
    */
-  const roster = await GET('/accounts');
-  const primary = roster.json?.data?.find((a) => a.stage === 'pregnant');
-  if (primary) await POST('/accounts/use', { userId: primary.id });
+  /* ------------------------------------------------------------ auth */
+  console.log('  --- authentication ---');
+
+  check('the API refuses an anonymous request', (await GET('/patients/1')).status === 401,
+    'GET /patients/1 without a session');
+  check('  and so does her own record', (await GET('/me')).status === 401);
+  check('  signing in is still reachable', (await GET('/auth/session')).status === 200);
+
+  check('POST /auth/login rejects a wrong password',
+    (await POST('/auth/login', { email: 'ayesha@example.com', password: 'nope' })).status === 401);
+  check('  and says the same thing about an account that does not exist',
+    (await POST('/auth/login', { email: 'nobody@nowhere.invalid', password: 'nope' })).json?.error
+      === (await POST('/auth/login', { email: 'ayesha@example.com', password: 'nope' })).json?.error);
+
+  const primary = await signIn('ayesha@example.com');
+  check('POST /auth/login signs in', Boolean(primary), `${primary?.name} · ${primary?.stage}`);
+  check('  the session then resolves', (await GET('/auth/session')).json?.data?.user?.name === primary?.name);
+  check('  and her record is reachable', (await GET('/me')).status === 200);
+  check('  no response carries a password or a hash',
+    !JSON.stringify((await GET('/auth/session')).json).match(/password|scrypt/i));
 
   // clear any litter a previous crashed run left behind, before it can make
   // this one fail on a unique constraint against its own probe rows
@@ -394,7 +452,7 @@ const filled = (v) => {
   const withImage = await POST('/community/posts', { topic: 'General', title: '__audit__ image', image: PIXEL });
   check('POST a post with an image', withImage.status === 201 && Boolean(withImage.json?.data?.image),
     withImage.json?.data?.image);
-  const shot = await fetch(`${ORIGIN}${withImage.json.data.image}`);
+  const shot = await authed(`${ORIGIN}${withImage.json.data.image}`);
   const shotBytes = Buffer.from(await shot.arrayBuffer());
   check('  served back with a declared type',
     shot.status === 200
@@ -404,7 +462,7 @@ const filled = (v) => {
   check('  and they are the bytes that went in',
     shotBytes.subarray(0, 4).toString('hex') === '89504e47');
   check('  image paths cannot escape the upload directory',
-    (await fetch(`${ORIGIN}/api/community/images/..%2F..%2Fpackage.json`)).status === 404);
+    (await authed(`${ORIGIN}/api/community/images/..%2F..%2Fpackage.json`)).status === 404);
 
   /* ------------------------------------------------- reporting (F18) */
   console.log('\n  --- reporting & moderation ---');
@@ -449,67 +507,57 @@ const filled = (v) => {
     (await POST(`/moderation/posts/${postId}/resolve`, { action: 'incinerate' })).status === 400);
   check('GET /moderation/count', Number.isFinite((await GET('/moderation/count')).json?.data?.open));
 
-  /* --------------------- demo accounts, one per life stage */
-  console.log('\n  --- demo accounts & the child log ---');
-  const accounts = await GET('/accounts');
-  check('GET /accounts lists the demo mothers', accounts.json?.data?.length >= 4,
-    accounts.json?.data?.map((a) => a.stage).join(', '));
-  const stages = new Set((accounts.json?.data ?? []).map((a) => a.stage));
-  check('  all four life stages are represented',
-    ['pregnant', 'planning', 'new-mother', 'parent'].every((st) => stages.has(st)),
-    [...stages].join(', '));
+  /* --------------------- the four life stages, each its own account */
+  console.log('\n  --- life stages ---');
 
-  const startAccount = accounts.json.data.find((a) => a.active)?.id;
+  const STAGE_LOGINS = [
+    ['tonima@stage.demo', 'planning'],
+    ['nabila@stage.demo', 'new-mother'],
+    ['orpa@stage.demo', 'parent'],
+  ];
 
-  /*
-   * Each account has to carry its own data, which is what the missing owner
-   * column on `vaccinations` used to prevent: one global schedule that every
-   * mother read and wrote.
-   */
-  const seen = new Map();
-  for (const acct of accounts.json.data.filter((a) => a.stage !== 'pregnant' || a.active)) {
-    await POST('/accounts/use', { userId: acct.id });
+  const schedules = new Map();
+  for (const [email, stage] of STAGE_LOGINS) {
+    const who = await signIn(email);
+    if (!who) { check(`  ${stage}: sign in`, false, `${email} — run npm run db:passwords`); continue; }
+
     const vax = await GET('/vaccinations');
     const child = await GET('/child');
-    seen.set(acct.name, (vax.json?.data ?? []).map((v) => v.id).join(','));
-    const wantsChild = acct.stage === 'new-mother' || acct.stage === 'parent';
-    check(`  ${acct.name} (${acct.stage})`,
-      Array.isArray(vax.json?.data)
+    schedules.set(email, (vax.json?.data ?? []).map((v) => v.id).join(','));
+    const wantsChild = stage === 'new-mother' || stage === 'parent';
+
+    check(`  ${who.name} signs in as ${stage}`,
+      who.stage === stage
+        && Array.isArray(vax.json?.data)
         && (!wantsChild || Boolean(child.json?.data?.child)),
       `${vax.json?.data?.length} vaccinations`
         + (child.json?.data?.child ? `, child ${child.json.data.child.name}` : ''));
   }
-  const lists = [...seen.values()].filter(Boolean);
-  check('  and no two accounts share a vaccination schedule',
+
+  const lists = [...schedules.values()].filter(Boolean);
+  check('  no two accounts share a vaccination schedule',
     new Set(lists).size === lists.length, `${lists.length} distinct schedules`);
 
-  /* the child's own daily check-in */
-  const parent = accounts.json.data.find((a) => a.stage === 'parent');
-  if (parent) {
-    await POST('/accounts/use', { userId: parent.id });
-    const log = await GET('/child/log');
-    check('GET /child/log', log.status === 200 && Boolean(log.json?.data?.child),
-      `${log.json?.data?.child?.name}, ${log.json?.data?.history?.length} days logged`);
-    const wasNappies = log.json?.data?.today?.wetNappies ?? null;
-    const patched = await PATCH('/child/log', { feeds: 5 });
-    check('PATCH /child/log writes one field',
-      patched.json?.data?.today?.feeds === 5);
-    check('  without blanking the rest of the day',
-      (patched.json?.data?.today?.wetNappies ?? null) === wasNappies,
-      `nappies still ${patched.json?.data?.today?.wetNappies}`);
-    check('  and refuses a mood it does not know',
-      (await PATCH('/child/log', { mood: '__nope__' })).status === 400);
-  }
+  /* the child's own daily check-in, as the parent */
+  await signIn('orpa@stage.demo');
+  const childLog = await GET('/child/log');
+  check('GET /child/log', childLog.status === 200 && Boolean(childLog.json?.data?.child),
+    `${childLog.json?.data?.child?.name}, ${childLog.json?.data?.history?.length} days logged`);
+  const wasNappies = childLog.json?.data?.today?.wetNappies ?? null;
+  const patched = await PATCH('/child/log', { feeds: 5 });
+  check('PATCH /child/log writes one field', patched.json?.data?.today?.feeds === 5);
+  check('  without blanking the rest of the day',
+    (patched.json?.data?.today?.wetNappies ?? null) === wasNappies,
+    `nappies still ${patched.json?.data?.today?.wetNappies}`);
+  check('  and refuses a mood it does not know',
+    (await PATCH('/child/log', { mood: '__nope__' })).status === 400);
 
-  const planning = accounts.json.data.find((a) => a.stage === 'planning');
-  if (planning) {
-    await POST('/accounts/use', { userId: planning.id });
-    check('  a mother with no child gets 404 from /child/log, not a crash',
-      (await GET('/child/log')).status === 404);
-  }
+  await signIn('tonima@stage.demo');
+  check('  a mother with no child gets 404 from /child/log, not a crash',
+    (await GET('/child/log')).status === 404);
 
-  // back to the account this run pinned, so the next one starts clean too
-  if (primary) await POST('/accounts/use', { userId: primary.id });
+  /* back to the account the rest of this run assumes */
+  await signIn('ayesha@example.com');
 
   /* ---------------------------- the dashboard follows her stage */
   console.log('\n  --- life stage ---');
@@ -656,7 +704,7 @@ const filled = (v) => {
   });
   check('POST /documents', madeDoc.status === 201 && madeDoc.json?.data?.id, madeDoc.json?.data?.title);
   if (madeDoc.json?.data?.id) {
-    const fileRes = await fetch(`${BASE}/documents/${madeDoc.json.data.id}/file`);
+    const fileRes = await authed(`${BASE}/documents/${madeDoc.json.data.id}/file`);
     check('GET /documents/:id/file serves the bytes', fileRes.ok, `${fileRes.headers.get('content-type')}`);
     check('DELETE /documents/:id', (await DEL(`/documents/${madeDoc.json.data.id}`)).status === 204);
   }

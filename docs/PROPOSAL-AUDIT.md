@@ -272,7 +272,7 @@ it writes them down.
 
 | Quality | Implied by | State |
 |---|---|---|
-| **Authentication** | F19 "secure access", F20 user accounts | **Absent** |
+| **Authentication** | F19 "secure access", F20 user accounts | **Built** — scrypt, server-side sessions |
 | Authorisation | F19, F20 | Partial — patient-scoped endpoints check the caseload |
 | Data protection at rest | All medical records | Partial — RLS denies PostgREST; no field encryption |
 | Transport security | All | Absent locally; TLS is the host's job in production |
@@ -283,15 +283,34 @@ it writes them down.
 | Data honesty | Everything clinical | Enforced throughout — see below |
 | Testability | — | Good — 301 assertions across three suites |
 
-### The one that matters most: there is no authentication
+### Authentication — closed
 
-`userModel.current()` returns the first seeded mother. Every request is that
-mother. The clinician portal is reachable by anyone who visits `/doctor`, and
-`GET /api/patients/2` will return a patient record to an unauthenticated
-stranger.
+`userModel.current()` used to return the first seeded mother. Every request was
+that woman, `/doctor` was reachable by anyone who typed it, and
+`GET /api/patients/2` handed a patient record to an unauthenticated stranger.
 
-This is fine for a demo and is disqualifying for anything else. It is listed
-first under production work below.
+Now:
+
+* **scrypt** hashing at OWASP's recommended minimum (N=2^17, r=8, p=1, ~200 ms
+  a verification) using Node's own crypto — no native dependency;
+* **server-side sessions** rather than a stateless token, because a row can be
+  revoked before it expires and a JWT cannot. For medical records the ability
+  to end a session the moment a phone is lost is worth a lookup per request;
+* the token lives in an **httpOnly, SameSite=Lax** cookie, so an XSS bug cannot
+  read it and a cross-site request cannot spend it;
+* every route under `/api` requires a session **by default**, with a short
+  exception list. The other arrangement fails silently — a new endpoint added
+  without its guard serves records to anybody and nothing complains;
+* `AsyncLocalStorage` carries the signed-in user down the async call tree, so
+  the model layer resolves *who is asking* without a userId being threaded
+  through several dozen function signatures where one missed call would serve
+  the wrong woman's record;
+* login gives the **same message** for a wrong password and a missing account,
+  and hashes either way, so the form cannot be used to find out who is a
+  patient here.
+
+Still outstanding: password reset, rate limiting on the login endpoint, and
+2FA. Rate limiting is item 3 below and matters most of the three.
 
 ### Data honesty as a standing rule
 
@@ -312,12 +331,9 @@ stated where the user can see it. F5 was the last known violation, and is now fi
 
 Ordered by what would stop this being deployable to a real mother tomorrow.
 
-### 1. Authentication and sessions — **blocking**
-Real accounts, password hashing (argon2 or bcrypt), server-side sessions or
-JWTs, and a middleware that resolves the current user from the session instead
-of `SELECT ... LIMIT 1`. Every `/api` route needs an authorisation check;
-clinician routes need a role gate. Nothing else on this list matters until this
-is done. *2–3 days.*
+### 1. Authentication and sessions — **done**
+See the section above. What remains from the original item: a password reset
+flow, and rate limiting on the login endpoint (item 3).
 
 ### 2. Transport and headers
 TLS termination, HSTS, `helmet` for security headers, a real CORS allow-list
