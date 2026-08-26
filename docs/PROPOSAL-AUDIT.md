@@ -1,7 +1,8 @@
 # MaternalCare+ — audit against the project proposal
 
-Audited 26 August 2026, at commit `ccc08cc`, against *MaternalCare+ — Maternity
-and Childcare monitoring Platform*.
+Audited against *MaternalCare+ — Maternity and Childcare monitoring Platform*
+on 26 August 2026, at commit `ccc08cc`. The one defect it found (F5) has since
+been fixed and re-verified.
 
 Every claim below was checked against running code, not against memory. Where a
 feature is marked partial the specific missing piece is named, and where
@@ -11,11 +12,11 @@ absent, because nobody goes looking for it.
 
 | | |
 |---|---|
-| **Built** | 15 of 20 |
+| **Built** | 16 of 20 |
 | **Partial** | 4 of 20 |
-| **Not built** | 1 of 20 |
-| **Defects found in "built" features** | 1 (F5, below) |
-| Verification at this commit | 137 model tests · 144 API audit · 13 ML service tests |
+| **Not built** | 0 of 20 |
+| **Defects found in "built" features** | 0 — the one found (F5) is fixed |
+| Verification | 144 model tests · 144 API audit · 13 ML service tests |
 
 ---
 
@@ -44,26 +45,41 @@ hide an abnormal glucose.
 ### F4 · Child growth recorder — **built**
 Height, weight and head circumference over time in `growth_records`.
 
-### F5 · WHO percentile comparator — **built, with a defect**
+### F5 · WHO percentile comparator — **built** *(defect found and fixed)*
 
-> **Defect — `models/childModel.js`, `percentileSummary()`**
->
-> The comparator holds one reference table, `WHO_WEIGHT_GIRLS`, and uses it
-> unconditionally. It never reads the child's sex, although `children.gender`
-> is recorded. A boy is silently plotted against girls' curves and told
-> "healthy range" or "below the 3rd percentile" on the wrong reference.
->
-> It also covers **weight-for-age only**. F4 records height and head
-> circumference; neither has a curve, so two thirds of what is measured is
-> never compared to anything.
->
-> This is the same class of problem as the fabricated nutrition panel removed
-> in F14 — a confident number with nothing behind it. It reads as working
-> because the seeded child is female.
+**What was wrong.** The comparator held one hand-typed table of approximate
+P3/P50/P97 values — girls' weight only — and applied it to every child without
+ever reading `children.gender`. It also covered weight alone, so the height and
+head circumference recorded by F4 were compared to nothing. It read as working
+because the only seeded child is female.
 
-**To close it:** add boys' weight-for-age, plus length/height-for-age and
-head-circumference-for-age for both sexes, and branch on `children.gender`.
-Roughly half a day, mostly transcribing WHO tables.
+The cost was measurable: a boy at the **3rd centile** for boys — genuinely
+underweight — came out at roughly the **14th** on the girls' curve, comfortably
+inside "healthy range", so nobody would have looked.
+
+**What replaced it.** The official WHO Child Growth Standards, downloaded from
+`cdn.who.int` as the published LMS parameters, for all three measures and both
+sexes, 0–60 months (`models/data/whoGrowth.js`). That gives an exact z-score
+and percentile rather than a band chosen by eye:
+
+```
+z = ((X / M) ^ L − 1) / (L × S)
+```
+
+Behaviour now:
+
+* the reference is chosen from the child's recorded sex, and `male`/`M`/`boy`
+  all resolve;
+* weight, height **and** head circumference are each placed on their own curve;
+* the growth chart's shaded band is generated from the same parameters, so the
+  picture and the number can never disagree;
+* where the sex is **not** recorded, no reference is chosen and the screen says
+  why. Guessing is what the old code did, and a growth assessment against the
+  wrong curves is not an approximate answer — it is a wrong one a parent has no
+  way to detect.
+
+Pinned by seven tests, including one asserting directly that a boy and a girl
+with identical measurements get different z-scores.
 
 ### F6 · Developmental milestone tracker — **built**
 `milestones` table with per-child achieved state, toggled from the child screen.
@@ -265,7 +281,7 @@ it writes them down.
 | Auditability | F18 moderation, F11 endings | Good — decisions record who, when and why |
 | Accessibility | F13 multi-language, target users | Partial — Bangla started, no screen-reader pass |
 | Data honesty | Everything clinical | Enforced throughout — see below |
-| Testability | — | Good — 294 assertions across three suites |
+| Testability | — | Good — 301 assertions across three suites |
 
 ### The one that matters most: there is no authentication
 
@@ -288,7 +304,7 @@ credentials" promise nobody was keeping.
 The rule applied throughout: **an interface element is a claim.** A progress bar
 claims measurement; a "Reported" button claims someone will read it. Where the
 system cannot honour the claim, the element is removed or the limitation is
-stated where the user can see it. F5 above is the last known violation.
+stated where the user can see it. F5 was the last known violation, and is now fixed.
 
 ---
 
@@ -303,48 +319,45 @@ of `SELECT ... LIMIT 1`. Every `/api` route needs an authorisation check;
 clinician routes need a role gate. Nothing else on this list matters until this
 is done. *2–3 days.*
 
-### 2. Fix the WHO percentile defect — **blocking for child users**
-F5 above. A silently wrong growth assessment is worse than none. *Half a day.*
-
-### 3. Transport and headers
+### 2. Transport and headers
 TLS termination, HSTS, `helmet` for security headers, a real CORS allow-list
 instead of the current permissive handler, and cookies marked `Secure`,
 `HttpOnly`, `SameSite`. *Half a day.*
 
-### 4. Rate limiting and abuse control
+### 3. Rate limiting and abuse control
 Nothing throttles anything. The SOS endpoint, the report endpoint, login (once
 it exists) and the PDF generator are all trivially floodable, and the PDF
 route is expensive per call. *Half a day.*
 
-### 5. Upload hardening
+### 4. Upload hardening
 Files are validated by declared MIME and written to disk under a UUID. Add
 magic-byte sniffing, a per-account quota, virus scanning if budget allows, and
 move storage to object storage (S3/Supabase Storage) so the app tier stays
 stateless. Also: deleting a post currently orphans its image on disk. *1 day.*
 
-### 6. Secrets and configuration
+### 5. Secrets and configuration
 `DATABASE_URL` is read from `.env`. In production it belongs in a secret
 manager with rotation. The Supabase service key must never reach a client
 bundle. *Half a day.*
 
-### 7. Backups and recovery
+### 6. Backups and recovery
 No backup policy is written down. Medical records need point-in-time recovery,
 a tested restore, and a stated retention period. Supabase provides the
 mechanism; the policy and the *tested* restore are yours. *Half a day.*
 
-### 8. Observability
+### 7. Observability
 No structured logging, no error tracking, no uptime monitoring. For a service
 with an SOS button, an alert that silently fails is the worst possible failure
 and nothing would currently notice. Add structured request logs, Sentry or
 equivalent, and a health check on each service. *1 day.*
 
-### 9. Data protection compliance
+### 8. Data protection compliance
 A privacy policy, a lawful basis for processing, a data-subject export and
 delete path, and a retention schedule. Bangladesh's Digital Security Act and —
 if any user is in the EU — GDPR both apply to health data. This is paperwork,
 but it is not optional. *Depends on legal input.*
 
-### 10. CI
+### 9. CI
 The three test suites are run by hand. They should run on every push, with the
 ML service started in the pipeline so the F13 integration is covered in both
 its up and down states. *Half a day.*
@@ -365,8 +378,7 @@ explainable. Keeping both is the design, not a transitional state.
 
 | Status | Features |
 |---|---|
-| **Built** | F1, F2, F3, F4, F6, F7, F9, F10, F11, F12, F14, F15, F17, F18, F19 |
-| **Built with a defect** | F5 — sex-blind growth curves, weight only |
+| **Built** | F1, F2, F3, F4, F5, F6, F7, F9, F10, F11, F12, F14, F15, F17, F18, F19 |
 | **Partial** | F8 (no delivery when closed) · F13 (voice barely started, translation incomplete) · F16 (no voice) · F20 (no admin portal) |
 | **Not built** | — |
 

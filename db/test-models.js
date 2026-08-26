@@ -363,7 +363,35 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const growth = await childModel.growth(child.id);
   check('childModel.growth', growth.length === 7, `${growth.length} records`);
   const pct = await childModel.percentileSummary(child.id);
-  check('childModel.percentileSummary', pct.band === 'P50 – P97', pct.band);
+  check('childModel.percentileSummary places all three measures',
+    pct.sexKnown && pct.measures.filter((m) => m.available).length === 3,
+    pct.measures.map((m) => `${m.key} ${m.centile}`).join(', '));
+  check('  against the reference for the sex on record', pct.sex === 'girls', pct.sex);
+
+  /*
+   * The defect this replaced: one hand-typed girls-only weight table applied
+   * to every child. A boy at the 3rd centile for boys read as roughly the
+   * 14th on the girls' curve — inside "healthy range", so nobody looked.
+   */
+  const boyAt3rd = 7.84;   // kg, 12 months, boys P3
+  check('  a boy is not graded against the girls curves',
+    Math.abs(childModel.zScore('weight', 'boys', 12, boyAt3rd)
+      - childModel.zScore('weight', 'girls', 12, boyAt3rd)) > 0.5,
+    `boys z=${childModel.zScore('weight', 'boys', 12, boyAt3rd).toFixed(2)} vs `
+      + `girls z=${childModel.zScore('weight', 'girls', 12, boyAt3rd).toFixed(2)}`);
+  check('  and that boy reads as underweight, which he is',
+    childModel.zScore('weight', 'boys', 12, boyAt3rd) < -1.8);
+
+  check('  height and head circumference have a reference now',
+    pct.measures.every((m) => m.available),
+    pct.measures.map((m) => m.label).join(' · '));
+  check('  the median comes from the WHO table, not a guess',
+    pct.measures.every((m) => Number.isFinite(m.median) && m.median > 0));
+  check('  sex spellings a parent might type all resolve',
+    ['male', 'M', 'Boy'].every((g) => childModel.sexOf({ gender: g }) === 'boys')
+      && ['female', 'f', 'Girl'].every((g) => childModel.sexOf({ gender: g }) === 'girls'));
+  check('  an unrecorded sex resolves to nothing rather than a default',
+    childModel.sexOf({ gender: null }) === null && childModel.sexOf({}) === null);
   const miles = await childModel.milestones(child.id);
   check('childModel.milestones', miles.length === 12 && typeof miles[0].achieved === 'boolean',
     `${miles.filter((m) => m.achieved).length}/12 achieved`);

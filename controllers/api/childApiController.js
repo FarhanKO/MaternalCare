@@ -42,7 +42,7 @@ exports.show = async (req, res, next) => {
         headCm: g.head_cm,
       })),
       percentile,
-      reference: childModel.WHO_WEIGHT_GIRLS,
+      reference: childModel.referenceCurve(childModel.sexOf(child) || 'girls'),
       milestones: milestones.map((m) => ({
         id: String(m.id),
         title: m.title,

@@ -121,6 +121,21 @@ function field(doc, label, value, x, y, w) {
     .text(value == null || value === '' ? '—' : String(value), x, y + 11, { width: w });
 }
 
+/**
+ * The WHO growth line for the report.
+ *
+ * Names the reference used — a clinician reading this needs to know which
+ * curves the centiles came from, and the answer used to be "girls, always".
+ */
+function whoLine(p) {
+  if (!p) return '';
+  if (!p.sexKnown) return p.note;
+  const done = (p.measures || []).filter((m) => m.available);
+  if (!done.length) return p.note;
+  const parts = done.map((m) => `${m.label.toLowerCase()} ${m.centileLabel} centile`);
+  return `WHO ${p.sex} standard — ${parts.join(', ')}. ${p.note}`;
+}
+
 /** A pill, used for status and risk. Returns its width. */
 function pill(doc, text, x, y, colour) {
   doc.font('Helvetica-Bold').fontSize(7.5);
@@ -495,7 +510,7 @@ function carePage(doc, data) {
     y += 46;
     if (data.child.percentile) {
       doc.font('Helvetica').fontSize(9.5).fillColor(SOFT)
-        .text(`WHO percentile band ${data.child.percentile.band}. ${data.child.percentile.note}`,
+        .text(whoLine(data.child.percentile),
           M, y, { width: CONTENT_W });
       y = doc.y + 6;
     }

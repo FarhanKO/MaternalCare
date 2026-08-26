@@ -131,12 +131,31 @@ export interface Milestone {
   achievedOn?: string;
 }
 
+/** One measurement placed on the WHO curve for this child's sex and age. */
+export interface PercentileMeasure {
+  key: 'weight' | 'height' | 'head';
+  label: string;
+  unit: string;
+  value: number | null;
+  available: boolean;
+  z?: number;
+  /** '<1' and '>99' are reported as bounds rather than false precision */
+  centile?: string;
+  /** the same figure spelled for display: '57th', 'below the 1st' */
+  centileLabel?: string;
+  median?: number;
+  band?: { key: string; label: string; tone: 'ok' | 'watch' | 'warn' | 'alert' };
+}
+
 export interface PercentileSummary {
-  band: string;
-  note: string;
-  weight: number;
+  /** false when the child's sex is not recorded — no reference is picked */
+  sexKnown: boolean;
+  sex?: 'boys' | 'girls';
   ageMonths: number;
-  p50: string;
+  measuredOn?: string;
+  beyondReference?: boolean;
+  measures: PercentileMeasure[];
+  note: string;
 }
 
 /** WHO weight-for-age reference curves the chart draws behind her readings. */

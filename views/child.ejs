@@ -10,7 +10,7 @@
     <div class="stat">
       <span class="k">Latest weight</span>
       <span class="v"><%= growth[growth.length-1].weight_kg %> <small>kg</small></span>
-      <span class="d up">● <%= percentile.band %> band</span>
+      <span class="d up">● <%= percentile.measures.find(m => m.key === 'weight' && m.available)?.band.label || 'No reference' %></span>
     </div>
   </div>
   <div class="card hoverable reveal reveal-d1">
@@ -45,14 +45,18 @@
     <div class="card-head">
       <div>
         <div class="card-title"><span class="ico">📊</span> Weight vs WHO percentiles</div>
-        <div class="card-sub">Girls 0–24 months · shaded band spans P3–P97 (healthy range)</div>
+        <div class="card-sub"><%= percentile.sexKnown ? (percentile.sex === 'boys' ? 'Boys' : 'Girls') : 'No sex recorded' %> · WHO standard · shaded band spans P3–P97</div>
       </div>
-      <div class="right"><span class="pill pill-good">● <%= percentile.band %></span></div>
+      <div class="right"><span class="pill pill-good">● WHO <%= percentile.sexKnown ? (percentile.sex === 'boys' ? 'boys' : 'girls') : '—' %></span></div>
     </div>
     <div class="chart-box" style="height:290px"><canvas id="whoChart"></canvas></div>
     <div class="alert alert-good" style="margin-top:14px">
       <span class="aico">✅</span>
-      <div><b>WHO standard comparison</b><%= percentile.note %> Median (P50) weight at <%= percentile.ageMonths %> months is <%= percentile.p50 %> kg.</div>
+      <div><b>WHO standard comparison</b><%= percentile.note %>
+        <% for (const m of percentile.measures.filter(x => x.available)) { %>
+          <br><%= m.label %>: <%= m.value %> <%= m.unit %> — <%= m.centileLabel %> centile (median <%= m.median %> <%= m.unit %>).
+        <% } %>
+      </div>
     </div>
   </div>
 

@@ -15,7 +15,9 @@ exports.index = async (req, res, next) => {
       page: 'child', user, child, growth, milestones,
       achieved, milestonePct: milestones.length ? Math.round((achieved / milestones.length) * 100) : 0,
       percentile,
-      who: childModel.WHO_WEIGHT_GIRLS,
+      // the curve for *this* child, not girls' weight for everyone
+      who: childModel.referenceCurve(childModel.sexOf(child) || 'girls')
+        || childModel.referenceCurve('girls'),
       saved: req.query.saved === '1',
     });
   } catch (err) { next(err); }
