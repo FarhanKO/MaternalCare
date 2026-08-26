@@ -24,7 +24,33 @@ const WEEK_NOTES = {
   28: 'Baby can blink and may respond to light and sound from outside.',
 };
 
+/**
+ * The size table as a plottable series, in numbers rather than display
+ * strings.
+ *
+ * The dashboard used to carry its own copy of these figures as a chart
+ * fixture, which had drifted: it showed a week-26 baby at 35.6 cm while the
+ * badge beside it read the week-28 row. Serving one table means the curve and
+ * the badge cannot disagree, and it is honest about what it is — typical size
+ * for a week, not a measurement of her baby.
+ */
+function growthReference() {
+  const grams = (w) => (w.endsWith('kg')
+    ? Math.round(parseFloat(w) * 1000)
+    : Math.round(parseFloat(w) || 0));
+  return Object.entries(SIZE_BY_WEEK)
+    .map(([week, [fruit, length, weight]]) => ({
+      week: Number(week),
+      label: `W${week}`,
+      fruit,
+      lengthCm: parseFloat(length) || 0,
+      weightG: grams(weight),
+    }))
+    .sort((a, b) => a.week - b.week);
+}
+
 module.exports = {
+  growthReference,
   async forUser(userId) {
     const p = await db.one('SELECT * FROM pregnancies WHERE user_id = $1', [userId]);
     if (!p) return null;

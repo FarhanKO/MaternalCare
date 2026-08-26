@@ -357,3 +357,43 @@ export interface RiskView {
     sugar: number; tempC: number; heartBpm: number | null; week: number;
   };
 }
+
+
+/** One point on the typical-fetal-size curve. Reference data, not a measurement. */
+export interface FetalSizePoint {
+  week: number;
+  label: string;
+  fruit: string;
+  lengthCm: number;
+  weightG: number;
+}
+
+
+/* ------------------------------------------- the child's daily log */
+
+export interface ChildLogEntry {
+  date: string;
+  feeds?: number;
+  wetNappies?: number;
+  sleepHours?: number;
+  tempC?: number;
+  mood?: string;
+  note?: string;
+}
+
+export interface ChildLogState {
+  child: { id: string; name: string };
+  today: ChildLogEntry;
+  /** oldest first, ready to chart */
+  history: ChildLogEntry[];
+  summary: {
+    days: number;
+    avgFeeds: number | null;
+    avgNappies: number | null;
+    avgSleepHours: number | null;
+    commonMood: string | null;
+  };
+  /** raised by the entry itself — a fever, or too few wet nappies */
+  flags: { level: 'urgent' | 'warn' | 'watch'; text: string }[];
+  moods: string[];
+}

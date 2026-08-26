@@ -7,8 +7,8 @@ exports.index = async (req, res, next) => {
     const user = await userModel.current();
     const [child, vaccinations, stats] = await Promise.all([
       childModel.forUser(user.id),
-      vaccinationModel.all(),
-      vaccinationModel.stats(),
+      vaccinationModel.all(user.id),
+      vaccinationModel.stats(user.id),
     ]);
     res.render('vaccinations', {
       page: 'vaccinations', user,
@@ -21,7 +21,8 @@ exports.index = async (req, res, next) => {
 
 exports.markDone = async (req, res, next) => {
   try {
-    await vaccinationModel.markDone(Number(req.params.id));
+    const user = await userModel.current();
+    await vaccinationModel.markDone(Number(req.params.id), user.id);
     res.redirect('/vaccinations');
   } catch (err) { next(err); }
 };

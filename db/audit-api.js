@@ -43,6 +43,49 @@ const PATCH = (p, b) => call('PATCH', p, b);
 const PUT = (p, b) => call('PUT', p, b);
 const DEL = (p, b) => call('DELETE', p, b);
 
+/**
+ * Remove everything this audit creates.
+ *
+ * Run at both ends: `before`, so a previous run that threw part way through
+ * cannot make this one fail on its own litter — a leftover probe clinician
+ * makes the registration check fail on a unique constraint, which reads as a
+ * broken feature rather than a dirty database. And `after`, so a clean run
+ * leaves nothing behind.
+ */
+async function sweep(when) {
+  const db = require('../config/db');
+  if (when === 'after') console.log('\n  --- cleaning up ---');
+  console.log('\n  --- cleaning up ---');
+  const removed = await db.sql(`
+    DELETE FROM symptoms      WHERE name  LIKE '__audit__%';
+  `).catch(() => null);
+  await db.run("DELETE FROM reminders    WHERE title LIKE '__audit__%'");
+  await db.run("DELETE FROM appointments WHERE reason LIKE '__audit__%'");
+  await db.run("DELETE FROM messages     WHERE body  LIKE '__audit__%'");
+  await db.run("DELETE FROM post_comments WHERE body LIKE '__audit__%'");
+  await db.run("DELETE FROM content_reports WHERE detail LIKE '__audit__%' OR review_note LIKE '__audit__%'");
+  await db.run("DELETE FROM care_terminations WHERE note LIKE '__audit__%'");
+  await db.run("DELETE FROM posts        WHERE title LIKE '__audit__%'");
+  await db.run("DELETE FROM documents    WHERE title LIKE '__audit__%'");
+  await db.run("DELETE FROM doctors      WHERE license_no LIKE '__audit__%'");
+  await db.run("DELETE FROM vitals       WHERE date  = '2019-01-02'");
+  // the table is growth_records; this said `growth` and swallowed the error,
+  // so every audit run silently left its probe row behind and the child's
+  // percentile band drifted a little further off with each one
+  await db.run("DELETE FROM growth_records WHERE date = '2019-01-02'");
+  await db.run("DELETE FROM emergency_contacts WHERE name LIKE '__audit__%'");
+  // GET /messages/:id legitimately marks the clinician's replies read — that is
+  // what opening a thread means. The audit still has to put the seeded one back,
+  // or it quietly changes state the model tests assert on.
+  await db.run(
+    "UPDATE messages SET read_at = NULL WHERE sender = 'doctor' AND body NOT LIKE '__audit__%'",
+  );
+  void removed;
+
+  if (when === 'after') console.log('  probe rows removed');
+}
+
+
 /** Non-empty object or array — the thing a 200 is supposed to carry. */
 const filled = (v) => {
   if (v === null || v === undefined) return false;
@@ -60,6 +103,23 @@ const filled = (v) => {
     console.log('  \x1b[31mThe server is not answering. Start it with `node app.js` first.\x1b[0m\n');
     process.exit(1);
   }
+
+  /*
+   * Pin the account this run audits.
+   *
+   * Most of what follows assumes a pregnant mother with a full record. The
+   * demo account is switchable now, so inheriting whatever the app was last
+   * left as made the whole run depend on the previous session — a section
+   * would fail with "week undefined" because somebody had been looking at the
+   * planning dashboard an hour earlier.
+   */
+  const roster = await GET('/accounts');
+  const primary = roster.json?.data?.find((a) => a.stage === 'pregnant');
+  if (primary) await POST('/accounts/use', { userId: primary.id });
+
+  // clear any litter a previous crashed run left behind, before it can make
+  // this one fail on a unique constraint against its own probe rows
+  await sweep('before');
 
   /* ------------------------------------------------------- identity */
   console.log('  --- identity & profile ---');
@@ -174,8 +234,12 @@ const filled = (v) => {
   check('POST /doctors/register', reg.status === 201 && reg.json?.data?.bookable === true,
     `${reg.json?.data?.name} · ${reg.json?.data?.status} · ৳${reg.json?.data?.feeBdt}`);
   const afterReg = await GET('/doctors/recommended');
-  check('  and is ranked immediately', afterReg.json.data.some((d) => d.id === reg.json.data.id),
-    `#${afterReg.json.data.findIndex((d) => d.id === reg.json.data.id) + 1} of ${afterReg.json.data.length}`);
+  const regId = reg.json?.data?.id;
+  check('  and is ranked immediately',
+    Boolean(regId) && afterReg.json.data.some((d) => d.id === regId),
+    regId
+      ? `#${afterReg.json.data.findIndex((d) => d.id === regId) + 1} of ${afterReg.json.data.length}`
+      : 'registration did not return a clinician');
   const dupe = await POST('/doctors/register', {
     name: 'Dr. __audit__ Twin',
     specialty: 'Paediatrics',
@@ -385,6 +449,68 @@ const filled = (v) => {
     (await POST(`/moderation/posts/${postId}/resolve`, { action: 'incinerate' })).status === 400);
   check('GET /moderation/count', Number.isFinite((await GET('/moderation/count')).json?.data?.open));
 
+  /* --------------------- demo accounts, one per life stage */
+  console.log('\n  --- demo accounts & the child log ---');
+  const accounts = await GET('/accounts');
+  check('GET /accounts lists the demo mothers', accounts.json?.data?.length >= 4,
+    accounts.json?.data?.map((a) => a.stage).join(', '));
+  const stages = new Set((accounts.json?.data ?? []).map((a) => a.stage));
+  check('  all four life stages are represented',
+    ['pregnant', 'planning', 'new-mother', 'parent'].every((st) => stages.has(st)),
+    [...stages].join(', '));
+
+  const startAccount = accounts.json.data.find((a) => a.active)?.id;
+
+  /*
+   * Each account has to carry its own data, which is what the missing owner
+   * column on `vaccinations` used to prevent: one global schedule that every
+   * mother read and wrote.
+   */
+  const seen = new Map();
+  for (const acct of accounts.json.data.filter((a) => a.stage !== 'pregnant' || a.active)) {
+    await POST('/accounts/use', { userId: acct.id });
+    const vax = await GET('/vaccinations');
+    const child = await GET('/child');
+    seen.set(acct.name, (vax.json?.data ?? []).map((v) => v.id).join(','));
+    const wantsChild = acct.stage === 'new-mother' || acct.stage === 'parent';
+    check(`  ${acct.name} (${acct.stage})`,
+      Array.isArray(vax.json?.data)
+        && (!wantsChild || Boolean(child.json?.data?.child)),
+      `${vax.json?.data?.length} vaccinations`
+        + (child.json?.data?.child ? `, child ${child.json.data.child.name}` : ''));
+  }
+  const lists = [...seen.values()].filter(Boolean);
+  check('  and no two accounts share a vaccination schedule',
+    new Set(lists).size === lists.length, `${lists.length} distinct schedules`);
+
+  /* the child's own daily check-in */
+  const parent = accounts.json.data.find((a) => a.stage === 'parent');
+  if (parent) {
+    await POST('/accounts/use', { userId: parent.id });
+    const log = await GET('/child/log');
+    check('GET /child/log', log.status === 200 && Boolean(log.json?.data?.child),
+      `${log.json?.data?.child?.name}, ${log.json?.data?.history?.length} days logged`);
+    const wasNappies = log.json?.data?.today?.wetNappies ?? null;
+    const patched = await PATCH('/child/log', { feeds: 5 });
+    check('PATCH /child/log writes one field',
+      patched.json?.data?.today?.feeds === 5);
+    check('  without blanking the rest of the day',
+      (patched.json?.data?.today?.wetNappies ?? null) === wasNappies,
+      `nappies still ${patched.json?.data?.today?.wetNappies}`);
+    check('  and refuses a mood it does not know',
+      (await PATCH('/child/log', { mood: '__nope__' })).status === 400);
+  }
+
+  const planning = accounts.json.data.find((a) => a.stage === 'planning');
+  if (planning) {
+    await POST('/accounts/use', { userId: planning.id });
+    check('  a mother with no child gets 404 from /child/log, not a crash',
+      (await GET('/child/log')).status === 404);
+  }
+
+  // back to the account this run pinned, so the next one starts clean too
+  if (primary) await POST('/accounts/use', { userId: primary.id });
+
   /* ---------------------------- the dashboard follows her stage */
   console.log('\n  --- life stage ---');
   const startStage = (await GET('/me')).json?.data?.user?.stage;
@@ -579,36 +705,11 @@ const filled = (v) => {
   check('GET /doctors/:id/sos', Array.isArray((await GET(`/doctors/${docId}/sos`)).json?.data));
   check('  404s on an unknown clinician', (await GET('/doctors/99999/sos')).status === 404);
 
-  /* ----------------------------------------------------------- clean */
-  console.log('\n  --- cleaning up ---');
-  const db = require('../config/db');
-  const removed = await db.sql(`
-    DELETE FROM symptoms      WHERE name  LIKE '__audit__%';
-  `).catch(() => null);
-  await db.run("DELETE FROM reminders    WHERE title LIKE '__audit__%'");
-  await db.run("DELETE FROM appointments WHERE reason LIKE '__audit__%'");
-  await db.run("DELETE FROM messages     WHERE body  LIKE '__audit__%'");
-  await db.run("DELETE FROM post_comments WHERE body LIKE '__audit__%'");
-  await db.run("DELETE FROM content_reports WHERE detail LIKE '__audit__%' OR review_note LIKE '__audit__%'");
-  await db.run("DELETE FROM care_terminations WHERE note LIKE '__audit__%'");
-  await db.run("DELETE FROM posts        WHERE title LIKE '__audit__%'");
-  await db.run("DELETE FROM documents    WHERE title LIKE '__audit__%'");
-  await db.run("DELETE FROM doctors      WHERE license_no LIKE '__audit__%'");
-  await db.run("DELETE FROM vitals       WHERE date  = '2019-01-02'");
-  // the table is growth_records; this said `growth` and swallowed the error,
-  // so every audit run silently left its probe row behind and the child's
-  // percentile band drifted a little further off with each one
-  await db.run("DELETE FROM growth_records WHERE date = '2019-01-02'");
-  await db.run("DELETE FROM emergency_contacts WHERE name LIKE '__audit__%'");
-  // GET /messages/:id legitimately marks the clinician's replies read — that is
-  // what opening a thread means. The audit still has to put the seeded one back,
-  // or it quietly changes state the model tests assert on.
-  await db.run(
-    "UPDATE messages SET read_at = NULL WHERE sender = 'doctor' AND body NOT LIKE '__audit__%'",
-  );
-  void removed;
-  console.log('  probe rows removed');
+  await sweep('after');
 
+
+  // `db` used to be required inside the cleanup block, which is a function now
+  const db = require('../config/db');
   console.log(`\n  ${pass} passed, ${fail} failed`);
   if (fail) console.log(`  failing: ${failures.join(', ')}`);
   console.log();

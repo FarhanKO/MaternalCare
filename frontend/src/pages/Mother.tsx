@@ -23,6 +23,7 @@ import { VaccinationRecord } from '@/components/mother/VaccinationRecord';
 import { CarePlan } from '@/components/mother/CarePlan';
 import { RiskPanel } from '@/components/mother/RiskPanel';
 import { StageHero } from '@/components/mother/StageHero';
+import { ChildVitals } from '@/components/mother/ChildVitals';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
@@ -31,7 +32,6 @@ import { DailyCheckIn } from '@/components/mother/DailyCheckIn';
 import { OutOfRange, RangeChip } from '@/components/mother/OutOfRange';
 import { ReportButton } from '@/components/ui/ReportButton';
 import { NotificationBell } from '@/components/mother/NotificationBell';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { checkInStatus } from '@/lib/checkin';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useVitalSeries } from '@/hooks/useVitalSeries';
@@ -50,7 +50,7 @@ import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import type { SosAlert } from '@/data/sos';
-import type { ChildState, Vaccination } from '@/data/records';
+import type { ChildState, FetalSizePoint, Vaccination } from '@/data/records';
 import { useT } from '@/i18n';
 
 /* ---------------- palette for charts ---------------- */
@@ -107,65 +107,46 @@ function dayNoteFor(d: Date) {
   return 'Rest well — sleep on your side tonight.';
 }
 
-const WEIGHT = [
-  { w: 'W12', kg: 1.2, lo: 0.5, hi: 2.0 },
-  { w: 'W16', kg: 3.1, lo: 1.6, hi: 3.6 },
-  { w: 'W20', kg: 5.4, lo: 3.5, hi: 6.4 },
-  { w: 'W24', kg: 7.2, lo: 5.5, hi: 9.0 },
-  { w: 'W26', kg: 8.3, lo: 6.8, hi: 10.6 },
-];
-
-const GROWTH = [
-  { w: 'W12', len: 5.4, wt: 14 },
-  { w: 'W16', len: 11.6, wt: 100 },
-  { w: 'W20', len: 16.4, wt: 300 },
-  { w: 'W24', len: 30, wt: 600 },
-  { w: 'W26', len: 35.6, wt: 760 },
-];
-
-const BP = [
-  { d: 'Sep', sys: 116, dia: 74 },
-  { d: 'Oct', sys: 118, dia: 76 },
-  { d: 'Nov', sys: 121, dia: 78 },
-  { d: 'Dec', sys: 119, dia: 75 },
-];
-
-const HR = [
-  { d: 'W22', bpm: 152 }, { d: 'W23', bpm: 150 }, { d: 'W24', bpm: 149 },
-  { d: 'W25', bpm: 151 }, { d: 'W26', bpm: 148 },
-];
-
-const SLEEP = [
-  { d: 'Mon', h: 7.2 }, { d: 'Tue', h: 6.4 }, { d: 'Wed', h: 8.1 }, { d: 'Thu', h: 7.6 },
-  { d: 'Fri', h: 6.9 }, { d: 'Sat', h: 8.4 }, { d: 'Sun', h: 7.8 },
-];
-
-const FUNDAL = [
-  { w: 'W20', cm: 20 }, { w: 'W22', cm: 22 }, { w: 'W24', cm: 24.5 }, { w: 'W26', cm: 26 },
-];
-
-const MOOD = [
-  { name: 'Calm', value: 42, color: C.brand },
-  { name: 'Happy', value: 28, color: C.mint },
-  { name: 'Tired', value: 18, color: C.gold },
-  { name: 'Anxious', value: 12, color: C.rose },
-];
-
 /*
- * A NUTRIENTS constant lived here — Folate 92%, Iron 78%, Calcium 85% — drawn
- * as progress bars under the heading "Nutrition today · % of daily goal".
- * There is no food logging anywhere in this app, so not one of those numbers
- * could have been measured. A bar is a claim of measurement. It is now the
- * CarePlan section, which separates what to aim for from what she has
- * actually logged.
+ * Six fixture arrays lived here — WEIGHT, BP, HR, SLEEP, MOOD and a FUNDAL
+ * height series. Five were rendered by nothing at all and were simply dead.
+ * FUNDAL was drawn as a real chart behind a "Sample" pill: fundal height is a
+ * measurement a midwife takes with a tape, and this app has never collected
+ * it, so the line was invented. Labelling invented data as a sample does not
+ * make it a measurement, and the chart is gone rather than relabelled.
+ *
+ * GROWTH went too. It plotted fetal length and weight by week from numbers
+ * typed here, which drifted from SIZE_BY_WEEK in pregnancyModel — the table
+ * that produces the size shown on her hero. The chart now reads that table
+ * through the API, so the badge and the curve cannot disagree.
  */
 
-const APPTS = [
-  { date: 'Dec 20', title: 'Growth ultrasound', who: 'Dr. Lena Ortiz', type: 'Scan', tint: C.brand },
-  { date: 'Jan 03', title: 'Glucose screening', who: 'MaternalCare Lab', type: 'Test', tint: C.aqua },
-  { date: 'Jan 17', title: 'Week 30 check-up', who: 'Dr. Lena Ortiz', type: 'Visit', tint: C.rose },
-];
-
+/**
+ * What the vitals page is for, per life stage.
+ *
+ * The readings themselves are the same four numbers whoever is logging them —
+ * blood pressure, glucose, weight, temperature — but what they are *for*
+ * changes completely, and a page that opens with the same sentence for all
+ * four is telling three of them something slightly untrue.
+ */
+const VITALS_INTRO: Record<string, { title: string; body: string }> = {
+  pregnant: {
+    title: 'Your readings through the pregnancy',
+    body: 'Blood pressure and glucose are the two that matter most from here, and the trend is what your midwife reads — not any single day. Log twice a week and the shape of it becomes visible.',
+  },
+  planning: {
+    title: 'Your baseline, before you conceive',
+    body: 'The numbers you record now are the ones a pregnancy gets compared against later. A blood pressure and a weight that are already known make an early problem far easier to spot.',
+  },
+  'new-mother': {
+    title: 'Both of you, every day',
+    body: 'Your own blood pressure still matters after the birth — most of the serious problems in the first weeks are hers, not the baby’s. Your baby’s day is logged below.',
+  },
+  parent: {
+    title: 'Yours, and your child’s',
+    body: 'Your own readings keep their own record. Your child’s feeds, sleep and temperature are logged separately below, because they are a different person with a different chart.',
+  },
+};
 
 /* ---------------- shared bits ---------------- */
 function Tip({ active, payload, label, unit }: any) {
@@ -517,6 +498,7 @@ export function Mother() {
    */
   const [childState, setChildState] = useState<ChildState | null>(null);
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
+  const [growthRef, setGrowthRef] = useState<FetalSizePoint[]>([]);
   useEffect(() => {
     let cancelled = false;
     api.getChild()
@@ -525,6 +507,9 @@ export function Mother() {
     api.getVaccinations()
       .then((v) => { if (!cancelled) setVaccinations(v.rows); })
       .catch(() => { /* the hero degrades to "—" */ });
+    api.getGrowthReference()
+      .then((g) => { if (!cancelled) setGrowthRef(g); })
+      .catch(() => { /* the chart shows its empty state */ });
     return () => { cancelled = true; };
   }, []);
   const week = pregnancy?.week ?? 0;
@@ -586,7 +571,6 @@ export function Mother() {
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            <LanguageToggle />
             <NotificationBell
               sosActive={!!liveAlert}
               vitalAlerts={vitals.alerts}
@@ -959,8 +943,31 @@ export function Mother() {
         <motion.div key="tab-vitals" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
-        {/* anything currently outside its band, whichever metric it is */}
+        {/*
+          What this page is for, in her words, because it is not the same thing
+          at every stage: pregnant and planning are about her own readings,
+          while a new mother and a parent are also watching somebody else.
+        */}
         <Reveal className="mt-9">
+          <GlassCard className="p-5 sm:p-6">
+            <div className="flex items-start gap-2.5">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-brand-500/12 text-brand-600">
+                <Activity className="h-[18px] w-[18px]" />
+              </span>
+              <div>
+                <div className="text-sm font-bold text-ink">
+                  {VITALS_INTRO[profile.stage]?.title ?? VITALS_INTRO.pregnant.title}
+                </div>
+                <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-muted">
+                  {VITALS_INTRO[profile.stage]?.body ?? VITALS_INTRO.pregnant.body}
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </Reveal>
+
+        {/* anything currently outside its band, whichever metric it is */}
+        <Reveal className="mt-5">
           <OutOfRange
             alerts={vitals.alerts}
             weightGain={vitals.weightGain}
@@ -1010,15 +1017,15 @@ export function Mother() {
             </ChartCard>
 
             {/* baby growth dual axis */}
-            <ChartCard title="Baby's growth" sub="Length &amp; weight over time" icon={TrendingUp} tint={C.rose}>
+            <ChartCard title="Baby's growth" sub="Typical length &amp; weight by week" icon={TrendingUp} tint={C.rose}>
               <ResponsiveContainer width="100%" height={190}>
-                <LineChart data={GROWTH} margin={{ top: 6, right: 4, left: -2, bottom: 0 }}>
-                  <XAxis dataKey="w" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
+                <LineChart data={growthRef} margin={{ top: 6, right: 4, left: -2, bottom: 0 }}>
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
                   <YAxis yAxisId="l" tickLine={false} axisLine={false} tick={axisTick} width={30} />
                   <YAxis yAxisId="r" orientation="right" tickLine={false} axisLine={false} tick={axisTick} width={34} />
                   <Tooltip content={<Tip />} cursor={{ stroke: 'rgba(242,120,159,0.35)', strokeDasharray: '4 4' }} />
-                  <Line yAxisId="l" type="monotone" dataKey="len" name="Length (cm)" stroke={C.brand} strokeWidth={2.6} dot={{ r: 3, fill: C.brand }} activeDot={{ r: 5 }} animationDuration={1400} />
-                  <Line yAxisId="r" type="monotone" dataKey="wt" name="Weight (g)" stroke={C.rose} strokeWidth={2.6} dot={{ r: 3, fill: C.rose }} activeDot={{ r: 5 }} animationDuration={1400} />
+                  <Line yAxisId="l" type="monotone" dataKey="lengthCm" name="Length (cm)" stroke={C.brand} strokeWidth={2.6} dot={{ r: 3, fill: C.brand }} activeDot={{ r: 5 }} animationDuration={1400} />
+                  <Line yAxisId="r" type="monotone" dataKey="weightG" name="Weight (g)" stroke={C.rose} strokeWidth={2.6} dot={{ r: 3, fill: C.rose }} activeDot={{ r: 5 }} animationDuration={1400} />
                 </LineChart>
               </ResponsiveContainer>
               <Legend items={[{ label: 'Length (cm)', color: C.brand }, { label: 'Weight (g)', color: C.rose }]} />
@@ -1048,9 +1055,10 @@ export function Mother() {
             <ChartCard title="Fetal heart rate" sub="Beats per minute" icon={HeartPulse} tint={C.rose}
               right={vitals.fetalHr.length
                 ? <RangeChip alerts={vitals.alerts} match={/fetal heart/i} />
-                : <SampleTag />}>
+                : undefined}>
+              {vitals.fetalHr.length === 0 ? <NoReadings what="heartbeats" /> : (
               <ResponsiveContainer width="100%" height={190}>
-                <AreaChart data={vitals.fetalHr.length ? vitals.fetalHr : HR} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <AreaChart data={vitals.fetalHr} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
                     <linearGradient id="hr" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.rose} stopOpacity={0.3} />
@@ -1064,6 +1072,7 @@ export function Mother() {
                   <Area type="monotone" dataKey="bpm" name="Heart rate" stroke={C.rose} strokeWidth={2.6} fill="url(#hr)" dot={{ r: 3, fill: C.rose }} animationDuration={1400} />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
             {/* baby kicks — straight from her daily log */}
@@ -1082,9 +1091,10 @@ export function Mother() {
 
             {/* sleep — from her own daily log once she has recorded a night */}
             <ChartCard title="Sleep quality" sub="Hours per night" icon={Moon} tint={C.brand2}
-              right={vitals.sleep.length ? undefined : <SampleTag />}>
+              right={undefined}>
+              {vitals.sleep.length === 0 ? <NoReadings what="nights of sleep" /> : (
               <ResponsiveContainer width="100%" height={190}>
-                <BarChart data={vitals.sleep.length ? vitals.sleep : SLEEP} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <BarChart data={vitals.sleep} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
                     <linearGradient id="sl" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.brand2} />
@@ -1097,6 +1107,7 @@ export function Mother() {
                   <Bar dataKey="h" name="Sleep" radius={[6, 6, 0, 0]} fill="url(#sl)" animationDuration={1200} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
           </div>
         </div>
@@ -1150,25 +1161,13 @@ export function Mother() {
 
         {/* fundal height + mood + hydration */}
         <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {/* fundal height — no column behind this one yet */}
-          <ChartCard title="Fundal height" sub="Belly measurement (cm)" icon={Ruler} tint={C.aqua}
-            right={<SampleTag />}>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={FUNDAL} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="fh" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.aqua} stopOpacity={0.28} />
-                    <stop offset="100%" stopColor={C.aqua} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="w" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
-                <YAxis tickLine={false} axisLine={false} tick={axisTick} width={30} />
-                <Tooltip content={<Tip unit="cm" />} />
-                <Area type="monotone" dataKey="cm" name="Height" stroke={C.aqua} strokeWidth={2.6} fill="url(#fh)" dot={{ r: 3, fill: C.aqua }} animationDuration={1400} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
+          {/*
+            A fundal-height chart stood here behind a "Sample" pill. Fundal
+            height is measured with a tape by a midwife and this app has never
+            collected it, so every point on that line was invented. Removed
+            rather than relabelled: the honest fix for a chart with no column
+            behind it is not a smaller caption.
+          */}
           {/* mood donut — counted from the moods she actually logged */}
           <ChartCard title="Mood recently" sub={`Last ${moodSlices.days} logged days`} icon={Smile} tint={C.gold}>
             {vitals.loaded && moodSlices.slices.length === 0 ? <NoReadings what="moods" height={170} /> : (
@@ -1245,6 +1244,14 @@ export function Mother() {
 
         {/* the personalised plan, where the fabricated nutrient bars used to be */}
         <CarePlan />
+
+        {/*
+          The child's own daily questions, for the two stages where somebody
+          else's day is half of what needs watching. It returns null when the
+          account has no child, so the guard is inside the component rather
+          than duplicated here.
+        */}
+        {(profile.stage === 'new-mother' || profile.stage === 'parent') && <ChildVitals />}
 
         </motion.div>
         )}

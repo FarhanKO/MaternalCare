@@ -19,8 +19,8 @@ exports.dashboard = async (req, res, next) => {
       vitalModel.latest(user.id),
       vitalModel.alerts(user.id),
       childModel.forUser(user.id),
-      vaccinationModel.stats(),
-      vaccinationModel.upcoming(2),
+      vaccinationModel.stats(user.id),
+      vaccinationModel.upcoming(user.id, 2),
       appointmentModel.upcoming(user.id, 3),
     ]);
     const risk = await riskModel.fromLatestVitals(user, pregnancy);

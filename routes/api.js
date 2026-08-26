@@ -31,6 +31,9 @@ router.get('/me', sessionApi.show);
 /* update the signed-in user's life stage (set at the end of onboarding) */
 router.patch('/me', sessionApi.setStage);
 router.get('/me/language', sessionApi.language);
+/* demo account switching — goes away when authentication arrives */
+router.get('/accounts', sessionApi.accounts);
+router.post('/accounts/use', sessionApi.useAccount);
 router.patch('/me/language', sessionApi.setLanguage);
 
 /* patients — the clinician's caseload */
@@ -121,6 +124,10 @@ router.post('/moderation/:target/:id/resolve', moderationApi.resolve);
 router.get('/child', childApi.show);
 router.post('/child/growth', childApi.addGrowth);
 router.patch('/child/milestones/:id', childApi.toggleMilestone);
+/* the child's own daily check-in — feeds, nappies, sleep, temperature */
+router.get('/child/log', childApi.log);
+router.patch('/child/log', childApi.saveLog);
+
 router.get('/vaccinations', childApi.vaccinations);
 router.patch('/vaccinations/:id/done', childApi.markVaccinationDone);
 router.post('/vaccinations/:id/card', childApi.uploadVaccinationCard);

@@ -133,8 +133,14 @@ FROM (VALUES
   ('Points to objects',    '12–16 months', '👉', FALSE, NULL)
 ) AS m(title, typical, icon, done, d);
 
-INSERT INTO vaccinations (subject, name, dose, due_date, status, completed_on)
-SELECT subject, nm, dose, CURRENT_DATE + due, status,
+-- Owned by Ayesha and her child. The table had no owner column until 0014, so
+-- these rows were a single global schedule that every account read and wrote:
+-- marking a dose done marked it done for the whole platform.
+INSERT INTO vaccinations (user_id, child_id, subject, name, dose, due_date, status, completed_on)
+SELECT (SELECT id FROM users WHERE name = 'Ayesha Rahman'),
+       CASE WHEN subject = 'child'
+            THEN (SELECT id FROM children WHERE name = 'Zara') END,
+       subject, nm, dose, CURRENT_DATE + due, status,
        CASE WHEN comp IS NULL THEN NULL ELSE CURRENT_DATE + comp END
 FROM (VALUES
   ('child',  'BCG',                        'Single dose',  -437, 'done',     -436),

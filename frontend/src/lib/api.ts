@@ -15,7 +15,8 @@ import {
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
-  CarePlan, ChildState, DailyLogState, Milestone, Pregnancy, ReportGroup, ReportReason,
+  CarePlan, ChildLogState, ChildState, DailyLogState, FetalSizePoint, Milestone,
+  Pregnancy, ReportGroup, ReportReason,
   RiskView, ServerPost, ServerProfile, Vaccination, VaccinationStats, VitalAlert,
   VitalReading, WeightGain,
 } from '@/data/records';
@@ -76,6 +77,11 @@ export const api = {
    */
   getPregnancy: () =>
     request<Envelope<{ pregnancy: Pregnancy | null }>>('/me').then((r) => r.data.pregnancy),
+
+  /** Typical fetal length and weight by week — reference, not her measurement. */
+  getGrowthReference: () =>
+    request<Envelope<{ growthReference: FetalSizePoint[] }>>('/me')
+      .then((r) => r.data.growthReference ?? []),
 
   /**
    * Her reading language, stored on the account so it follows her to another
@@ -462,6 +468,21 @@ export const api = {
   /* --------------------------------------------------------- child */
 
   getChild: () => request<Envelope<ChildState | null>>('/child').then((r) => r.data),
+
+  /**
+   * The child's own daily check-in — feeds, wet nappies, sleep, temperature.
+   *
+   * Separate from the mother's log because they are two different people, and
+   * a parent of a young child is asked both.
+   */
+  getChildLog: () => request<Envelope<ChildLogState>>('/child/log').then((r) => r.data),
+
+  /** Writes one field at a time; the model keeps the rest of the day intact. */
+  saveChildLog: (patch: Record<string, number | string>) =>
+    request<Envelope<{ today: ChildLogState['today']; flags: ChildLogState['flags'] }>>(
+      '/child/log',
+      { method: 'PATCH', body: JSON.stringify(patch) },
+    ).then((r) => r.data),
 
   toggleMilestone: (id: string) =>
     request<Envelope<Milestone[]>>(`/child/milestones/${id}`, { method: 'PATCH' })

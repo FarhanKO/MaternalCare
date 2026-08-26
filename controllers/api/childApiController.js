@@ -6,6 +6,7 @@
  * charts and milestone lists from hardcoded arrays. Same models, second view.
  */
 const childModel = require('../../models/childModel');
+const childLogModel = require('../../models/childLogModel');
 const vaccinationModel = require('../../models/vaccinationModel');
 const userModel = require('../../models/userModel');
 const documentModel = require('../../models/documentModel');
@@ -121,22 +122,26 @@ const toVax = (v, cards = []) => ({
  * Marking a dose done is a claim; the card is the proof. Sending them together
  * means the screen can show both without a second round trip per dose.
  */
-async function vaxPayload() {
-  const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
+async function vaxPayload(userId) {
+  const [rows, meta] = await Promise.all([
+    vaccinationModel.all(userId), vaccinationModel.stats(userId),
+  ]);
   const cards = await documentModel.forVaccinations(rows.map((r) => r.id));
   return { data: rows.map((r) => toVax(r, cards.get(String(r.id)) ?? [])), meta };
 }
 
 exports.vaccinations = async (req, res, next) => {
   try {
-    res.json(await vaxPayload());
+    const user = await userModel.current();
+    res.json(await vaxPayload(user.id));
   } catch (err) { next(err); }
 };
 
 exports.markVaccinationDone = async (req, res, next) => {
   try {
-    await vaccinationModel.markDone(req.params.id);
-    res.json(await vaxPayload());
+    const user = await userModel.current();
+    await vaccinationModel.markDone(req.params.id, user.id);
+    res.json(await vaxPayload(user.id));
   } catch (err) { next(err); }
 };
 
@@ -149,10 +154,12 @@ exports.markVaccinationDone = async (req, res, next) => {
 exports.uploadVaccinationCard = async (req, res, next) => {
   const { id } = req.params;
   try {
-    const vax = await vaccinationModel.find(id);
-    if (!vax) return res.status(404).json({ error: 'Vaccination not found' });
-
     const user = await userModel.current();
+    const vax = await vaccinationModel.find(id);
+    // scoped, so a card cannot be filed against somebody else's dose
+    if (!vax || String(vax.user_id) !== String(user.id)) {
+      return res.status(404).json({ error: 'Vaccination not found' });
+    }
     await documentModel.create(user.id, {
       kind: 'report',
       title: req.body?.title?.trim() || `${vax.name}${vax.dose ? ` · ${vax.dose}` : ''} card`,
@@ -163,11 +170,59 @@ exports.uploadVaccinationCard = async (req, res, next) => {
       uploadedBy: req.body?.uploadedBy || 'mother',
       vaccinationId: id,
     });
-    return res.status(201).json(await vaxPayload());
+    return res.status(201).json(await vaxPayload(user.id));
   } catch (err) {
     if (err instanceof documentModel.DocumentError) {
       return res.status(400).json({ error: err.message, code: err.code });
     }
     return next(err);
+  }
+};
+
+/* ------------------------------------------------ the child's daily log */
+
+/**
+ * Today's entry, the recent history, and the averages.
+ *
+ * Mirrors the mother's check-in endpoint exactly, because the two are answered
+ * together: a parent opening the check-in should not have to visit two screens
+ * to say how the day went for both of them.
+ */
+exports.log = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    const child = await childModel.forUser(user.id);
+    if (!child) return res.status(404).json({ error: 'No child on this account' });
+
+    const date = req.query.date || childLogModel.todayISO();
+    const [today, history, summary] = await Promise.all([
+      childLogModel.forDate(child.id, date),
+      childLogModel.history(child.id, 14),
+      childLogModel.summary(child.id, 7),
+    ]);
+
+    return res.json({
+      data: {
+        child: { id: String(child.id), name: child.name },
+        today,
+        history,
+        summary,
+        flags: childLogModel.flagsFor(today, child.ageMonths),
+        moods: childLogModel.MOODS,
+      },
+    });
+  } catch (err) { return next(err); }
+};
+
+exports.saveLog = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    const child = await childModel.forUser(user.id);
+    if (!child) return res.status(404).json({ error: 'No child on this account' });
+
+    const saved = await childLogModel.save(child.id, req.body || {});
+    return res.json({ data: { today: saved, flags: childLogModel.flagsFor(saved, child.ageMonths) } });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 };

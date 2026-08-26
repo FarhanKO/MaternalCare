@@ -135,6 +135,11 @@ CREATE TABLE milestones (
 
 CREATE TABLE vaccinations (
   id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- Whose schedule this is. The table had no owner at all until 0014: one
+  -- global list every account read and wrote, so marking a dose done marked
+  -- it done for everybody. F7 asks for a *personalised* scheduler.
+  user_id      INTEGER REFERENCES users(id)    ON DELETE CASCADE,
+  child_id     INTEGER REFERENCES children(id) ON DELETE CASCADE,
   subject      TEXT    NOT NULL CHECK (subject IN ('child', 'mother')),
   name         TEXT    NOT NULL,
   dose         TEXT,

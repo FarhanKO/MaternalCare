@@ -357,6 +357,58 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   check('dailyLogModel.summary averages', summary.days === 7 && summary.avgWaterLitres > 0,
     `${summary.days} days · ${summary.avgWaterLitres} L avg · mostly ${summary.commonMood}`);
 
+  /* -------------------------------- the child's own daily log */
+  const childLogModel = require('../models/childLogModel');
+  const kid = await childModel.forUser(me.id);
+  const beforeDay = await childLogModel.forDate(kid.id);
+
+  const afterFeeds = await childLogModel.save(kid.id, { feeds: 9 });
+  check('childLogModel.save writes one field', afterFeeds.feeds === 9, `${afterFeeds.feeds} feeds`);
+  const afterNappies = await childLogModel.save(kid.id, { wetNappies: 6 });
+  check('  and a second write keeps the first',
+    afterNappies.feeds === 9 && afterNappies.wetNappies === 6,
+    `${afterNappies.feeds} feeds, ${afterNappies.wetNappies} nappies`);
+
+  let badMood = null;
+  try { await childLogModel.save(kid.id, { mood: 'Grumpy' }); } catch (e) { badMood = e; }
+  check('  refuses a mood that is not on the list', Boolean(badMood), badMood?.message);
+
+  /*
+   * The flags are the reason this is a log rather than a diary. Both rules
+   * are age-sensitive, which is why the child's age is passed in.
+   */
+  check('childLogModel flags a fever in a baby under three months',
+    childLogModel.flagsFor({ tempC: 38.4 }, 1).some((f) => f.level === 'urgent'),
+    childLogModel.flagsFor({ tempC: 38.4 }, 1)[0]?.text.slice(0, 46));
+  check('  the same reading in a toddler warns rather than alarms',
+    childLogModel.flagsFor({ tempC: 38.4 }, 30)[0]?.level === 'warn');
+  check('  flags too few wet nappies in a young baby',
+    childLogModel.flagsFor({ wetNappies: 3 }, 2).some((f) => /wet nappies/.test(f.text)));
+  check('  and says nothing about nappies for a three-year-old',
+    childLogModel.flagsFor({ wetNappies: 3 }, 36).length === 0);
+  check('  a normal day raises nothing',
+    childLogModel.flagsFor({ feeds: 9, wetNappies: 7, tempC: 36.8 }, 2).length === 0);
+
+  await db.run('DELETE FROM child_logs WHERE child_id = $1 AND date = $2',
+    [kid.id, childLogModel.todayISO()]);
+  if (beforeDay.feeds != null || beforeDay.wetNappies != null || beforeDay.mood != null) {
+    await childLogModel.save(kid.id, beforeDay);
+  }
+  check('  probe day cleaned up',
+    (await childLogModel.forDate(kid.id)).feeds === beforeDay.feeds);
+
+  /* ------------------------- vaccinations belong to somebody */
+  const mineVax = await vaccinationModel.all(me.id);
+  const otherVax = await db.one(
+    'SELECT count(*) AS c FROM vaccinations WHERE user_id <> $1', [me.id],
+  );
+  check('vaccinationModel.all is scoped to one mother',
+    mineVax.every((v) => String(v.user_id) === String(me.id)),
+    `${mineVax.length} hers, ${otherVax.c} belonging to others`);
+  let unscoped = null;
+  try { await vaccinationModel.all(); } catch (e) { unscoped = e; }
+  check('  and refuses to run unscoped', Boolean(unscoped), unscoped?.message);
+
   console.log('\n  --- child ---');
   const child = await childModel.forUser(me.id);
   check('childModel.forUser', child.name === 'Zara', `${child.name} · ${child.agePretty}`);
@@ -402,9 +454,9 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   await childModel.toggleMilestone(target.id);
 
   console.log('\n  --- vaccinations & content ---');
-  const vax = await vaccinationModel.all();
+  const vax = await vaccinationModel.all(me.id);
   check('vaccinationModel.all', vax.length === 12, `${vax.length} rows`);
-  const stats = await vaccinationModel.stats();
+  const stats = await vaccinationModel.stats(me.id);
   check('vaccinationModel.stats counts are numbers', stats.total === 12 && typeof stats.done === 'number',
     `${stats.done} done · ${stats.pct}%`);
   const arts = await contentModel.articles();

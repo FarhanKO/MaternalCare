@@ -23,9 +23,43 @@ module.exports = {
     return db.one('SELECT * FROM users WHERE id = $1', [id]);
   },
 
+  /*
+   * Which account the app is "signed in" as.
+   *
+   * There is no authentication yet — this is the shim standing in for it, and
+   * it is deliberately a single module-level variable rather than anything
+   * that looks like a session, so it cannot be mistaken for one. Replacing
+   * this with a real session lookup is the first item on the production list.
+   *
+   * It exists so the four seeded life stages can each be looked at. Without
+   * it `current()` always returned the lowest mother id and three of the four
+   * dashboards were unreachable without editing the database by hand.
+   */
+  _demoUserId: null,
+
   async current() {
-    // Demo session: the seeded mother account
+    if (this._demoUserId) {
+      const chosen = await this.find(this._demoUserId);
+      if (chosen) return chosen;
+      this._demoUserId = null;      // deleted since it was chosen
+    }
     return db.one("SELECT * FROM users WHERE role = 'mother' ORDER BY id LIMIT 1");
+  },
+
+  /** Every mother on the platform, for the demo account switcher. */
+  async mothers() {
+    return db.sql(
+      `SELECT id, name, stage, age, conditions FROM users
+        WHERE role = 'mother' ORDER BY id`,
+    );
+  },
+
+  async useDemoUser(id) {
+    const user = await this.find(id);
+    if (!user) throw new Error('No such account');
+    if (user.role !== 'mother') throw new Error('The mother portal needs a mother account');
+    this._demoUserId = user.id;
+    return user;
   },
 
   /** Life stage drives which reading and news the client shows. */
