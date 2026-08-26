@@ -22,6 +22,7 @@ import { RemindersSection } from '@/components/mother/RemindersSection';
 import { VaccinationRecord } from '@/components/mother/VaccinationRecord';
 import { CarePlan } from '@/components/mother/CarePlan';
 import { RiskPanel } from '@/components/mother/RiskPanel';
+import { StageHero } from '@/components/mother/StageHero';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
@@ -49,6 +50,8 @@ import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import type { SosAlert } from '@/data/sos';
+import type { ChildState, Vaccination } from '@/data/records';
+import { useT } from '@/i18n';
 
 /* ---------------- palette for charts ---------------- */
 const C = {
@@ -64,18 +67,15 @@ const C = {
 };
 
 /* ---------------- mock data ---------------- */
-const WEEK_DAYS = [
-  { l: 'M', n: 15 }, { l: 'T', n: 16 }, { l: 'W', n: 17, today: true },
-  { l: 'T', n: 18 }, { l: 'F', n: 19 }, { l: 'S', n: 20 }, { l: 'S', n: 21 },
-];
-
-const FACTS = [
-  { icon: CalendarDays, label: 'Due date', value: 'Apr 2' },
-  { icon: Clock, label: 'Days to go', value: '98' },
-  { icon: Ruler, label: 'Length', value: '35.6 cm' },
-  { icon: Scale, label: 'Weight', value: '760 g' },
-  { icon: HeartPulse, label: 'Heartbeat', value: '148 bpm' },
-];
+/*
+ * WEEK_DAYS and FACTS lived here: a calendar strip fixed at the 15th to the
+ * 21st, and five tiles reading "Due date Apr 2 · Days to go 98 · Length
+ * 35.6 cm · Weight 760 g · Heartbeat 148 bpm". None of it came from her
+ * record, and all of it contradicted the record — which had her due in
+ * November, 73 days out, carrying something the size of an eggplant. The
+ * heartbeat had never been measured at all. They are gone; StageHero builds
+ * the same tiles from `pregnancy`, `child` and her logged weight.
+ */
 
 const MOODS = [
   { name: 'Happy', face: '😊', note: 'Lovely — happiness is good for baby too.', tint: '#f6b93b' },
@@ -416,107 +416,13 @@ function CounterCard({
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
 
 /* ---------------- the wide pregnancy arc (spans the full card) ---------------- */
-const MILESTONES = [
-  { wk: 8, label: 'Heartbeat' },
-  { wk: 20, label: 'Anatomy scan' },
-  { wk: 24, label: 'Viability' },
-  { wk: 37, label: 'Full term' },
-];
-
-function PregnancyArc({ week, total }: { week: number; total: number }) {
-  const W = 900, H = 224, cx = 450, topY = 46, rise = 132;
-  const alpha = 2 * Math.atan((2 * rise) / W);
-  const R = (W / 2) / Math.sin(alpha);
-  const cy = topY + R;
-  const at = (f: number) => {
-    const a = Math.PI / 2 + alpha - f * 2 * alpha;
-    return { x: cx + R * Math.cos(a), y: cy - R * Math.sin(a) };
-  };
-  const f = Math.min(1, week / total);
-  const L = at(0), Rt = at(1), M = at(f);
-  const arcLen = R * 2 * alpha;
-  const d = `M ${L.x.toFixed(1)} ${L.y.toFixed(1)} A ${R.toFixed(1)} ${R.toFixed(1)} 0 0 1 ${Rt.x.toFixed(1)} ${Rt.y.toFixed(1)}`;
-  const tris = [13, 27];
-  const pctL = (p: { x: number; y: number }) => `${(p.x / W) * 100}%`;
-  const pctT = (p: { x: number; y: number }) => `${(p.y / H) * 100}%`;
-
-  return (
-    <div className="relative w-full">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible">
-        <defs>
-          <linearGradient id="arcFill" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <path d={d} fill="none" stroke="rgba(255,255,255,0.26)" strokeWidth={14} strokeLinecap="round" />
-        <motion.path
-          d={d}
-          fill="none"
-          stroke="url(#arcFill)"
-          strokeWidth={14}
-          strokeLinecap="round"
-          strokeDasharray={arcLen}
-          initial={{ strokeDashoffset: arcLen }}
-          whileInView={{ strokeDashoffset: arcLen * (1 - f) }}
-          viewport={{ once: true }}
-          transition={{ duration: 1.7, ease: [0.22, 1, 0.36, 1] }}
-          style={{ filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.12))' }}
-        />
-        {/* milestone ticks */}
-        {MILESTONES.map((mst) => {
-          const p = at(mst.wk / total);
-          return <circle key={mst.wk} cx={p.x} cy={p.y} r={2.6} fill="rgba(255,255,255,0.6)" />;
-        })}
-        {/* trimester dividers */}
-        {tris.map((t) => {
-          const p = at(t / total);
-          return <circle key={t} cx={p.x} cy={p.y} r={4} fill="rgba(255,255,255,0.92)" />;
-        })}
-        {/* current marker */}
-        <circle cx={M.x} cy={M.y} r={11} fill="#fff" />
-        <circle cx={M.x} cy={M.y} r={5} fill="#f76592" />
-      </svg>
-
-      {/* end labels */}
-      <div className="pointer-events-none absolute whitespace-nowrap" style={{ left: pctL(L), top: pctT(L), transform: 'translate(0, 10px)' }}>
-        <div className="text-[11px] font-bold leading-tight text-white">Week 0</div>
-        <div className="text-[10px] font-medium text-white/70">Conception</div>
-      </div>
-      <div className="pointer-events-none absolute whitespace-nowrap text-right" style={{ left: pctL(Rt), top: pctT(Rt), transform: 'translate(-100%, 10px)' }}>
-        <div className="text-[11px] font-bold leading-tight text-white">Week 40</div>
-        <div className="text-[10px] font-medium text-white/70">Due · Apr 2</div>
-      </div>
-
-      {/* trimester labels — sit below the line so they never collide with the marker pill */}
-      {[{ wk: 13, t: '2nd tri' }, { wk: 27, t: '3rd tri' }].map((it) => {
-        const p = at(it.wk / total);
-        return (
-          <div key={it.wk} className="pointer-events-none absolute" style={{ left: pctL(p), top: pctT(p), transform: 'translate(-50%, 55%)' }}>
-            <span className="whitespace-nowrap rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur-md">{it.t}</span>
-          </div>
-        );
-      })}
-
-      {/* current position pill */}
-      <div className="pointer-events-none absolute" style={{ left: pctL(M), top: pctT(M), transform: 'translate(-50%, -210%)' }}>
-        <span className="whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[10px] font-extrabold text-rose-600 shadow-lg">You · Wk {week}</span>
-      </div>
-
-      {/* center info */}
-      <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center" style={{ top: '44%' }}>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Second trimester</span>
-        <div className="flex items-end justify-center gap-1.5 leading-none">
-          <span className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl">{week}</span>
-          <span className="pb-1 text-base font-bold text-white/80">weeks</span>
-        </div>
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white/95 backdrop-blur-md">
-          <Apple className="h-3.5 w-3.5" /> Butternut squash · 35.6 cm · 760 g
-        </div>
-      </div>
-    </div>
-  );
-}
+/*
+ * PregnancyArc moved into StageHero, where it takes the whole `pregnancy`
+ * object instead of a bare week number. It had "Second trimester", "Due ·
+ * Apr 2" and "Butternut squash · 35.6 cm · 760 g" written into its markup,
+ * so it announced the second trimester to a mother the model had placed in
+ * the third.
+ */
 
 /* ---------------- page ---------------- */
 export function Mother() {
@@ -596,10 +502,31 @@ export function Mother() {
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
   // the trend charts, built from her stored readings rather than fixtures
   const vitals = useVitalSeries();
+  // dates and month names follow her chosen language
+  const { locale } = useT();
   /** the daily check-in sheet — opened from the bell or from "View all" */
   const [checkInOpen, setCheckInOpen] = useState(false);
   // one source for "what week is she in" — every mention below reads this
   const { pregnancy } = usePregnancy();
+
+  /*
+   * The dashboard hero depends on her life stage, and three of the four
+   * stages are about a child rather than a pregnancy — so the child record
+   * and the vaccination schedule are loaded here rather than only on the
+   * tabs that used to need them.
+   */
+  const [childState, setChildState] = useState<ChildState | null>(null);
+  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.getChild()
+      .then((c) => { if (!cancelled) setChildState(c); })
+      .catch(() => { /* she may not have a child on the account */ });
+    api.getVaccinations()
+      .then((v) => { if (!cancelled) setVaccinations(v.rows); })
+      .catch(() => { /* the hero degrades to "—" */ });
+    return () => { cancelled = true; };
+  }, []);
   const week = pregnancy?.week ?? 0;
   const weeksToGo = pregnancy ? Math.max(0, Math.round(pregnancy.daysLeft / 7)) : 0;
 
@@ -716,69 +643,24 @@ export function Mother() {
         <motion.div key="tab-dashboard" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
-        {/* HERO — pink card with the half-circular gauge */}
+        {/*
+          HERO — one card per life stage.
+
+          This was a single pregnancy hero shown to all four kinds of user, so
+          somebody planning a pregnancy was told she was 29 weeks into one. Most
+          of its figures were also hardcoded and contradicted the app's own
+          record — see StageHero for the list.
+        */}
         <Reveal>
-          <div
-            className="relative overflow-hidden rounded-4xl p-6 text-white shadow-glass-lg sm:p-8"
-            style={{ background: 'linear-gradient(148deg, #ff9db9 0%, #ff7ba6 46%, #f76592 100%)' }}
-          >
-            {/* soft light blobs */}
-            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/25 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-28 -left-16 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
-
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-white/90">December 2025</div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">
-                  <Sparkles className="h-3.5 w-3.5" /> On track
-                </span>
-              </div>
-
-              {/* daily week strip */}
-              <div className="mx-auto mt-4 flex max-w-xl items-center justify-between gap-1">
-                {WEEK_DAYS.map((d) => (
-                  <div key={d.n} className="flex flex-col items-center gap-1.5">
-                    <span className="text-[11px] font-semibold text-white/70">{d.l}</span>
-                    <span className={cn(
-                      'grid h-9 w-9 place-items-center rounded-full text-sm font-bold transition',
-                      d.today ? 'bg-white text-rose-500 shadow-lg' : 'text-white/90 hover:bg-white/15',
-                    )}>
-                      {d.n}
-                    </span>
-                    <span className={cn('h-1 w-1 rounded-full', d.today ? 'bg-white' : 'bg-white/30')} />
-                  </div>
-                ))}
-              </div>
-
-              {/* the wide pregnancy arc — spans the full card */}
-              <div className="mt-6">
-                <PregnancyArc week={week} total={40} />
-              </div>
-
-              {/* facts */}
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {FACTS.map((f) => (
-                  <div key={f.label} className="rounded-2xl border border-white/25 bg-white/15 p-4 backdrop-blur-md">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/75">
-                      <f.icon className="h-3.5 w-3.5" /> {f.label}
-                    </div>
-                    <div className="mt-1.5 text-xl font-extrabold leading-none sm:text-2xl">{f.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* action row */}
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm text-white/85">40-week journey · 5 days ahead of average growth</div>
-                <button
-                  onClick={() => navigate('/onboarding')}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-rose-600 shadow-lg transition hover:bg-white/90"
-                >
-                  <CalendarDays className="h-[18px] w-[18px]" /> Edit due date
-                </button>
-              </div>
-            </div>
-          </div>
+          <StageHero
+            stage={profile.stage}
+            pregnancy={pregnancy}
+            child={childState}
+            weightGain={vitals.weightGain}
+            vaccinations={vaccinations}
+            locale={locale}
+            onEditDates={() => navigate('/onboarding')}
+          />
         </Reveal>
 
         {/* DAILY INSIGHTS */}

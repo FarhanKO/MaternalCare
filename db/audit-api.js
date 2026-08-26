@@ -385,6 +385,31 @@ const filled = (v) => {
     (await POST(`/moderation/posts/${postId}/resolve`, { action: 'incinerate' })).status === 400);
   check('GET /moderation/count', Number.isFinite((await GET('/moderation/count')).json?.data?.open));
 
+  /* ---------------------------- the dashboard follows her stage */
+  console.log('\n  --- life stage ---');
+  const startStage = (await GET('/me')).json?.data?.user?.stage;
+  check('GET /me carries her life stage', ['pregnant', 'planning', 'new-mother', 'parent', 'general'].includes(startStage), startStage);
+
+  /*
+   * The dashboard hero is chosen from this value, so what matters is that
+   * every stage is served the data its hero needs. A planning user has no
+   * pregnancy, and used to be shown a 40-week countdown anyway.
+   */
+  for (const stage of ['planning', 'new-mother', 'parent', 'pregnant']) {
+    await PATCH('/me', { stage });
+    const me = await GET('/me');
+    const child = await GET('/child');
+    const vax = await GET('/vaccinations');
+    const ok = me.json?.data?.user?.stage === stage
+      && (stage !== 'pregnant' || Boolean(me.json?.data?.pregnancy))
+      && Array.isArray(vax.json?.data);
+    check(`  ${stage}: the hero has what it needs`, ok,
+      stage === 'pregnant'
+        ? `week ${me.json?.data?.pregnancy?.week}, due ${me.json?.data?.pregnancy?.eddPretty}`
+        : `child ${child.json?.data?.child?.agePretty ?? 'none'}, ${vax.json?.data?.length} vaccinations`);
+  }
+  await PATCH('/me', { stage: startStage });
+
   /* ------------------------------------------------ language (F13) */
   console.log('\n  --- language ---');
   const startingLang = (await GET('/me/language')).json?.data?.language;
