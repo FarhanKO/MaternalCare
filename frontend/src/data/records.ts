@@ -397,3 +397,14 @@ export interface ChildLogState {
   flags: { level: 'urgent' | 'warn' | 'watch'; text: string }[];
   moods: string[];
 }
+
+
+/** One switchable demo account. Goes away when authentication arrives. */
+export interface DemoAccount {
+  id: string;
+  name: string;
+  stage: string;
+  age: number | null;
+  conditions: string;
+  active: boolean;
+}

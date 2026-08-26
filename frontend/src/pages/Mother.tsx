@@ -24,6 +24,7 @@ import { CarePlan } from '@/components/mother/CarePlan';
 import { RiskPanel } from '@/components/mother/RiskPanel';
 import { StageHero } from '@/components/mother/StageHero';
 import { ChildVitals } from '@/components/mother/ChildVitals';
+import { AccountSwitcher } from '@/components/mother/AccountSwitcher';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
@@ -129,6 +130,15 @@ function dayNoteFor(d: Date) {
  * changes completely, and a page that opens with the same sentence for all
  * four is telling three of them something slightly untrue.
  */
+/** What the page is about, per stage — it is not a pregnancy for three of them. */
+const EYEBROW: Record<string, string> = {
+  pregnant: 'Your pregnancy',
+  planning: 'Getting ready',
+  'new-mother': 'You and your baby',
+  parent: 'You and your child',
+  general: 'Your health',
+};
+
 const VITALS_INTRO: Record<string, { title: string; body: string }> = {
   pregnant: {
     title: 'Your readings through the pregnancy',
@@ -564,13 +574,18 @@ export function Mother() {
         {/* greeting */}
         <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Your pregnancy</span>
+            {/* the eyebrow follows her stage — a parent is not "your pregnancy" */}
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
+              {EYEBROW[profile.stage] ?? EYEBROW.pregnant}
+            </span>
             <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
               {greeting}, <span className="font-serif italic text-brand-600">{profile.name.split(' ')[0]}</span>
             </h1>
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
+            {/* demo only — see AccountSwitcher */}
+            <AccountSwitcher />
             <NotificationBell
               sosActive={!!liveAlert}
               vitalAlerts={vitals.alerts}

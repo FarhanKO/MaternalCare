@@ -22,6 +22,7 @@
  * Re-running replaces them, so it is idempotent.
  */
 const db = require('../config/db');
+const { WHO } = require('../models/data/whoGrowth');
 
 /*
  * Ayesha is deliberately NOT in this list.
@@ -170,27 +171,29 @@ async function seedOne(spec, seed) {
     childId = c.id;
 
     /*
-     * Growth records. The weights and lengths track close to the WHO median
-     * for that child's sex, so the percentile screen shows a plausible band
-     * rather than a child who is off the chart.
+     * Growth records, seeded from the WHO median for that child's sex and age
+     * with a small deterministic wobble.
+     *
+     * An earlier version used a hand-rolled formula that applied the final
+     * monthly rate to every month, so a two-and-a-half-year-old came out at
+     * 9.3 kg and 75.5 cm — against a WHO median of 12.7 kg and 90.7 cm. The
+     * demo parent's dashboard therefore opened with "below the 1st centile ·
+     * underweight", which is an alarming thing to invent about a healthy
+     * child. Reading the same table the percentile screen reads means the
+     * demo cannot disagree with the assessment drawn from it.
      */
     const months = Math.floor(spec.child.ageDays / 30.44);
-    const boy = spec.child.gender === 'male';
+    const sexKey = spec.child.gender === 'male' ? 'boys' : 'girls';
+    const median = (measure, m) => WHO[sexKey][measure].M[Math.min(m, 60)];
+
     for (let m = 0; m <= months; m += Math.max(1, Math.round(months / 5))) {
-      const wt = boy
-        ? 3.3 + m * (m < 6 ? 0.75 : m < 12 ? 0.42 : 0.21)
-        : 3.2 + m * (m < 6 ? 0.7 : m < 12 ? 0.4 : 0.2);
-      const ht = boy ? 49.9 + m * (m < 6 ? 2.9 : m < 12 ? 1.5 : 0.9)
-        : 49.1 + m * (m < 6 ? 2.8 : m < 12 ? 1.45 : 0.88);
-      const hd = boy ? 34.5 + m * (m < 6 ? 1.4 : m < 12 ? 0.5 : 0.15)
-        : 33.9 + m * (m < 6 ? 1.35 : m < 12 ? 0.48 : 0.14);
       await db.run(
         `INSERT INTO growth_records (child_id, date, age_months, weight_kg, height_cm, head_cm)
          VALUES ($1, CURRENT_DATE - ($2::int), $3, $4, $5, $6)`,
         [childId, Math.round((months - m) * 30.44), m,
-          Math.round((wt + wobble(seed, m, 0.15)) * 10) / 10,
-          Math.round((ht + wobble(seed, m + 1, 0.6)) * 10) / 10,
-          Math.round((hd + wobble(seed, m + 2, 0.3)) * 10) / 10],
+          Math.round((median('weight', m) + wobble(seed, m, 0.25)) * 10) / 10,
+          Math.round((median('height', m) + wobble(seed, m + 1, 0.8)) * 10) / 10,
+          Math.round((median('head', m) + wobble(seed, m + 2, 0.4)) * 10) / 10],
       );
     }
 
@@ -276,9 +279,9 @@ async function seedOne(spec, seed) {
     );
   }
 
-  console.log('\n  Sign in as any of them by making them the current user:');
-  console.log('    the demo session takes the first mother by id, so reorder or');
-  console.log('    switch with PATCH /api/me { stage } to see each dashboard.\n');
+  console.log('\n  Ayesha Rahman (pregnant) comes from the main seed and is untouched.');
+  console.log('  Switch between all four from the account menu in the app header,');
+  console.log('  or with GET /api/accounts and POST /api/accounts/use { userId }.\n');
 
   await db.pool.end();
 })().catch((err) => {

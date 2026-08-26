@@ -15,8 +15,8 @@ import {
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
-  CarePlan, ChildLogState, ChildState, DailyLogState, FetalSizePoint, Milestone,
-  Pregnancy, ReportGroup, ReportReason,
+  CarePlan, ChildLogState, ChildState, DailyLogState, DemoAccount, FetalSizePoint,
+  Milestone, Pregnancy, ReportGroup, ReportReason,
   RiskView, ServerPost, ServerProfile, Vaccination, VaccinationStats, VitalAlert,
   VitalReading, WeightGain,
 } from '@/data/records';
@@ -96,6 +96,21 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ language }),
     }).then((r) => r.data.language),
+
+  /**
+   * The demo accounts, and which one the app is viewing as.
+   *
+   * Standing in for authentication. Four screens branch on life stage, and
+   * without this only one of the four could be reached.
+   */
+  getAccounts: () =>
+    request<Envelope<DemoAccount[]>>('/accounts').then((r) => r.data),
+
+  useAccount: (userId: string) =>
+    request<Envelope<{ id: string; name: string; stage: string }>>('/accounts/use', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }).then((r) => r.data),
 
   setStage: (stage: LifeStage) =>
     request<Envelope<{ stage: LifeStage }>>('/me', {
