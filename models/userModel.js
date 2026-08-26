@@ -31,6 +31,30 @@ module.exports = {
   /** Life stage drives which reading and news the client shows. */
   STAGES: ['pregnant', 'new-mother', 'parent', 'planning', 'general'],
 
+  /** The languages the app is translated into. */
+  LANGUAGES: ['en', 'bn'],
+
+  /**
+   * Her reading language.
+   *
+   * Stored on the account rather than only in her browser because the care
+   * plan and the risk assessment are composed as sentences on the server —
+   * the server has to know which language to compose them in, and a
+   * localStorage value in one browser cannot tell it.
+   */
+  async setLanguage(id, language) {
+    if (!this.LANGUAGES.includes(language)) {
+      throw new Error(`Unknown language: ${language}`);
+    }
+    await db.run('UPDATE users SET language = $2 WHERE id = $1', [id, language]);
+    return language;
+  },
+
+  async language(id) {
+    const row = await db.one('SELECT language FROM users WHERE id = $1', [id]);
+    return row?.language ?? 'en';
+  },
+
   async setStage(id, stage) {
     if (!this.STAGES.includes(stage)) throw new Error(`Unknown stage: ${stage}`);
     await db.run('UPDATE users SET stage = $2 WHERE id = $1', [id, stage]);

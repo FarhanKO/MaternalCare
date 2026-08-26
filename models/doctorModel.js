@@ -6,6 +6,15 @@
  * soon, who is best qualified for what she needs? Qualification alone would
  * send everybody to the busiest consultant; availability alone would send them
  * to whoever happens to be idle. Both are scored, then added.
+ *
+ * There is deliberately nothing here for her to filter by. Every input the
+ * list could be filtered on — what they specialise in, how they are rated,
+ * whether they have room, how fast they answer — is already read, weighted
+ * and ordered below. Handing a woman four dropdowns asks her to guess at
+ * weightings the server can work out from the data it holds, and the guess
+ * she is least equipped to make is the one that matters most: how much
+ * "FCPS" should count against "free on Thursday". So she gets a list, in
+ * order, each entry saying in words why it sits where it does.
  */
 const db = require('../config/db');
 
@@ -16,12 +25,17 @@ const SLOT_TIMES = [
 ];
 
 /**
- * Every doctor with their live diary counts.
+ * Every doctor with their live diary counts and their answering record.
  *
  * This used to be one query for the list plus two per doctor for the booked
  * and pending counts — fifteen round trips for seven clinicians, which is
  * about two seconds against a database in Sydney. The counts are correlated
  * subqueries now, so it is one.
+ *
+ * `answered` and `reply_hours` come from the requests they have already been
+ * sent: `requested_at` to `responded_at`, which the appointment flow has
+ * always written and nothing has ever read. It is the one thing here measured
+ * from what a clinician did rather than what they told us about themselves.
  */
 const WITH_COUNTS = `
   SELECT d.*,
@@ -30,7 +44,16 @@ const WITH_COUNTS = `
              AND a.status IN ('requested','accepted')
              AND a.date >= CURRENT_DATE)                  AS booked,
          (SELECT count(*) FROM appointments a
-           WHERE a.doctor_id = d.id AND a.status = 'requested') AS queue
+           WHERE a.doctor_id = d.id AND a.status = 'requested') AS queue,
+         (SELECT count(*) FROM appointments a
+           WHERE a.doctor_id = d.id
+             AND a.responded_at IS NOT NULL
+             AND a.requested_at IS NOT NULL)               AS answered,
+         (SELECT avg(EXTRACT(EPOCH FROM (a.responded_at - a.requested_at)) / 3600.0)
+            FROM appointments a
+           WHERE a.doctor_id = d.id
+             AND a.responded_at IS NOT NULL
+             AND a.requested_at IS NOT NULL)               AS reply_hours
   FROM doctors d
 `;
 
@@ -54,6 +77,32 @@ function qualificationScore(doctor) {
 /** 0 when the list is full, 30 when it is empty. */
 function availabilityScore(load) {
   return Math.round(Math.max(0, 1 - load) * 30);
+}
+
+/**
+ * Weight for how fast they answer, out of 10.
+ *
+ * A clinician who has not been asked anything yet scores the middle of the
+ * band rather than nothing. Being new is not the same as being slow, and
+ * starting everyone at zero would mean no doctor who registered today could
+ * ever climb past the seeded roster — the list would ossify on its first day.
+ */
+function responseScore(answered, hours) {
+  if (!answered || answered < 2 || hours == null) return 5;   // no record yet
+  if (hours <= 6) return 10;
+  if (hours <= 24) return 8;
+  if (hours <= 48) return 5;
+  if (hours <= 96) return 2;
+  return 0;
+}
+
+/**
+ * Weight for how she is rated, out of 10, with an unrated clinician held at
+ * the roster average for the same reason as above.
+ */
+function ratingScore(rating, average) {
+  const r = rating == null ? average : rating;
+  return Math.round(Math.max(0, Math.min(5, r)) * 2);
 }
 
 /** What every clinic visit costs before seniority is added, in taka. */
@@ -117,13 +166,29 @@ function plansFor(doctor) {
 /**
  * How a mother's need maps onto a specialty. Anything unmatched still ranks —
  * it simply gets no bonus, rather than being hidden.
+ *
+ * The optional 'a' matters now that clinicians type their own specialty:
+ * "Pediatrics" and "Paediatrics" are the same doctor, and matching only the
+ * British spelling would have quietly filed every American-trained
+ * paediatrician under "a different specialty to what you need".
  */
 const SPECIALTY_FOR = {
-  pregnant: /obstetric|maternal|gynaec/i,
-  planning: /obstetric|gynaec|nutrition/i,
-  'new-mother': /obstetric|maternal|paediatric|nutrition/i,
-  parent: /paediatric/i,
+  pregnant: /obstetric|maternal|gyn[a]?ec/i,
+  planning: /obstetric|gyn[a]?ec|nutrition/i,
+  'new-mother': /obstetric|maternal|p[a]?ediatric|nutrition/i,
+  parent: /p[a]?ediatric/i,
 };
+
+/** A registration field that came back wrong, with the message to show. */
+function invalid(field, message) {
+  const err = new Error(message);
+  err.code = 'INVALID_REGISTRATION';
+  err.field = field;
+  return err;
+}
+
+/** Trim, collapse runs of whitespace, and cap — every text field gets this. */
+const clean = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
 /** Row (already carrying booked/queue) → the shape the client reads. */
 function toDTO(d) {
@@ -142,11 +207,13 @@ function toDTO(d) {
     id: String(d.id),
     name: d.name,
     specialty: d.specialty,
-    hospital: d.hospital,
     qualification: d.qualification || '',
     years: d.years || 0,
-    rating: d.rating,
-    distanceKm: d.distance_km,
+    /** null until they have been rated — not zero, which would read as bad */
+    rating: d.rating == null ? null : d.rating,
+    /** requests they have answered, and how long they took on average */
+    answered: Number(d.answered || 0),
+    replyHours: d.reply_hours == null ? null : Math.round(Number(d.reply_hours) * 10) / 10,
     panel,
     capacity,
     openings,
@@ -170,6 +237,64 @@ module.exports = {
   consultationFee,
   chatMonthFee,
   plansFor,
+
+  /**
+   * A clinician signing themselves up.
+   *
+   * Everything the ranking reads is asked for here, because a doctor who
+   * registers has to be able to reach the top of the list on merit. The one
+   * that matters most is `qualification`: it is worth up to 60 of the ~110
+   * points, so leaving it out would file every new registration below a
+   * seeded row forever. It is a free-text field on purpose — a clinician
+   * writes what is on their certificate, not what fits our dropdown.
+   *
+   * Nothing here is a credential check. We store what they claim and the
+   * licence number they claim it under; the interface says exactly that
+   * rather than implying an approval step that nobody is performing.
+   */
+  async register(input = {}) {
+    const name = clean(input.name, 120);
+    const specialty = clean(input.specialty, 80);
+    const qualification = clean(input.qualification, 160);
+    const licenseNo = clean(input.licenseNo, 40);
+    const email = clean(input.email, 160).toLowerCase();
+    const phone = clean(input.phone, 40);
+    const years = Math.max(0, Math.min(60, Math.round(Number(input.years) || 0)));
+
+    if (name.length < 3) throw invalid('name', 'Please give your full name');
+    if (!specialty) throw invalid('specialty', 'Please choose a specialty');
+    if (qualification.length < 4) {
+      throw invalid('qualification', 'Please list your qualifications as they appear on your certificate');
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      throw invalid('email', 'That does not look like an email address');
+    }
+    // loose on purpose: numbers are written a dozen ways here, and a format
+    // rule that rejects a real number is worse than one that accepts a typo
+    if (phone.replace(/\D/g, '').length < 6) throw invalid('phone', 'Please give a phone number');
+    if (licenseNo.length < 3) throw invalid('licenseNo', 'Please give your medical licence number');
+
+    const taken = await db.one(
+      `SELECT lower(email) = $1 AS by_email FROM doctors
+        WHERE lower(email) = $1 OR lower(license_no) = $2 LIMIT 1`,
+      [email, licenseNo.toLowerCase()],
+    );
+    if (taken) {
+      throw taken.by_email
+        ? invalid('email', 'A clinician is already registered with that email')
+        : invalid('licenseNo', 'A clinician is already registered under that licence number');
+    }
+
+    const row = await db.insert(
+      `INSERT INTO doctors (name, specialty, qualification, years,
+                            email, phone, license_no, available, patients, capacity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 0, 30)
+       RETURNING id`,
+      [name, specialty, qualification, years, email, phone, licenseNo],
+    );
+
+    return this.find(row.id);
+  },
 
   async all() {
     const rows = await db.sql(`${WITH_COUNTS} ORDER BY d.id`);
@@ -200,13 +325,20 @@ module.exports = {
     const pattern = SPECIALTY_FOR[stage];
     const doctors = await this.all();
 
+    // the prior an unrated clinician is held at, taken from the roster she is
+    // actually choosing among rather than from a number picked in advance
+    const rated = doctors.filter((d) => d.rating != null);
+    const average = rated.length
+      ? rated.reduce((n, d) => n + d.rating, 0) / rated.length
+      : 4;
+
     return doctors
       .map((d) => {
         const qual = qualificationScore({ qualification: d.qualification, years: d.years });
         const avail = availabilityScore(d.load);
         const relevant = !pattern || pattern.test(d.specialty);
-        const stars = Math.round((d.rating || 0) * 2);
-        const near = d.distanceKm <= 2 ? 3 : d.distanceKm <= 4 ? 1 : 0;
+        const stars = ratingScore(d.rating, average);
+        const reply = responseScore(d.answered, d.replyHours);
 
         const tier = !d.bookable ? 2 : relevant ? 0 : 1;
 
@@ -215,8 +347,18 @@ module.exports = {
         if (qual >= 40) reasons.push('Senior specialist qualification');
         else if (qual >= 25) reasons.push('Specialist qualified');
         if (d.status === 'open') reasons.push(`${d.openings} places left on their list`);
-        if (d.bookable && d.queue === 0) reasons.push('No one waiting — usually answers same day');
+        // "usually answers same day" used to hang off an empty queue, which
+        // was a guess dressed as a fact — and once reply times were measured
+        // it could contradict them on the same card. The queue says what is
+        // in front of her; how fast they answer is said below, from the record.
+        if (d.bookable && d.queue === 0) reasons.push('Nothing waiting to be answered');
         else if (d.bookable) reasons.push(`${d.queue} request${d.queue > 1 ? 's' : ''} ahead of you`);
+        if (d.answered >= 2 && d.replyHours != null) {
+          reasons.push(d.replyHours <= 24
+            ? `Answers requests within a day`
+            : `Takes about ${Math.round(d.replyHours / 24)} days to answer`);
+        }
+        if (d.rating == null) reasons.push('New here — not rated yet');
         if (d.status === 'away') reasons.push('Currently on leave');
         if (d.status === 'full') reasons.push('List is full — not taking new requests');
         if (!relevant && d.bookable) reasons.push('A different specialty to what you need now');
@@ -225,11 +367,15 @@ module.exports = {
           ...d,
           tier,
           relevant,
-          score: qual + avail + stars + near,
-          breakdown: { qualification: qual, availability: avail, rating: stars, distance: near },
+          score: qual + avail + stars + reply,
+          breakdown: {
+            qualification: qual, availability: avail, rating: stars, response: reply,
+          },
           reasons,
         };
       })
-      .sort((a, b) => a.tier - b.tier || b.score - a.score || a.distanceKm - b.distanceKm);
+      // the tie-break is the queue: same score, so send her to whoever has
+      // fewer people already waiting
+      .sort((a, b) => a.tier - b.tier || b.score - a.score || a.queue - b.queue);
   },
 };

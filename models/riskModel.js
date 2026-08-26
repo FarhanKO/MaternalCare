@@ -5,71 +5,82 @@
  * Risk dataset: age, blood pressure, blood sugar, temperature, heart rate).
  */
 const vitalModel = require('./vitalModel');
+const strings = require('./i18n/risk');
 
-function scoreFactors({ age, systolic, diastolic, sugar, temp, week }) {
+/**
+ * The five factors, scored.
+ *
+ * The thresholds are the logic; the words are a lookup. Separating them is
+ * what let this become translatable without touching a single number — a
+ * factor now carries a stable `id` and `band`, and the sentence for that pair
+ * is fetched in whichever language she reads.
+ *
+ * `id` is also what the care plan keys off, so a rename in one language can no
+ * longer quietly break the guidance that depends on it.
+ */
+function scoreFactors({ age, systolic, diastolic, sugar, temp, week }, lang = 'en') {
   const factors = [];
-  const add = (name, points, detail) => factors.push({ name, points, detail });
+  const vars = { age, systolic, diastolic, sugar, temp, week };
+  const add = (id, band, points) => factors.push({
+    id,
+    band,
+    name: strings.name(id, lang),
+    points,
+    detail: strings.detail(`${id}.${band}`, vars, lang),
+  });
 
-  if (age >= 35)      add('Maternal age', 25, `${age} years — advanced maternal age raises monitoring needs`);
-  else if (age <= 18) add('Maternal age', 20, `${age} years — adolescent pregnancy needs closer follow-up`);
-  else                add('Maternal age', 0,  `${age} years — within the lower-risk range`);
+  if (age >= 35)      add('age', 'high', 25);
+  else if (age <= 18) add('age', 'low', 20);
+  else                add('age', 'ok', 0);
 
-  if (systolic >= 140 || diastolic >= 90)      add('Blood pressure', 40, `${systolic}/${diastolic} mmHg — hypertensive range`);
-  else if (systolic >= 130 || diastolic >= 85) add('Blood pressure', 20, `${systolic}/${diastolic} mmHg — elevated, monitor daily`);
-  else                                         add('Blood pressure', 0,  `${systolic}/${diastolic} mmHg — normal range`);
+  if (systolic >= 140 || diastolic >= 90)      add('bp', 'high', 40);
+  else if (systolic >= 130 || diastolic >= 85) add('bp', 'raised', 20);
+  else                                         add('bp', 'ok', 0);
 
-  if (sugar >= 126)      add('Blood glucose', 35, `${sugar} mg/dL — diabetic range, needs medical review`);
-  else if (sugar >= 95)  add('Blood glucose', 18, `${sugar} mg/dL — above the fasting target for pregnancy`);
-  else                   add('Blood glucose', 0,  `${sugar} mg/dL — within target`);
+  if (sugar >= 126)      add('sugar', 'high', 35);
+  else if (sugar >= 95)  add('sugar', 'raised', 18);
+  else                   add('sugar', 'ok', 0);
 
-  if (temp >= 38.0)      add('Body temperature', 25, `${temp} °C — fever, possible infection`);
-  else if (temp >= 37.5) add('Body temperature', 10, `${temp} °C — slightly raised`);
-  else                   add('Body temperature', 0,  `${temp} °C — normal`);
+  if (temp >= 38.0)      add('temp', 'fever', 25);
+  else if (temp >= 37.5) add('temp', 'raised', 10);
+  else                   add('temp', 'ok', 0);
 
-  if (week >= 37)      add('Gestational stage', 10, `Week ${week} — full term, delivery preparation stage`);
-  else if (week >= 28) add('Gestational stage', 5,  `Week ${week} — third trimester, increased monitoring`);
-  else                 add('Gestational stage', 0,  `Week ${week} — routine monitoring stage`);
+  if (week >= 37)      add('week', 'term', 10);
+  else if (week >= 28) add('week', 'third', 5);
+  else                 add('week', 'ok', 0);
 
   return factors;
 }
 
-const RECOMMENDATIONS = {
-  low: [
-    { icon: '🥗', title: 'Nutrition', text: 'Keep a balanced plate: leafy greens, lentils, dairy and one iron-rich meal daily. Stay hydrated (2.5–3 L).' },
-    { icon: '🚶‍♀️', title: 'Activity', text: '30 minutes of gentle walking or prenatal yoga most days. Avoid lying flat on your back for long periods.' },
-    { icon: '😴', title: 'Rest', text: 'Aim for 7–9 hours of sleep, resting on your left side to improve blood flow to the baby.' },
-    { icon: '📋', title: 'Monitoring', text: 'Log vitals twice a week and do daily kick counts after week 28.' },
-  ],
-  medium: [
-    { icon: '🩺', title: 'Medical follow-up', text: 'Book a check-up within the next 7 days and share your vitals trend with your doctor.' },
-    { icon: '🧂', title: 'Nutrition', text: 'Reduce salt and refined sugar. Prefer complex carbs, and split meals into 5–6 smaller portions.' },
-    { icon: '📈', title: 'Monitoring', text: 'Log blood pressure and glucose daily. Set reminders — trends matter more than single readings.' },
-    { icon: '🧘‍♀️', title: 'Stress', text: 'Practice 10 minutes of breathing exercises daily; elevated stress can raise blood pressure.' },
-  ],
-  high: [
-    { icon: '🚨', title: 'Urgent review', text: 'Contact your obstetrician today. Readings in this range need professional evaluation.' },
-    { icon: '🛏️', title: 'Rest', text: 'Avoid strenuous activity until your doctor reviews you. Rest on your left side.' },
-    { icon: '📞', title: 'Emergency plan', text: 'Keep the SOS page ready, confirm your emergency contacts, and know your nearest 24/7 hospital.' },
-    { icon: '📈', title: 'Monitoring', text: 'Check blood pressure twice daily and record symptoms like headache, blurred vision or swelling.' },
-  ],
-};
+/*
+ * Three arrays of four hardcoded tips used to live here, keyed only by risk
+ * level. Every mother at "medium" read the same four sentences whether she was
+ * in week 9 or week 39, whether her score came from her blood pressure or her
+ * blood sugar, and whether or not she had gestational diabetes on her record —
+ * which is to say they were not personalised at all, only sorted into three
+ * buckets. The plan now comes from guidanceModel, which reads the factors this
+ * file already produces along with her stage, her conditions and her own log.
+ *
+ * This model deliberately does not require guidanceModel: guidance depends on
+ * risk, and a cycle between the two would be a worse problem than the
+ * duplication it saves. Callers that want both ask for both.
+ */
 
 module.exports = {
-  assess(input) {
-    const factors = scoreFactors(input);
+  assess(input, lang = 'en') {
+    const factors = scoreFactors(input, lang);
     const score = Math.min(100, factors.reduce((s, f) => s + f.points, 0));
     const level = score >= 55 ? 'high' : score >= 25 ? 'medium' : 'low';
-    const label = { low: 'Low Risk', medium: 'Medium Risk', high: 'High Risk' }[level];
-    return { score, level, label, factors, recommendations: RECOMMENDATIONS[level] };
+    return { score, level, label: strings.level(level, lang), factors };
   },
 
   /** Assessment built from the user's latest logged vitals */
-  async fromLatestVitals(user, pregnancy) {
+  async fromLatestVitals(user, pregnancy, lang = user?.language || 'en') {
     const v = await vitalModel.latest(user.id);
     if (!v || !pregnancy) return null;
     return this.assess({
       age: user.age, systolic: v.systolic, diastolic: v.diastolic,
       sugar: v.sugar, temp: v.temp_c, week: pregnancy.week,
-    });
+    }, lang);
   },
 };

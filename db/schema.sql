@@ -20,9 +20,10 @@
 BEGIN;
 
 DROP TABLE IF EXISTS sos_notifications, sos_alerts, documents, messages,
-  reminders, symptoms, daily_logs, emergency_contacts, appointments, vitals,
+  reminders, symptoms, daily_logs, emergency_contacts,
+  care_terminations, appointment_changes, appointments, vitals,
   growth_records, milestones, children, pregnancies, vaccinations,
-  hospitals, post_comments, posts, articles, doctors, users CASCADE;
+  post_comments, posts, articles, doctors, users CASCADE;
 
 /* ------------------------------------------------------------- people */
 
@@ -41,25 +42,44 @@ CREATE TABLE users (
   last_visit       DATE,
   next_visit       DATE,
   emergency_number TEXT    NOT NULL DEFAULT '999',
+  -- Which language she reads the app in. On the account rather than only in
+  -- the browser because the care plan and the risk assessment are composed as
+  -- sentences on the server — the server has to know which language to write
+  -- them in, and a localStorage value in one browser cannot tell it.
+  language         TEXT    NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'bn')),
   -- profile photo, stored on disk like documents are; the row keeps the name
   avatar_file      TEXT,
   bio              TEXT    NOT NULL DEFAULT ''
 );
 
+-- Clinicians register themselves; every row here either came from the seed
+-- or from someone filling in the registration form. There is no hospital
+-- column and no distance: consultations are held by video, the platform has
+-- no affiliation with any institution, and a doctor signing up cannot say
+-- how far they are from a mother who has not signed up yet.
 CREATE TABLE doctors (
   id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name          TEXT    NOT NULL,
   specialty     TEXT,
-  hospital      TEXT,
+  -- NULL until they have been rated; the ranking holds an unrated clinician
+  -- at the roster average rather than treating "new" as "bad"
   rating        REAL,
-  distance_km   REAL,
   available     BOOLEAN NOT NULL DEFAULT TRUE,
-  -- current panel size; capacity is what the clinic will carry
+  -- current panel size; capacity is what the clinician will carry
   patients      INTEGER NOT NULL DEFAULT 0,
   qualification TEXT    NOT NULL DEFAULT '',
   years         INTEGER NOT NULL DEFAULT 0,
-  capacity      INTEGER NOT NULL DEFAULT 30
+  capacity      INTEGER NOT NULL DEFAULT 30,
+  -- what registration collects
+  email         TEXT,
+  phone         TEXT,
+  license_no    TEXT,
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX doctors_license_key ON doctors (lower(license_no))
+  WHERE license_no IS NOT NULL;
+CREATE UNIQUE INDEX doctors_email_key   ON doctors (lower(email))
+  WHERE email IS NOT NULL;
 
 /* ---------------------------------------------------------- pregnancy */
 
@@ -149,8 +169,54 @@ CREATE TABLE appointments (
   -- 'visit' is the consultation alone; 'visit-plus-chat' adds a month of
   -- messaging. chat_until is a date, so the entitlement lapses by itself.
   plan           TEXT CHECK (plan IS NULL OR plan IN ('visit', 'visit-plus-chat')),
-  chat_until     DATE
+  chat_until     DATE,
+  -- Why it was cancelled, and by whom. `status = 'cancelled'` alone is the
+  -- difference between "she could not afford it" and "she went into labour",
+  -- and the clinic used to see only the empty slot.
+  cancelled_at   TIMESTAMPTZ,
+  cancelled_by   TEXT CHECK (cancelled_by IS NULL OR cancelled_by IN ('mother', 'doctor')),
+  cancel_reason  TEXT,
+  cancel_note    TEXT
 );
+
+-- Every time an appointment moved. A row per move rather than columns on the
+-- appointment, because "moved twice already" is exactly what a clinic wants.
+CREATE TABLE appointment_changes (
+  id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+  moved_by       TEXT    NOT NULL CHECK (moved_by IN ('mother', 'doctor')),
+  from_date      DATE    NOT NULL,
+  from_time      TEXT,
+  to_date        DATE    NOT NULL,
+  to_time        TEXT,
+  reason         TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX appointment_changes_appt_idx
+  ON appointment_changes (appointment_id, created_at);
+
+-- Ending the arrangement between a mother and a clinician — not one visit,
+-- but the relationship the visits sit inside. Either side may end it and both
+-- must give a reason; a clinician must also write one in words.
+CREATE TABLE care_terminations (
+  id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+  doctor_id  INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+  ended_by   TEXT NOT NULL CHECK (ended_by IN ('mother', 'doctor')),
+  -- the vocabularies differ by side; the model enforces which codes belong
+  reason     TEXT NOT NULL,
+  note       TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- stamped when the pair start again, so the record of the ending survives
+  resumed_at TIMESTAMPTZ
+);
+-- Only one live ending per pair: booking again resumes the old one rather
+-- than stacking a second on top of it.
+CREATE UNIQUE INDEX care_terminations_active_key
+  ON care_terminations (user_id, doctor_id)
+  WHERE resumed_at IS NULL;
+CREATE INDEX care_terminations_doctor_idx
+  ON care_terminations (doctor_id, created_at DESC);
 CREATE INDEX appointments_user_idx   ON appointments (user_id, date);
 CREATE INDEX appointments_doctor_idx ON appointments (doctor_id, status);
 
@@ -290,7 +356,11 @@ CREATE TABLE posts (
   image_file        TEXT,
   hearts            INTEGER NOT NULL DEFAULT 0,
   clinician_answered BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- moderation hides rather than deletes: a removal that destroys the
+  -- evidence cannot be reviewed, appealed, or explained to its author
+  hidden_at         TIMESTAMPTZ,
+  hidden_reason     TEXT
 );
 CREATE INDEX posts_recent_idx ON posts (created_at DESC);
 
@@ -301,9 +371,46 @@ CREATE TABLE post_comments (
   author     TEXT    NOT NULL,
   role       TEXT    NOT NULL DEFAULT 'mother' CHECK (role IN ('mother', 'doctor')),
   body       TEXT    NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  hidden_at     TIMESTAMPTZ,
+  hidden_reason TEXT
 );
 CREATE INDEX post_comments_post_idx ON post_comments (post_id, created_at);
+
+-- What members have flagged on the board. The forum has always claimed to be
+-- moderated; this is the table that makes the claim true.
+CREATE TABLE content_reports (
+  id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- exactly one target, enforced by the CHECK below
+  post_id     INTEGER REFERENCES posts(id)         ON DELETE CASCADE,
+  comment_id  INTEGER REFERENCES post_comments(id) ON DELETE CASCADE,
+  -- null once a reporter's account goes: the content is either against the
+  -- rules or it is not, and who said so does not change that
+  reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  reason      TEXT NOT NULL CHECK (reason IN (
+                'medical-misinformation', 'harassment', 'privacy',
+                'spam', 'explicit', 'other')),
+  detail      TEXT,
+  state       TEXT NOT NULL DEFAULT 'open'
+                CHECK (state IN ('open', 'upheld', 'dismissed')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by INTEGER REFERENCES doctors(id) ON DELETE SET NULL,
+  review_note TEXT,
+  CONSTRAINT content_reports_one_target
+    CHECK ((post_id IS NULL) <> (comment_id IS NULL))
+);
+-- One report per person per item: pressing the button twice is not two
+-- reports, and the count is what drives priority in the queue.
+CREATE UNIQUE INDEX content_reports_post_reporter_key
+  ON content_reports (post_id, reporter_id)
+  WHERE post_id IS NOT NULL AND reporter_id IS NOT NULL;
+CREATE UNIQUE INDEX content_reports_comment_reporter_key
+  ON content_reports (comment_id, reporter_id)
+  WHERE comment_id IS NOT NULL AND reporter_id IS NOT NULL;
+CREATE INDEX content_reports_open_idx
+  ON content_reports (state, created_at)
+  WHERE state = 'open';
 
 -- What she reports about herself each day. One row per day, so the dashboard
 -- can chart a trend instead of forgetting the moment the tab closes.
@@ -316,15 +423,6 @@ CREATE TABLE daily_logs (
   kicks        INTEGER CHECK (kicks IS NULL OR kicks >= 0),
   water_litres REAL    CHECK (water_litres IS NULL OR water_litres >= 0),
   UNIQUE (user_id, date)
-);
-
-CREATE TABLE hospitals (
-  id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name        TEXT,
-  distance_km REAL,
-  phone       TEXT,
-  ambulance   BOOLEAN NOT NULL DEFAULT TRUE,
-  open24      BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 COMMIT;

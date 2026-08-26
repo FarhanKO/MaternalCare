@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowRight, BellRing, CalendarDays, CheckCircle2, ChevronRight,
-  ClipboardList, ClipboardPlus, Clock, Droplet, HeartPulse, Inbox, LayoutDashboard, Search, ShieldAlert,
+  ClipboardList, ClipboardPlus, Clock, Droplet, FolderOpen, HeartPulse, Inbox, LayoutDashboard, Search,
+  ShieldAlert,
   Stethoscope, TrendingUp, Users, X,
 } from 'lucide-react';
 import {
@@ -29,16 +30,20 @@ import {
   TODAY_SLOTS, TRIMESTER_SPLIT, type Patient, type RiskLevel,
 } from '@/data/doctor';
 import { api } from '@/lib/api';
+import { ReportButton } from '@/components/ui/ReportButton';
+import { ModerationQueue } from '@/components/doctor/ModerationQueue';
+import { CareEndings } from '@/components/doctor/CareEndings';
 
 const P = { peach: '#fb7534', peachLight: '#ff9159', aqua: '#22b8c4', brand: '#3f66f0', mint: '#2fbf9b', rose: '#e5484d', violet: '#8b7bf3' };
 
-type DocTab = 'overview' | 'patients' | 'schedule' | 'requests' | 'reports';
+type DocTab = 'overview' | 'patients' | 'schedule' | 'requests' | 'moderation' | 'reports';
 
 const TABS: DockItem<DocTab>[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard, hint: 'Clinic at a glance' },
   { key: 'patients', label: 'Patients', icon: Users, hint: 'Your caseload' },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays, hint: 'Today’s clinic' },
   { key: 'requests', label: 'Inbox', icon: Inbox, hint: 'Requests to be seen, and your conversations' },
+  { key: 'moderation', label: 'Moderation', icon: ShieldAlert, hint: 'Content mothers have reported' },
   { key: 'reports', label: 'Reports', icon: ClipboardList, hint: 'Practice analytics' },
 ];
 
@@ -112,6 +117,28 @@ function RiskPill({ level }: { level: RiskLevel }) {
 
 /* ---------------- patient detail drawer ---------------- */
 function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null; onClose: () => void; onAssign: (p: Patient) => void }) {
+  /**
+   * The record opens on the summary, but paper is often the reason it was
+   * opened at all — so files get a pane of their own rather than a footnote
+   * below the fold.
+   */
+  const [pane, setPane] = useState<'overview' | 'files'>('overview');
+  const [fileCount, setFileCount] = useState<number | null>(null);
+
+  // a fresh patient starts on the summary, and its own count. The count is
+  // fetched here rather than left to the Files pane, so the tab and the
+  // shortcut can say "3 on record" before anyone opens them.
+  useEffect(() => {
+    setPane('overview');
+    setFileCount(null);
+    if (!patient) return undefined;
+    let cancelled = false;
+    api.getPatientDocuments(patient.id)
+      .then(({ documents }) => { if (!cancelled) setFileCount(documents.length); })
+      .catch(() => { if (!cancelled) setFileCount(null); });
+    return () => { cancelled = true; };
+  }, [patient?.id]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && patient && onClose();
     window.addEventListener('keydown', onKey);
@@ -166,6 +193,38 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
               </div>
             </div>
 
+            <div className="mt-4 flex flex-none gap-1.5 px-6">
+              {([
+                { key: 'overview' as const, label: 'Overview' },
+                { key: 'files' as const, label: 'Files' },
+              ]).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setPane(t.key)}
+                  className={cn(
+                    'flex-1 rounded-2xl px-3 py-2 text-[12px] font-bold ring-1 transition',
+                    pane === t.key
+                      ? 'bg-peach-500/15 text-peach-700 ring-peach-500/25'
+                      : 'bg-white/60 text-ink-muted ring-transparent hover:text-ink',
+                  )}
+                >
+                  {t.label}
+                  {t.key === 'files' && fileCount !== null && (
+                    <span className="ml-1.5 font-semibold opacity-70">{fileCount}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {pane === 'files' ? (
+              <div className="flex-1 overflow-hidden px-6 pb-6 pt-4">
+                <PatientFiles
+                  patientId={patient.id}
+                  patientName={patient.name}
+                  onCount={setFileCount}
+                />
+              </div>
+            ) : (
             <div className="flex-1 overflow-y-auto px-6 pb-6">
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {[
@@ -234,15 +293,42 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
                 </div>
               </div>
 
-              <PatientFiles patientId={patient.id} />
+              {/* a way through to the paper without hunting for the tab */}
+              <button
+                onClick={() => setPane('files')}
+                className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/55 px-4 py-3 text-left transition hover:bg-white"
+              >
+                <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-peach-500/12 text-peach-700">
+                  <FolderOpen className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold text-ink">Prescriptions &amp; reports</span>
+                  <span className="block text-[11px] font-semibold text-ink-muted">
+                    {fileCount === null ? 'Open her filed documents'
+                      : fileCount === 0 ? 'Nothing filed yet'
+                        : `${fileCount} on record, newest first`}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 flex-none text-ink-faint" />
+              </button>
+
+              {/* her whole record as one document, for the consultation */}
+              <ReportButton
+                patientId={patient.id}
+                patientName={patient.name}
+                variant="quiet"
+                label="Download health report"
+                className="mt-3 w-full"
+              />
 
               <button
                 onClick={() => onAssign(patient)}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)] transition hover:brightness-105"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-peach-400 to-peach-600 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.5)] transition hover:brightness-105"
               >
                 <ClipboardPlus className="h-[18px] w-[18px]" /> Assign test, medicine or appointment
               </button>
             </div>
+            )}
           </motion.aside>
         </motion.div>
       )}
@@ -254,8 +340,10 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
 export function Doctor() {
   const [params, setParams] = useSearchParams();
   const urlTab = params.get('tab') as DocTab | null;
+  // read off TABS rather than a second hardcoded list, which is how
+  // ?tab=moderation silently fell back to the overview when the tab was added
   const valid = (t: string | null): t is DocTab =>
-    !!t && ['overview', 'patients', 'schedule', 'requests', 'reports'].includes(t);
+    !!t && TABS.some((x) => x.key === t);
   const [tab, setTabState] = useState<DocTab>(valid(urlTab) ? urlTab : 'overview');
   const setTab = (t: DocTab) => {
     setTabState(t);
@@ -563,6 +651,9 @@ export function Doctor() {
                 </div>
               )}
             </div>
+
+            {/* discharging, and what the ones who left said on the way out */}
+            <CareEndings doctorId={meId} patients={roster} onChanged={() => setRoster((r) => [...r])} />
           </motion.div>
         )}
 
@@ -674,6 +765,13 @@ export function Doctor() {
                 Cannot reach the clinic server, so requests are unavailable.
               </GlassCard>
             )}
+          </motion.div>
+        )}
+
+        {/* ============================ MODERATION ============================ */}
+        {tab === 'moderation' && (
+          <motion.div key="md" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+            <ModerationQueue doctorId={meId} />
           </motion.div>
         )}
 

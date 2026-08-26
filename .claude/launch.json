@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3000
+    },
+    {
+      "name": "ml",
+      "runtimeExecutable": "ml-service/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--port", "8000", "--app-dir", "ml-service"],
+      "port": 8000
     }
   ]
 }

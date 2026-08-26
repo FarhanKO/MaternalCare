@@ -18,12 +18,20 @@ const profileApi = require('../controllers/api/profileApiController');
 const childApi = require('../controllers/api/childApiController');
 const sessionApi = require('../controllers/api/sessionApiController');
 const vitalApi = require('../controllers/api/vitalApiController');
+const networkApi = require('../controllers/api/networkApiController');
+const reportApi = require('../controllers/api/reportApiController');
+const guidanceApi = require('../controllers/api/guidanceApiController');
+const moderationApi = require('../controllers/api/moderationApiController');
+const careEndingApi = require('../controllers/api/careEndingApiController');
+const riskApi = require('../controllers/api/riskApiController');
 
 /* current demo session user + pregnancy summary */
 router.get('/me', sessionApi.show);
 
 /* update the signed-in user's life stage (set at the end of onboarding) */
 router.patch('/me', sessionApi.setStage);
+router.get('/me/language', sessionApi.language);
+router.patch('/me/language', sessionApi.setLanguage);
 
 /* patients — the clinician's caseload */
 router.get('/patients', patientApi.index);
@@ -31,10 +39,22 @@ router.get('/patients/:id', patientApi.show);
 router.get('/patients/:id/reminders', patientApi.reminders);
 router.get('/patients/:id/symptoms', patientApi.symptoms);
 router.post('/patients/:id/reminders', patientApi.assign);
+router.get('/patients/:id/guidance', guidanceApi.forPatient);
+
+/* the personalised nutrition, movement and lifestyle plan */
+router.get('/guidance', guidanceApi.mine);
+
+/* F13: the rule engine and the FastAPI classifier, side by side */
+router.get('/risk', riskApi.mine);
+router.post('/risk/simulate', riskApi.simulate);
+router.get('/risk/model', riskApi.modelCard);
+router.get('/patients/:id/risk', riskApi.forPatient);
 
 /* finding a doctor */
 router.get('/doctors', careApi.doctors);
 router.get('/doctors/recommended', careApi.recommended);
+// a clinician signing themselves up — the only way a doctor enters the list
+router.post('/doctors/register', careApi.registerDoctor);
 router.get('/doctors/:id/slots', careApi.slots);
 router.get('/doctors/:id/plans', careApi.plans);
 router.get('/doctors/:id/appointments', careApi.doctorAppointments);
@@ -46,6 +66,17 @@ router.post('/appointments', careApi.requestAppointment);
 router.post('/appointments/paid', careApi.payAndBook);
 router.patch('/appointments/:id', careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
+/* F11: move an appointment rather than losing your place in the queue */
+router.patch('/appointments/:id/reschedule', careApi.reschedule);
+router.get('/appointments/:id/changes', careApi.changes);
+router.get('/cancel-reasons', careApi.cancelReasons);
+
+/* ending the care relationship — either side, with a reason */
+router.get('/care-endings/reasons', careEndingApi.reasons);
+router.get('/care-endings', careEndingApi.mine);
+router.post('/care-endings/:doctorId', careEndingApi.endByMother);
+router.get('/doctors/:doctorId/care-endings', careEndingApi.forDoctor);
+router.post('/doctors/:doctorId/care-endings/:patientId', careEndingApi.endByDoctor);
 
 /* profile: name, photo, bio — previously lost on every refresh */
 router.get('/profile', profileApi.show);
@@ -54,6 +85,13 @@ router.get('/profile/avatar/:file', profileApi.avatar);
 
 /* weight gain vs the range recommended for her starting BMI */
 router.get('/weight-gain', profileApi.weightGain);
+
+/* the downloadable health report — same document, both sides */
+router.get('/report.pdf', reportApi.mine);
+router.get('/patients/:id/report.pdf', reportApi.forPatient);
+
+/* where this server can be reached from — the guardian pairing link needs it */
+router.get('/network', networkApi.index);
 
 /* vitals — the readings behind the trend charts */
 router.get('/vitals', vitalApi.index);
@@ -70,6 +108,14 @@ router.post('/community/posts/:id/comments', communityApi.comment);
 router.post('/community/posts/:id/heart', communityApi.heart);
 router.get('/community/images/:file', communityApi.image);
 
+/* reporting — :target is 'posts' or 'comments' */
+router.post('/community/:target/:id/report', communityApi.report);
+
+/* moderation — the clinician's queue */
+router.get('/moderation/reports', moderationApi.queue);
+router.get('/moderation/count', moderationApi.count);
+router.post('/moderation/:target/:id/resolve', moderationApi.resolve);
+
 /* child: growth, milestones, vaccinations — the React client had no route
    to these, so it drew them from hardcoded arrays */
 router.get('/child', childApi.show);
@@ -77,6 +123,7 @@ router.post('/child/growth', childApi.addGrowth);
 router.patch('/child/milestones/:id', childApi.toggleMilestone);
 router.get('/vaccinations', childApi.vaccinations);
 router.patch('/vaccinations/:id/done', childApi.markVaccinationDone);
+router.post('/vaccinations/:id/card', childApi.uploadVaccinationCard);
 
 /* the guardian companion app — scoped by link token, read-only */
 router.get('/guardian/:token', guardianApi.dashboard);

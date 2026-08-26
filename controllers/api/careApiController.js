@@ -30,6 +30,26 @@ exports.recommended = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * A clinician registering themselves.
+ *
+ * 201 with the row they will appear as, so the client can show them what a
+ * mother will see rather than a success message. A field that failed
+ * validation comes back named, because "check your details" on a form of
+ * eight is not help.
+ */
+exports.registerDoctor = async (req, res, next) => {
+  try {
+    const doctor = await doctorModel.register(req.body || {});
+    return res.status(201).json({ data: doctor });
+  } catch (err) {
+    if (err.code === 'INVALID_REGISTRATION') {
+      return res.status(400).json({ error: err.message, field: err.field });
+    }
+    return next(err);
+  }
+};
+
 exports.slots = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -122,13 +142,80 @@ exports.respond = async (req, res) => {
   }
 };
 
-exports.cancel = async (req, res) => {
+/**
+ * Cancel, with a reason.
+ *
+ * `side` says who is doing it — the mother from her own list, the clinician
+ * from the inbox. The reason has to come from that side's vocabulary, so the
+ * clinic can count cancellations by cause instead of only seeing empty slots.
+ */
+exports.cancel = async (req, res, next) => {
+  const side = req.body?.side === 'doctor' ? 'doctor' : 'mother';
   try {
     const user = await userModel.current();
-    const cancelled = await appointmentModel.withdraw(req.params.id, user.id);
+    const cancelled = await appointmentModel.cancelWithReason(req.params.id, {
+      by: side,
+      userId: user.id,
+      doctorId: req.body?.doctorId,
+      reason: req.body?.reason || 'other',
+      note: req.body?.note,
+    });
     if (!cancelled) return res.status(404).json({ error: 'Appointment not found' });
-    res.json({ data: cancelled });
+    return res.json({ data: cancelled });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err instanceof appointmentModel.NotBookableError) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
   }
+};
+
+/** The reasons one side may give for cancelling. */
+exports.cancelReasons = async (req, res) => {
+  const side = req.query.side === 'doctor' ? 'doctor' : 'mother';
+  res.json({ data: appointmentModel.cancelReasons(side), meta: { side } });
+};
+
+/**
+ * Move an appointment to another slot.
+ *
+ * The whole of F11's "rescheduling" — until now a mother whose Tuesday stopped
+ * working could only cancel and rejoin the queue at the back, behind everyone
+ * who had not had to change anything.
+ */
+exports.reschedule = async (req, res, next) => {
+  const side = req.body?.side === 'doctor' ? 'doctor' : 'mother';
+  try {
+    const user = await userModel.current();
+    const moved = await appointmentModel.reschedule(req.params.id, {
+      by: side,
+      userId: user.id,
+      doctorId: req.body?.doctorId,
+      date: req.body?.date,
+      time: req.body?.time,
+      reason: req.body?.reason,
+    });
+    if (!moved) return res.status(404).json({ error: 'Appointment not found' });
+    return res.json({ data: moved, meta: { changes: await appointmentModel.changes(req.params.id) } });
+  } catch (err) {
+    // a taken slot is not the caller's fault — hand back somewhere else to go
+    if (err.code === 'SLOT_TAKEN') {
+      return res.status(409).json({
+        error: 'Somebody took that time while you were choosing',
+        code: 'SLOT_TAKEN',
+        alternatives: err.alternatives,
+      });
+    }
+    if (err instanceof appointmentModel.NotBookableError) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+};
+
+/** Everywhere an appointment has been moved from. */
+exports.changes = async (req, res, next) => {
+  try {
+    return res.json({ data: await appointmentModel.changes(req.params.id) });
+  } catch (err) { return next(err); }
 };

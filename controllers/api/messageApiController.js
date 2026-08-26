@@ -9,6 +9,7 @@
 const db = require('../../config/db');
 const messageModel = require('../../models/messageModel');
 const doctorModel = require('../../models/doctorModel');
+const careEndingModel = require('../../models/careEndingModel');
 const patientModel = require('../../models/patientModel');
 const userModel = require('../../models/userModel');
 const appointmentModel = require('../../models/appointmentModel');
@@ -23,7 +24,7 @@ const appointmentModel = require('../../models/appointmentModel');
 async function careTeamFor(userId) {
   const [rows, threads] = await Promise.all([
     db.sql(`
-      SELECT DISTINCT d.id, d.name, d.specialty, d.hospital, d.qualification
+      SELECT DISTINCT d.id, d.name, d.specialty, d.qualification
       FROM appointments a JOIN doctors d ON d.id = a.doctor_id
       WHERE a.user_id = $1 AND a.status IN ('accepted','completed','requested')
     `, [userId]),
@@ -37,25 +38,32 @@ async function careTeamFor(userId) {
     const d = await doctorModel.find(t.doctorId);
     if (d) {
       rows.push({
-        id: d.id, name: d.name, specialty: d.specialty, hospital: d.hospital,
+        id: d.id, name: d.name, specialty: d.specialty,
         qualification: d.qualification,
       });
       seen.add(t.doctorId);
     }
   }
 
+  /*
+   * Anyone she has ended with drops off the team. A doctor she has formally
+   * left should not still be sitting on her Doctor tab with a message box
+   * under them — that is exactly the confusion ending it was meant to remove.
+   */
+  const ended = await careEndingModel.endedFor(userId);
+  const active = rows.filter((r) => !ended.has(String(r.id)));
+
   const unreadBy = new Map(threads.map((t) => [String(t.doctorId), t.unread ?? 0]));
 
   // whether her month of messaging with each of them is still running
   const chat = await Promise.all(
-    rows.map((r) => appointmentModel.chatOpen(userId, r.id)),
+    active.map((r) => appointmentModel.chatOpen(userId, r.id)),
   );
 
-  return rows.map((r, i) => ({
+  return active.map((r, i) => ({
     doctorId: String(r.id),
     doctorName: r.name,
     specialty: r.specialty,
-    hospital: r.hospital,
     qualification: r.qualification || '',
     unread: unreadBy.get(String(r.id)) ?? 0,
     chatOpen: chat[i].open,

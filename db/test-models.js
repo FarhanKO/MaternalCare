@@ -54,6 +54,21 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   check('vitalModel.alerts flags high glucose', alerts.some((a) => a.metric === 'Fasting glucose'),
     `${alerts.length} alert(s)`);
 
+  // Test validation & preeclampsia red flags
+  let rejected = false;
+  try {
+    await vitalModel.add(me.id, { systolic: 999 });
+  } catch {
+    rejected = true;
+  }
+  check('vitalModel.add rejects out-of-range systolic', rejected, 'rejected');
+
+  const severeReading = await vitalModel.add(me.id, { systolic: 165, diastolic: 115 });
+  const severeAlerts = await vitalModel.alerts(me.id);
+  check('vitalModel.alerts flags preeclampsia emergency', severeAlerts.some((a) => a.level === 'emergency'),
+    'emergency flagged');
+  await db.run('DELETE FROM vitals WHERE id = $1', [severeReading.id]);
+
   console.log('\n  --- symptoms ---');
   const syms = await symptomModel.all(me.id);
   check('symptomModel.all', syms.length === 1 && syms[0].name === 'Back ache', syms[0]?.name);
@@ -66,7 +81,15 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const rems = await reminderModel.all(me.id);
   check('reminderModel.all', rems.length === 5, `${rems.length} reminders`);
   const upcoming = await reminderModel.upcoming(me.id);
-  check('reminderModel.upcoming', upcoming.length === 5, `${upcoming.length} ahead`);
+  // The seed sets these relative to when it ran, so a fixed count decays into a
+  // failure as the clock passes them. Assert what upcoming() actually promises:
+  // only what is still ahead (within its one-hour grace), soonest first.
+  const grace = Date.now() - 3600_000;
+  const allAhead = upcoming.every((r) => new Date(r.at).getTime() >= grace);
+  const sorted = upcoming.every((r, i) => i === 0
+    || new Date(upcoming[i - 1].at).getTime() <= new Date(r.at).getTime());
+  check('reminderModel.upcoming', upcoming.length <= rems.length && allAhead && sorted,
+    `${upcoming.length} of ${rems.length} still ahead, in order`);
   const made = await reminderModel.create(me.id, {
     kind: 'test', title: '__probe__', at: new Date(Date.now() + 86400000).toISOString(),
   });
@@ -76,7 +99,8 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
 
   console.log('\n  --- doctors (N+1 collapsed) ---');
   const docs = await doctorModel.all();
-  check('doctorModel.all', docs.length === 7, `${docs.length} clinicians`);
+  // >= rather than a fixed count: the panel grows, and that is not a defect
+  check('doctorModel.all', docs.length >= 7, `${docs.length} clinicians`);
   const lena = docs.find((d) => d.name === 'Dr. Lena Ortiz');
   check('  live diary counts joined in', typeof lena.queue === 'number' && typeof lena.panel === 'number',
     `panel ${lena.panel}/${lena.capacity} · queue ${lena.queue}`);
@@ -85,13 +109,87 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const ranked = await doctorModel.recommend({ stage: 'pregnant' });
   check('doctorModel.recommend tiers obstetrics first', ranked[0].tier === 0 && /Obstetric/i.test(ranked[0].specialty),
     `${ranked[0].name} · ${ranked[0].specialty}`);
+  // the whole point of the ranking is that she is not asked to filter, so the
+  // list has to arrive complete — nobody hidden, everybody placed
+  check('  ranks the whole roster, hides nobody', ranked.length === docs.length,
+    `${ranked.length} of ${docs.length}`);
+  check('  ordered by tier then score', ranked.every((d, i) => i === 0
+    || ranked[i - 1].tier < d.tier
+    || (ranked[i - 1].tier === d.tier && ranked[i - 1].score >= d.score)),
+    `top ${ranked[0].score} → bottom ${ranked[ranked.length - 1].score}`);
+  check('  every entry says why it sits there', ranked.every((d) => d.reasons.length > 0),
+    `${ranked[0].reasons[0]}`);
+  check('  scores four things, none of them a location',
+    Object.keys(ranked[0].breakdown).join(',') === 'qualification,availability,rating,response',
+    Object.keys(ranked[0].breakdown).join(' + '));
+
+  /* registration: a clinician who signs up has to reach the list on merit */
+  const LICENCE = '__probe__-LIC-9001';
+  await db.run('DELETE FROM doctors WHERE license_no = $1', [LICENCE]);
+  const signedUp = await doctorModel.register({
+    name: 'Dr. Probe Registrant',
+    specialty: 'Obstetrics & Gynaecology',
+    qualification: 'MBBS, FCPS (Obs & Gynae)',
+    years: 11,
+    email: '__probe__registrant@example.invalid',
+    phone: '01700000000',
+    licenseNo: LICENCE,
+  });
+  check('doctorModel.register writes a usable row',
+    signedUp && signedUp.qualification.includes('FCPS') && signedUp.bookable === true,
+    `${signedUp.name} · ${signedUp.status}`);
+  const afterSignup = await doctorModel.recommend({ stage: 'pregnant' });
+  const placed = afterSignup.find((d) => d.id === signedUp.id);
+  check('  and appears in the ranking, unrated, without being buried',
+    placed && placed.tier === 0 && placed.rating === null && placed.score > 0,
+    `#${afterSignup.indexOf(placed) + 1} of ${afterSignup.length} · score ${placed.score}`);
+
+  let dupLicence = null;
+  try {
+    await doctorModel.register({
+      name: 'Dr. Probe Registrant',
+      specialty: 'Obstetrics & Gynaecology',
+      qualification: 'MBBS, FCPS (Obs & Gynae)',
+      years: 11,
+      email: 'someone.else@example.invalid',
+      phone: '01700000000',
+      licenseNo: LICENCE,
+    });
+  } catch (err) { dupLicence = err; }
+  check('  refuses a licence number already registered',
+    dupLicence?.code === 'INVALID_REGISTRATION' && dupLicence.field === 'licenseNo',
+    dupLicence?.message);
+
+  let blank = null;
+  try {
+    await doctorModel.register({
+      name: 'Dr. No Letters', specialty: 'Paediatrics', qualification: '',
+      email: 'x@example.invalid', phone: '01700000000', licenseNo: '__probe__-LIC-9002',
+    });
+  } catch (err) { blank = err; }
+  check('  refuses a registration with no qualifications',
+    blank?.code === 'INVALID_REGISTRATION' && blank.field === 'qualification', blank?.message);
+
+  // put the roster back exactly as it was found
+  await db.run('DELETE FROM doctors WHERE license_no LIKE $1', ['__probe__%']);
+  const restored = await doctorModel.all();
+  check('  probe registrations cleaned up', restored.length === docs.length,
+    `${restored.length} clinicians`);
 
   console.log('\n  --- community ---');
   const posts = await postModel.all({ limit: 20 });
-  check('postModel.all', posts.length === 8, `${posts.length} posts`);
-  const withComments = posts.find((p) => p.comments.length > 0);
-  check('  comments joined in one query', withComments?.comments.length === 2,
-    `${withComments?.comments.length} on "${withComments?.title.slice(0, 28)}…"`);
+  check('postModel.all', posts.length === 9, `${posts.length} posts`);
+  /*
+   * What matters is that each post got its own comments in one round trip,
+   * not that some particular post has two. Pinning the count meant a single
+   * new seeded post at the top of the board broke this.
+   */
+  const commented2 = posts.filter((p) => p.comments.length > 0);
+  const totalJoined = posts.reduce((n, p) => n + p.comments.length, 0);
+  const { c: commentRows } = await db.one('SELECT count(*) AS c FROM post_comments');
+  check('  comments joined in one query, none lost or duplicated',
+    commented2.length > 0 && totalJoined === Number(commentRows),
+    `${totalJoined} across ${commented2.length} posts`);
   check('  topic column reads back', posts.every((p) => p.topic !== undefined || p.topic === undefined),
     posts[0].topic);
   const newPost = await postModel.create(me.id, { title: '__probe__', body: 'x', topic: 'Sleep' });
@@ -99,15 +197,162 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   check('postModel.comment', commented.comments.length === 1, commented.comments[0].body);
   const hearted = await postModel.heart(newPost.id, 1);
   check('postModel.heart', hearted.hearts === 1, `${hearted.hearts}`);
+
+  /* --------------------------------------------- reporting (F18) */
+  const moderationModel = require('../models/moderationModel');
+  const filed = await moderationModel.report({
+    postId: newPost.id, reporterId: me.id,
+    reason: 'medical-misinformation', detail: '__probe__ unsafe advice',
+  });
+  check('moderationModel.report', filed.state === 'open', filed.reason);
+
+  let twice = null;
+  try {
+    await moderationModel.report({ postId: newPost.id, reporterId: me.id, reason: 'spam' });
+  } catch (err) { twice = err; }
+  check('  one report per person per item', twice?.code === 'ALREADY_REPORTED', twice?.message);
+
+  let bothTargets = null;
+  try {
+    await moderationModel.report({
+      postId: newPost.id, commentId: commented.comments[0].id,
+      reporterId: me.id, reason: 'spam',
+    });
+  } catch (err) { bothTargets = err; }
+  check('  refuses a report against two things at once', bothTargets?.code === 'BAD_TARGET');
+
+  const queue = await moderationModel.queue({ state: 'open' });
+  const group = queue.find((g) => g.postId === String(newPost.id));
+  check('moderationModel.queue groups by the item reported', Boolean(group),
+    `${queue.length} group(s), ${group?.reports.length} report(s)`);
+  check('  unsafe medical advice weighs heaviest', group?.urgent === true, `weight ${group?.weight}`);
+  check('  the content comes with it', group?.content.title === '__probe__');
+
+  const upheld = await moderationModel.resolve({
+    target: 'post', id: newPost.id, action: 'uphold',
+    note: '__probe__ removed', reviewerId: 1,
+  });
+  check('moderationModel.resolve upholds', upheld.action === 'uphold' && upheld.reportsClosed === 1);
+  const publicBoard = await postModel.all({ limit: 50 });
+  check('  a removed post leaves the public board',
+    !publicBoard.some((x) => x.id === String(newPost.id)),
+    `${publicBoard.length} visible`);
+  check('  but a moderator can still see it',
+    (await postModel.all({ limit: 50, includeHidden: true })).some((x) => x.id === String(newPost.id)));
+  check('  and the count agrees with the board',
+    (await postModel.count()) === publicBoard.length, `${await postModel.count()}`);
+
+  let onRemoved = null;
+  try {
+    await postModel.comment(newPost.id, me.id, { author: 'Probe', body: 'still open?' });
+  } catch (err) { onRemoved = err; }
+  check('  a removed post takes no more replies', onRemoved?.code === 'REMOVED', onRemoved?.message);
+
+  await moderationModel.resolve({
+    target: 'post', id: newPost.id, action: 'dismiss', note: '__probe__ reversed', reviewerId: 1,
+  });
+  check('  dismissing reverses the removal',
+    (await postModel.all({ limit: 50 })).some((x) => x.id === String(newPost.id)));
+
+  /* a removed *comment* becomes a tombstone rather than vanishing */
+  const commentId = commented.comments[0].id;
+  await moderationModel.report({
+    commentId, reporterId: me.id, reason: 'harassment', detail: '__probe__',
+  });
+  await moderationModel.resolve({
+    target: 'comment', id: commentId, action: 'uphold', note: '__probe__', reviewerId: 1,
+  });
+  const tombstoned = await postModel.find(newPost.id);
+  check('a removed reply leaves a tombstone, not a gap',
+    tombstoned.comments.length === 1
+      && tombstoned.comments[0].removed === true
+      && !tombstoned.comments[0].body.includes('hello'),
+    tombstoned.comments[0].body);
+
+  await db.run("DELETE FROM content_reports WHERE detail LIKE '__probe__%' OR review_note LIKE '__probe__%'");
   await db.run('DELETE FROM posts WHERE title = $1', ['__probe__']);
+  const { c: probesLeft } = await db.one(
+    "SELECT count(*) AS c FROM content_reports WHERE detail LIKE '__probe__%'",
+  );
+  check('  probe posts and reports cleaned up',
+    (await postModel.count()) === posts.length && Number(probesLeft) === 0,
+    `${await postModel.count()} posts, ${probesLeft} probe reports`);
+
+  /* ---------------------------------------------- care plan (F14) */
+  console.log('\n  --- care plan ---');
+  const guidanceModel = require('../models/guidanceModel');
+  const plan = await guidanceModel.forUser(me.id);
+  check('guidanceModel.forUser', Boolean(plan),
+    `${plan.nutrition.length} nutrition · ${plan.exercise.length} movement · ${plan.lifestyle.length} lifestyle`);
+  const everyItem = [...plan.nutrition, ...plan.exercise, ...plan.lifestyle];
+  check('  every line names the reading behind it', everyItem.every((i) => i.why && i.why.length > 10),
+    everyItem[0].why.slice(0, 44));
+  check('  the basis is stated, not implied', plan.basis.length > 0, plan.basis.join(' · ').slice(0, 52));
+  check('  hydration is measured, the rest are targets',
+    plan.hydration.targetLitres > 0 && plan.targets.every((t) => typeof t.amount === 'string'),
+    `${plan.hydration.avgLitres} of ${plan.hydration.targetLitres} L`);
+
+  /*
+   * The safety rule, tested directly rather than hoped for: a high-risk
+   * profile must not be handed an exercise programme.
+   */
+  const highRisk = guidanceModel.build({
+    stage: 'pregnant', week: 32, trimester: 3, conditionsText: 'Gestational hypertension',
+    risk: {
+      level: 'high',
+      label: 'High Risk',
+      score: 88,
+      factors: [
+        { name: 'Blood pressure', points: 40, detail: '' },
+        { name: 'Maternal age', points: 25, detail: '' },
+      ],
+    },
+    vitals: { systolic: 158, diastolic: 104, sugar: 90, temp_c: 36.8 },
+    log: null, symptoms: [], weightGain: null,
+  });
+  check('  a high-risk plan prescribes no exercise programme',
+    highRisk.exercise.every((i) => !/150 minutes|walk for ten/i.test(i.title))
+      && highRisk.exercise[0].priority === 'urgent',
+    highRisk.exercise.map((i) => i.title).join(' | '));
+  check('  and its first instruction is to call someone',
+    /obstetrician/i.test(highRisk.lifestyle[0].title + highRisk.lifestyle[0].text),
+    highRisk.lifestyle[0].title);
+
+  const lowRisk = guidanceModel.build({
+    stage: 'pregnant', week: 12, trimester: 1, conditionsText: '',
+    risk: { level: 'low', label: 'Low Risk', score: 0, factors: [] },
+    vitals: { systolic: 110, diastolic: 70, sugar: 82, temp_c: 36.7 },
+    log: null, symptoms: [], weightGain: null,
+  });
+  check('  a well mother at week 12 gets a different plan entirely',
+    lowRisk.nutrition.some((i) => /trimester 1/i.test(i.title))
+      && !lowRisk.nutrition.some((i) => /carbohydrate/i.test(i.title)),
+    lowRisk.nutrition.map((i) => i.title).join(' | ').slice(0, 70));
+  check('  the two plans do not share a single line',
+    highRisk.exercise.every((h) => !lowRisk.exercise.some((l) => l.title === h.title)));
 
   console.log('\n  --- daily log ---');
+  // Today's row is the one the app itself is built to let her edit, so it
+  // cannot be asserted against a seeded value — a single real check-in makes
+  // that assertion fail forever, which is what happened. What is worth
+  // asserting is the invariant: writing one field must not blank the others.
   const today = await dailyLogModel.forDate(me.id);
-  check('dailyLogModel.forDate', today.mood === 'Calm', `${today.mood} · ${today.kicks} kicks`);
-  const saved = await dailyLogModel.save(me.id, { kicks: 21 });
-  check('dailyLogModel.save upserts one field', saved.kicks === 21 && saved.mood === 'Calm',
-    `kicks ${saved.kicks}, mood ${saved.mood} kept`);
-  await dailyLogModel.save(me.id, { kicks: today.kicks });
+  // the model's own helper, not toISOString(): "today" here is her local
+  // calendar date, and in UTC+6 the two disagree for six hours every evening
+  check('dailyLogModel.forDate returns today', today.date === dailyLogModel.todayISO(),
+    `${today.date} · ${today.kicks} kicks`);
+  const probeKicks = (today.kicks ?? 0) + 3;
+  const saved = await dailyLogModel.save(me.id, { kicks: probeKicks });
+  check('dailyLogModel.save upserts one field, keeping the rest',
+    saved.kicks === probeKicks
+      && saved.mood === today.mood
+      && saved.waterLitres === today.waterLitres
+      && saved.sleepHours === today.sleepHours,
+    `kicks ${today.kicks ?? '—'} → ${saved.kicks}, mood ${saved.mood ?? '—'} kept`);
+  await dailyLogModel.save(me.id, { kicks: today.kicks ?? null });
+  const undone = await dailyLogModel.forDate(me.id);
+  check('  and the probe is undone', (undone.kicks ?? null) === (today.kicks ?? null),
+    `back to ${undone.kicks ?? '—'}`);
   const summary = await dailyLogModel.summary(me.id, 7);
   check('dailyLogModel.summary averages', summary.days === 7 && summary.avgWaterLitres > 0,
     `${summary.days} days · ${summary.avgWaterLitres} L avg · mostly ${summary.commonMood}`);
@@ -136,9 +381,6 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
     `${stats.done} done · ${stats.pct}%`);
   const arts = await contentModel.articles();
   check('contentModel.articles', arts.length === 8, `${arts.length} articles`);
-  const hosp = await contentModel.hospitals();
-  check('contentModel.hospitals booleans', hosp.length === 4 && typeof hosp[0].ambulance === 'boolean',
-    `${hosp.length} hospitals`);
 
   console.log('\n  --- messages ---');
   const doctorId = docs.find((d) => d.name === 'Dr. Lena Ortiz').id;
@@ -146,14 +388,19 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   const thread = await messageModel.thread(me.id, doctorId);
   check('messageModel.send + thread', thread.length === 3, `${thread.length} messages`);
   const threads = await messageModel.threadsForUser(me.id);
+  // the seed leaves the clinician's reply unread, which is what she should see
   check('messageModel.threadsForUser (DISTINCT ON)', threads.length === 1 && threads[0].unread === 1,
-    `${threads.length} thread, last: "${threads[0].lastMessage.body.slice(0, 20)}…"`);
+    `${threads.length} thread, ${threads[0].unread} unread from the clinician`);
   const docThreads = await messageModel.threadsForDoctor(doctorId);
-  // the seeded message from her is already read, so only the probe is unread
   check('messageModel.threadsForDoctor', docThreads[0].unread === 1, `${docThreads[0].unread} unread`);
   await messageModel.markRead(me.id, doctorId, 'doctor');
   check('messageModel.markRead', (await messageModel.unreadForDoctor(doctorId)) === 0);
   await db.run('DELETE FROM messages WHERE body LIKE $1', ['__probe__%']);
+  // markRead touches the seeded row too — put it back the way it was found
+  await db.run(
+    "UPDATE messages SET read_at = NULL WHERE user_id = $1 AND sender = 'doctor' AND body NOT LIKE '__probe__%'",
+    [me.id],
+  );
 
   console.log('\n  --- documents ---');
   const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -175,7 +422,8 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
 
   console.log('\n  --- caseload (worst N+1, now 2 queries) ---');
   const roster = await patientModel.all();
-  check('patientModel.all', roster.length === 6, `${roster.length} patients`);
+  // likewise — seeding a demo patient must not read as a broken query
+  check('patientModel.all', roster.length >= 6, `${roster.length} patients`);
   const nusrat = roster.find((p) => p.name === 'Nusrat Jahan');
   check('  week derived in SQL', nusrat.week === 34, `week ${nusrat.week}`);
   check('  BP trend aggregated by LATERAL', nusrat.trend.length === 5,
@@ -244,6 +492,141 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
 
   await db.run('DELETE FROM appointments WHERE reason = $1', ['__probe__']);
 
+  /* ------------------------------------ rescheduling & ending (F11) */
+  const careEndingModel = require('../models/careEndingModel');
+  const dayIn = (n) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    const p2 = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  };
+
+  const moveDoc = 3;
+  const dayA = dayIn(5);
+  const dayB = dayIn(10);
+  const freeA = (await appointmentModel.slots(moveDoc, dayA)).times;
+  const toMove = await appointmentModel.request(me.id, moveDoc, {
+    date: dayA, time: freeA[0], reason: '__probe__ move me',
+  });
+
+  const freeB = (await appointmentModel.slots(moveDoc, dayB)).times;
+  const movedTo = await appointmentModel.reschedule(toMove.id, {
+    by: 'mother', userId: me.id, date: dayB, time: freeB[0], reason: 'Work clash',
+  });
+  check('appointmentModel.reschedule moves it', movedTo.date === dayB && movedTo.time === freeB[0],
+    `${toMove.date} ${toMove.time} -> ${movedTo.date} ${movedTo.time}`);
+  check('  the old slot is free again',
+    (await appointmentModel.slots(moveDoc, dayA)).times.includes(freeA[0]));
+  check('  and the new one is taken',
+    !(await appointmentModel.slots(moveDoc, dayB)).times.includes(freeB[0]));
+  check('  the move is recorded, with its reason',
+    (await appointmentModel.changes(toMove.id))[0]?.reason === 'Work clash',
+    `${movedTo.moves} move(s), from ${movedTo.movedFrom}`);
+
+  let sameSlot = null;
+  try {
+    await appointmentModel.reschedule(toMove.id, {
+      by: 'mother', userId: me.id, date: dayB, time: freeB[0],
+    });
+  } catch (err) { sameSlot = err; }
+  check('  moving it to where it already is is refused', sameSlot?.code === 'NOT_BOOKABLE');
+
+  // the limit exists so one appointment cannot hold a queue position forever
+  await appointmentModel.reschedule(toMove.id, { by: 'mother', userId: me.id, date: dayB, time: freeB[1] });
+  await appointmentModel.reschedule(toMove.id, { by: 'mother', userId: me.id, date: dayB, time: freeB[2] });
+  let tooMany = null;
+  try {
+    await appointmentModel.reschedule(toMove.id, { by: 'mother', userId: me.id, date: dayB, time: freeB[3] });
+  } catch (err) { tooMany = err; }
+  check(`  a mother may move it ${appointmentModel.MOVE_LIMIT} times, not more`,
+    tooMany?.code === 'NOT_BOOKABLE', tooMany?.message);
+
+  const withReason = await appointmentModel.cancelWithReason(toMove.id, {
+    by: 'mother', userId: me.id, reason: 'cost', note: '__probe__ too expensive this month',
+  });
+  check('appointmentModel.cancelWithReason records who and why',
+    withReason.status === 'cancelled'
+      && withReason.cancellation?.by === 'mother'
+      && withReason.cancellation?.reason === 'cost'
+      && Boolean(withReason.cancellation?.note),
+    withReason.cancellation?.reasonLabel);
+
+  let badReason = null;
+  try {
+    await appointmentModel.cancelWithReason(toMove.id, { by: 'mother', userId: me.id, reason: 'nope' });
+  } catch (err) { badReason = err; }
+  check('  a reason outside that side list is refused', badReason?.code === 'NOT_BOOKABLE');
+
+  /* --------------------------------------- ending the relationship */
+  const endDoc = 6;
+  const future = dayIn(7);
+  const freeC = (await appointmentModel.slots(endDoc, future)).times;
+  await appointmentModel.request(me.id, endDoc, {
+    date: future, time: freeC[0], reason: '__probe__ ending test',
+  });
+
+  let noReason = null;
+  try {
+    await careEndingModel.end({ userId: me.id, doctorId: endDoc, endedBy: 'mother', reason: 'x' });
+  } catch (err) { noReason = err; }
+  check('careEndingModel refuses an unknown reason', noReason?.code === 'BAD_REASON');
+
+  const ending = await careEndingModel.end({
+    userId: me.id, doctorId: endDoc, endedBy: 'mother',
+    reason: 'communication', note: '__probe__ replies took days',
+  });
+  check('careEndingModel.end', ending.endedBy === 'mother' && ending.active,
+    `${ending.reasonLabel}, ${ending.cancelledAppointments} appointment(s) cancelled`);
+  check('  it takes future appointments with it', ending.cancelledAppointments >= 1);
+
+  let endedTwice = null;
+  try {
+    await careEndingModel.end({
+      userId: me.id, doctorId: endDoc, endedBy: 'mother', reason: 'cost',
+    });
+  } catch (err) { endedTwice = err; }
+  check('  ending it twice is refused', endedTwice?.code === 'ALREADY_ENDED');
+  check('  she is recorded as having ended with them',
+    (await careEndingModel.endedFor(me.id)).has(String(endDoc)));
+
+  // a clinician must write a sentence; a mother need not
+  let noNote = null;
+  try {
+    await careEndingModel.end({
+      userId: 4, doctorId: 1, endedBy: 'doctor', reason: 'capacity', note: 'full',
+    });
+  } catch (err) { noNote = err; }
+  check('  a clinician ending it must say why in words',
+    noNote?.code === 'NOTE_REQUIRED', noNote?.message);
+
+  const byDoctor = await careEndingModel.end({
+    userId: 4, doctorId: 1, endedBy: 'doctor', reason: 'wrong-specialty',
+    note: '__probe__ referred on to maternal-fetal medicine',
+  });
+  check('  and then it is accepted', byDoctor.endedBy === 'doctor', byDoctor.reasonLabel);
+
+  const leaverView = await careEndingModel.forDoctor(endDoc);
+  check('careEndingModel.forDoctor counts the reasons',
+    leaverView.leftByPatients === 1 && leaverView.topReasons[0]?.count === 1,
+    leaverView.topReasons.map((r) => `${r.label} x${r.count}`).join(', '));
+
+  // booking again resumes the pairing; the record of the ending survives
+  const backAgain = dayIn(12);
+  const freeD = (await appointmentModel.slots(endDoc, backAgain)).times;
+  await appointmentModel.request(me.id, endDoc, {
+    date: backAgain, time: freeD[0], reason: '__probe__ back again',
+  });
+  check('  booking again resumes the pairing',
+    !(await careEndingModel.endedFor(me.id)).has(String(endDoc)));
+  check('  but the ending is still on the record',
+    (await careEndingModel.forUser(me.id)).some((e) => e.doctorId === String(endDoc) && !e.active));
+
+  await db.run("DELETE FROM care_terminations WHERE note LIKE '__probe__%'");
+  await db.run("DELETE FROM appointments WHERE reason LIKE '__probe__%'");
+  check('  probe appointments and endings cleaned up',
+    (await db.one("SELECT count(*) AS c FROM care_terminations WHERE note LIKE '__probe__%'")).c === 0
+      && (await db.one("SELECT count(*) AS c FROM appointments WHERE reason LIKE '__probe__%'")).c === 0);
+
   console.log('\n  --- SOS ---');
   const guardians = await sosModel.contacts(me.id);
   check('sosModel.contacts', guardians.length === 3, `${guardians.length} guardians`);
@@ -285,6 +668,52 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
   console.log('\n  --- risk ---');
   const risk = await riskModel.fromLatestVitals(me, preg);
   check('riskModel.fromLatestVitals', risk && risk.level, `${risk?.label} (${risk?.score})`);
+
+  /* ------------------------------------------- translation (F13) */
+  const sample = {
+    age: 37, systolic: 142, diastolic: 93, sugar: 133, temp: 36.8, week: 31,
+  };
+  const inEnglish = riskModel.assess(sample, 'en');
+  const inBangla = riskModel.assess(sample, 'bn');
+
+  check('riskModel.assess translates the band', inBangla.label === 'বেশি ঝুঁকি',
+    `${inEnglish.label} -> ${inBangla.label}`);
+  check('  and every factor name and detail with it',
+    inBangla.factors.every((f, i) => f.name !== inEnglish.factors[i].name
+      && f.detail !== inEnglish.factors[i].detail),
+    inBangla.factors[1].detail);
+  check('  but not the score, which is the same logic either way',
+    inBangla.score === inEnglish.score
+      && inBangla.factors.every((f, i) => f.points === inEnglish.factors[i].points),
+    `${inEnglish.score} = ${inBangla.score}`);
+  check('  units stay in the script printed on the meter',
+    /mmHg/.test(inBangla.factors[1].detail) && /mg\/dL/.test(inBangla.factors[2].detail));
+  check('  an unknown language falls back to English rather than breaking',
+    riskModel.assess(sample, 'fr').label === 'High Risk');
+
+  /*
+   * The bug this guards: guidanceModel used to match drivers on the display
+   * name, so translating "Blood pressure" silently stopped every piece of
+   * blood-pressure advice from firing — for exactly the mothers least able to
+   * notice it was missing. It matches on the stable id now.
+   */
+  const planEn = guidanceModel.build({
+    stage: 'pregnant', week: 31, trimester: 3, conditionsText: '',
+    risk: inEnglish, vitals: { systolic: 142, diastolic: 93, sugar: 133, temp_c: 36.8 },
+    log: null, symptoms: [], weightGain: null,
+  });
+  const planBn = guidanceModel.build({
+    stage: 'pregnant', week: 31, trimester: 3, conditionsText: '',
+    risk: inBangla, vitals: { systolic: 142, diastolic: 93, sugar: 133, temp_c: 36.8 },
+    log: null, symptoms: [], weightGain: null,
+  });
+  check('  the care plan does not depend on the language of the factor names',
+    planEn.nutrition.length === planBn.nutrition.length
+      && planEn.nutrition.every((it, i) => it.title === planBn.nutrition[i].title),
+    `${planEn.nutrition.length} items either way`);
+  check('  and blood-pressure advice still fires on a Bangla assessment',
+    planBn.nutrition.some((i) => /salt/i.test(i.title)),
+    planBn.nutrition.map((i) => i.title).join(' | ').slice(0, 60));
 
   console.log(`\n  ${pass} passed, ${fail} failed\n`);
   await db.pool.end();

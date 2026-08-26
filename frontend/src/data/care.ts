@@ -6,11 +6,13 @@ export interface Doctor {
   id: string;
   name: string;
   specialty: string;
-  hospital: string;
   qualification: string;
   years: number;
-  rating: number;
-  distanceKm: number;
+  /** null until they have been rated — new is not the same as bad */
+  rating: number | null;
+  /** requests they have already answered, and how long they took on average */
+  answered: number;
+  replyHours: number | null;
   /** patients currently on their list */
   panel: number;
   capacity: number;
@@ -33,7 +35,7 @@ export interface RankedDoctor extends Doctor {
   tier: 0 | 1 | 2;
   relevant: boolean;
   score: number;
-  breakdown: { qualification: number; availability: number; rating: number; distance: number };
+  breakdown: { qualification: number; availability: number; rating: number; response: number };
   /** plain-language why, shown on the card */
   reasons: string[];
 }
@@ -46,7 +48,7 @@ export interface Appointment {
   doctorId: string;
   doctorName: string;
   specialty: string;
-  hospital: string;
+  qualification: string;
   date: string;
   time: string;
   reason: string;
@@ -55,6 +57,17 @@ export interface Appointment {
   note?: string;
   requestedAt?: string;
   respondedAt?: string;
+  /** why it was cancelled, and by whom — absent unless it was */
+  cancellation?: {
+    by: 'mother' | 'doctor';
+    reason: string;
+    reasonLabel: string;
+    note?: string;
+    at: string;
+  };
+  /** how many times it has been moved, and the slot it last came from */
+  moves: number;
+  movedFrom?: string;
   /** how many unanswered requests sit ahead of hers */
   queuePosition: number;
   waitingDays: number;
@@ -113,7 +126,6 @@ export interface CareTeamMember {
   doctorId: string;
   doctorName: string;
   specialty: string;
-  hospital: string;
   qualification: string;
   unread: number;
   /** true while a paid month of messaging with them is still running */
@@ -125,7 +137,7 @@ export interface MotherThread {
   doctorId: string;
   doctorName: string;
   specialty: string;
-  hospital: string;
+  qualification: string;
   lastMessage: Message | null;
   total: number;
   unread: number;
@@ -168,6 +180,8 @@ export interface CareDocument {
   takenOn: string;
   uploadedAt: string;
   uploadedBy: string;
+  /** set when this document is the card evidencing a vaccination dose */
+  vaccinationId?: string;
   /** path on the API host where the bytes live */
   url: string;
 }
@@ -290,4 +304,52 @@ export function prettyTime(t: string) {
   const suffix = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+
+/* ------------------------------------------- rescheduling & endings */
+
+/** One move an appointment has been through. */
+export interface AppointmentChange {
+  id: string;
+  movedBy: 'mother' | 'doctor';
+  from: { date: string; time: string | null };
+  to: { date: string; time: string | null };
+  reason?: string;
+  at: string;
+}
+
+/** A reason offered for cancelling or for ending the arrangement. */
+export interface CareReason {
+  key: string;
+  label: string;
+  hint?: string;
+}
+
+/** Ending the arrangement between a mother and a clinician. */
+export interface CareEnding {
+  id: string;
+  userId: string;
+  doctorId: string;
+  patientName?: string;
+  doctorName?: string;
+  endedBy: 'mother' | 'doctor';
+  reason: string;
+  reasonLabel: string;
+  note?: string;
+  at: string;
+  resumedAt: string | null;
+  /** false once the pair have started again */
+  active: boolean;
+  /** returned on the ending itself: what it took down with it */
+  cancelledAppointments?: number;
+  chatClosed?: number;
+}
+
+/** What a clinician sees about why patients have left them. */
+export interface CareEndingSummary {
+  endings: CareEnding[];
+  leftByPatients: number;
+  endedByYou: number;
+  topReasons: { label: string; count: number }[];
 }

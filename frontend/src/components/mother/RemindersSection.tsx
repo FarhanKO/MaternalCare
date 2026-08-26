@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  CalendarDays, CheckCircle2, ChevronRight, Clock, Dumbbell, Pill, Plus, Repeat, Stethoscope,
-  Syringe, TestTube, Trash2,
+  CalendarDays, CheckCircle2, ChevronRight, Clock, Dumbbell, Pill, Plus, Repeat, Sparkles,
+  Stethoscope, Syringe, TestTube, Trash2,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
+import { VaccineSuggestions } from '@/components/mother/VaccineSuggestions';
 import {
   countdown, formatDay, formatTime, KIND_COLOR, sameDay, upcoming,
   type Reminder, type ReminderKind,
@@ -24,6 +25,9 @@ const GROUPS: { id: string; title: string; sub: string; kinds: ReminderKind[]; i
   { id: 'daily', title: 'Medicines & exercises', sub: 'Your daily routine', kinds: ['medicine', 'exercise'], icon: Pill, tint: KIND_COLOR.medicine },
   { id: 'vaccination', title: 'Vaccinations', sub: 'Protecting you and baby', kinds: ['vaccination'], icon: Syringe, tint: KIND_COLOR.vaccination },
 ];
+
+/** The same green the Auto Assign button uses, so the app has one green. */
+const SUGGEST_GREEN = '#2fbf9b';
 
 const minutesOfDay = (iso: string) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
 
@@ -159,10 +163,18 @@ interface Props {
   reminders: Reminder[];
   onAdd: () => void;
   onDelete: (id: string) => void;
+  /** her life stage, which decides what the suggested list offers */
+  stage?: string;
+  /** writes a suggested vaccine straight onto her schedule */
+  onAddReminder?: (reminder: Omit<Reminder, 'id'>) => void;
 }
 
-export function RemindersSection({ reminders, onAdd, onDelete }: Props) {
+export function RemindersSection({
+  reminders, onAdd, onDelete, stage = 'pregnant', onAddReminder,
+}: Props) {
   const now = new Date();
+  /** the suggested-vaccine catalogue, opened from the vaccinations card */
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const list = useMemo(() => upcoming(reminders), [reminders]);
 
   /** today's medicine + exercise items, ordered through the day */
@@ -226,16 +238,41 @@ export function RemindersSection({ reminders, onAdd, onDelete }: Props) {
                   )}
                 </div>
 
-                <button onClick={onAdd}
-                  className="mt-4 inline-flex items-center gap-1.5 self-start text-[12px] font-bold text-brand-600 transition hover:text-brand-700">
-                  <CalendarDays className="h-3.5 w-3.5" /> Schedule new
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <button onClick={onAdd}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-bold text-brand-600 transition hover:text-brand-700">
+                    <CalendarDays className="h-3.5 w-3.5" /> Schedule new
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+
+                  {/* knowing which vaccine she needs is the harder half of
+                      keeping to a schedule, so the catalogue sits right here */}
+                  {g.id === 'vaccination' && onAddReminder && (
+                    <button
+                      onClick={() => setSuggestOpen(true)}
+                      style={{ background: SUGGEST_GREEN }}
+                      className="inline-flex items-center gap-2 rounded-xl px-5 py-2 text-[12px] font-bold text-white shadow-[0_8px_20px_-8px_rgba(47,191,155,0.65)] transition hover:brightness-105"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Suggested
+                    </button>
+                  )}
+                </div>
               </GlassCard>
             </Reveal>
           );
         })}
       </div>
+
+      {onAddReminder && (
+        <VaccineSuggestions
+          open={suggestOpen}
+          onClose={() => setSuggestOpen(false)}
+          stage={stage}
+          reminders={reminders}
+          onAdd={onAddReminder}
+        />
+      )}
     </div>
   );
 }

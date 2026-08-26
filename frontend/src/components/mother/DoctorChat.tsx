@@ -9,9 +9,10 @@ import { Reveal } from '@/components/ui/Reveal';
 import { cn } from '@/lib/cn';
 import { api, fileUrl } from '@/lib/api';
 import {
-  messageStamp, type CareTeamMember, type Message, type MessageKind,
+  messageStamp, type CareReason, type CareTeamMember, type Message, type MessageKind,
   type MotherThread,
 } from '@/data/care';
+import { ReasonDialog } from '@/components/ui/ReasonDialog';
 
 const C = { brand: '#3f66f0', violet: '#8b7bf3' };
 
@@ -34,8 +35,13 @@ export const shortName = (name: string) => {
 /* ------------------------------------------------------------ conversation */
 
 function Conversation({
-  doctor, onBack, onSent,
-}: { doctor: CareTeamMember; onBack: () => void; onSent: () => void }) {
+  doctor, onBack, onSent, onEndCare,
+}: {
+  doctor: CareTeamMember;
+  onBack: () => void;
+  onSent: () => void;
+  onEndCare: (d: CareTeamMember) => void;
+}) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -127,10 +133,23 @@ function Conversation({
           style={{ background: `linear-gradient(140deg, ${C.brand}, ${C.violet})` }}>
           {initialsOf(doctor.doctorName)}
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-extrabold text-ink">{doctor.doctorName}</div>
           <div className="truncate text-[11px] font-semibold text-ink-muted">{doctor.specialty}</div>
         </div>
+
+        {/*
+          Ending the arrangement lives here rather than on the list, because
+          this is where she is looking at one clinician and can see what she
+          would be ending. Deliberately understated — it is a real decision,
+          not a thing to be nudged toward.
+        */}
+        <button
+          onClick={() => onEndCare(doctor)}
+          className="flex-none rounded-lg px-2 py-1 text-[10px] font-bold text-ink-faint transition hover:bg-rose-500/10 hover:text-rose-600"
+        >
+          End care
+        </button>
       </div>
 
       <div className="flex-1 space-y-2.5 overflow-y-auto py-3 pr-1">
@@ -312,6 +331,15 @@ export function DoctorChat() {
   const [threads, setThreads] = useState<MotherThread[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'offline'>('loading');
   const [open, setOpen] = useState<CareTeamMember | null>(null);
+  /* ending the arrangement with one of them — reasons come from the server */
+  const [ending, setEnding] = useState<CareTeamMember | null>(null);
+  const [endReasons, setEndReasons] = useState<CareReason[]>([]);
+
+  useEffect(() => {
+    api.getEndingReasons('mother')
+      .then((r) => setEndReasons(r.options))
+      .catch(() => setEndReasons([]));
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -359,6 +387,7 @@ export function DoctorChat() {
               doctor={open}
               onBack={() => { setOpen(null); load(); }}
               onSent={load}
+              onEndCare={setEnding}
             />
           ) : (
             <motion.div
@@ -435,6 +464,25 @@ export function DoctorChat() {
           )}
         </AnimatePresence>
       </GlassCard>
+
+      <ReasonDialog
+        open={Boolean(ending)}
+        title={`End care with ${ending ? shortName(ending.doctorName) : 'this clinician'}?`}
+        intro="They come off your care team, any appointments still ahead are cancelled, and messaging with them stops."
+        options={endReasons}
+        confirmLabel="End it"
+        notePrompt="What would you like them to know?"
+        footnote={ending?.chatOpen
+          ? 'Your paid month of messaging with them stops today. If you book with them again later, everything picks back up.'
+          : 'If you book with them again later, everything picks back up. Your records stay yours either way.'}
+        onClose={() => setEnding(null)}
+        onConfirm={async (reason, note) => {
+          if (!ending) return;
+          await api.endCare(ending.doctorId, { reason, note: note || undefined });
+          setOpen(null);
+          await load();
+        }}
+      />
     </Reveal>
   );
 }

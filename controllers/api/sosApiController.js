@@ -82,6 +82,16 @@ exports.removeContact = async (req, res, next) => {
 
 /* ------------------------------------------------------------ clinician */
 
+/*
+ * There was a `hospitals` endpoint here, serving a table of four named
+ * institutions with placeholder phone numbers. It has been removed with the
+ * table. An emergency screen is the last place to show a directory nobody is
+ * maintaining: a mother would have read a name she recognised, dialled a
+ * number that was never real, and lost the minutes she had. What is left is
+ * what works — the national emergency number, and the contacts she chose
+ * herself.
+ */
+
 exports.forDoctor = async (req, res, next) => {
   const { id } = req.params;
   try {

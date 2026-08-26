@@ -10,20 +10,24 @@ exports.home = (req, res) => {
   res.render('home', { page: 'home' });
 };
 
-exports.dashboard = (req, res) => {
-  const user = userModel.current();
-  const pregnancy = pregnancyModel.forUser(user.id);
-  const vitals = vitalModel.history(user.id);
-  const latest = vitalModel.latest(user.id);
-  const alerts = vitalModel.alerts(user.id);
-  const child = childModel.forUser(user.id);
-  const vaxStats = vaccinationModel.stats();
-  const nextVax = vaccinationModel.upcoming(2);
-  const appointments = appointmentModel.upcoming(user.id, 3);
-  const risk = riskModel.fromLatestVitals(user, pregnancy);
+exports.dashboard = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    const [pregnancy, vitals, latest, alerts, child, vaxStats, nextVax, appointments] = await Promise.all([
+      pregnancyModel.forUser(user.id),
+      vitalModel.history(user.id),
+      vitalModel.latest(user.id),
+      vitalModel.alerts(user.id),
+      childModel.forUser(user.id),
+      vaccinationModel.stats(),
+      vaccinationModel.upcoming(2),
+      appointmentModel.upcoming(user.id, 3),
+    ]);
+    const risk = await riskModel.fromLatestVitals(user, pregnancy);
 
-  res.render('dashboard', {
-    page: 'dashboard', user, pregnancy, vitals, latest, alerts,
-    child, vaxStats, nextVax, appointments, risk,
-  });
+    res.render('dashboard', {
+      page: 'dashboard', user, pregnancy, vitals, latest, alerts,
+      child, vaxStats, nextVax, appointments, risk,
+    });
+  } catch (err) { next(err); }
 };

@@ -1,0 +1,88 @@
+{
+  "rows_used": 451,
+  "rows_in_file": 1012,
+  "duplicates_dropped": 561,
+  "honesty_note": "Scored on de-duplicated data. The same model scored with the duplicate rows left in reports f1_macro 0.7537, which is the figure most published results on this dataset quote \u2014 it grades the model on rows it has already seen.",
+  "cv_f1_macro_if_duplicates_kept": 0.7537,
+  "features": [
+    "Age",
+    "SystolicBP",
+    "DiastolicBP",
+    "BS",
+    "BodyTemp",
+    "HeartRate"
+  ],
+  "classes": [
+    "high risk",
+    "low risk",
+    "mid risk"
+  ],
+  "best_params": {
+    "clf__max_depth": null,
+    "clf__min_samples_leaf": 4,
+    "clf__n_estimators": 400
+  },
+  "cv_f1_macro_mean": 0.6439,
+  "cv_f1_macro_std": 0.0667,
+  "test_accuracy": 0.6484,
+  "test_f1_macro": 0.5948,
+  "per_class": {
+    "high risk": {
+      "precision": 0.7619,
+      "recall": 0.6957,
+      "support": 23
+    },
+    "low risk": {
+      "precision": 0.6852,
+      "recall": 0.7872,
+      "support": 47
+    },
+    "mid risk": {
+      "precision": 0.375,
+      "recall": 0.2857,
+      "support": 21
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "high risk",
+      "low risk",
+      "mid risk"
+    ],
+    "matrix": [
+      [
+        16,
+        5,
+        2
+      ],
+      [
+        2,
+        37,
+        8
+      ],
+      [
+        3,
+        12,
+        6
+      ]
+    ]
+  },
+  "high_risk_missed_as_low": {
+    "count": 5,
+    "of": 23,
+    "note": "The costly error: a high-risk pregnancy classified low risk."
+  },
+  "feature_importance": {
+    "BS": 0.3658,
+    "SystolicBP": 0.2083,
+    "Age": 0.1319,
+    "DiastolicBP": 0.1019,
+    "HeartRate": 0.0975,
+    "BodyTemp": 0.0946
+  },
+  "units": {
+    "BS": "mmol/L (the application converts from mg/dL)",
+    "BodyTemp": "Fahrenheit (the application converts from Celsius)"
+  },
+  "source": "UCI Maternal Health Risk Data Set (Ahmed et al.), 1014 records"
+}

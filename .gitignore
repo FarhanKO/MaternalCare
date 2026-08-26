@@ -37,3 +37,8 @@ public/downloads/*.apk
 # seeded design canvases are published artifacts, not source
 design/**/*.html
 !design/**/*.dc.html
+
+# python virtualenv for the risk model service
+ml-service/.venv/
+ml-service/__pycache__/
+ml-service/.pytest_cache/

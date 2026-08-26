@@ -1,5 +1,5 @@
 /**
- * MaternityCare+ — application entry point (MVC architecture)
+ * MaternalCare+ — application entry point (MVC architecture)
  *   Models      → /models       (data access + domain logic, SQLite-backed)
  *   Views       → /views        (EJS templates)  +  /frontend (React client)
  *   Controllers → /controllers  (request handling, wired via /routes)
@@ -50,6 +50,9 @@ app.use('/api', (req, res, next) => {
   }
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  // the report download reads the filename off this header; without exposing it
+  // a cross-origin fetch cannot see it and every report saves under one name
+  res.header('Access-Control-Expose-Headers', 'Content-Disposition');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -60,6 +63,17 @@ app.use(routes);
 // 404
 app.use((req, res) => res.status(404).render('404', { page: '' }));
 
+// Global error handler middleware
+app.use((err, req, res, next) => {
+  console.error('[server error]', err);
+  if (req.originalUrl.startsWith('/api')) {
+    return res.status(err.status || 500).json({
+      error: err.message || 'Internal Server Error',
+    });
+  }
+  res.status(err.status || 500).render('404', { page: '', error: err.message });
+});
+
 app.listen(PORT, () => {
-  console.log(`\n  MaternityCare+ running →  http://localhost:${PORT}\n`);
+  console.log(`\n  MaternalCare+ running →  http://localhost:${PORT}\n`);
 });

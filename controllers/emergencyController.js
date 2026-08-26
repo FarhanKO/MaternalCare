@@ -1,11 +1,9 @@
 const userModel = require('../models/userModel');
-const contentModel = require('../models/contentModel');
 
-exports.index = (req, res) => {
-  const user = userModel.current();
-  res.render('emergency', {
-    page: 'emergency', user,
-    contacts: userModel.emergencyContacts(user.id),
-    hospitals: contentModel.hospitals(),
-  });
+exports.index = async (req, res, next) => {
+  try {
+    const user = await userModel.current();
+    const contacts = await userModel.emergencyContacts(user.id);
+    res.render('emergency', { page: 'emergency', user, contacts });
+  } catch (err) { next(err); }
 };

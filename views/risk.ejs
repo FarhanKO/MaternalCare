@@ -71,17 +71,92 @@
 
 <div class="section-head" style="margin:36px 0 20px; text-align:left">
   <h2 style="font-size:21px">Your personalised care plan</h2>
-  <p style="margin-top:5px; font-size:13.5px">AI-generated nutrition, activity and monitoring guidance for a <b><%= result.label.toLowerCase() %></b> profile</p>
+  <p style="margin-top:5px; font-size:13.5px">
+    Nutrition, movement and lifestyle, built from
+    <% if (plan.basis.length) { %><b><%= plan.basis.join(', ') %></b><% } else { %>your record<% } %>.
+  </p>
 </div>
 
-<div class="grid grid-4">
-  <% result.recommendations.forEach((r, i) => { %>
-    <div class="card hoverable reveal <%= ['','reveal-d1','reveal-d2','reveal-d3'][i % 4] %>">
-      <div class="stat-ico <%= ['tint-aqua','tint-violet','tint-rose','tint-peach'][i % 4] %>"><%= r.icon %></div>
-      <b style="font-size:14px"><%= r.title %></b>
-      <p style="font-size:12.6px; color:var(--ink-2); line-height:1.6; margin-top:7px"><%= r.text %></p>
+<%
+  /*
+    Four hardcoded tips per risk level used to render here. Every item below
+    carries the reading that produced it, because "personalised" is a claim
+    that has to be checkable — and because a mother following advice deserves
+    to know which of her own numbers it came from.
+  */
+  const DOMAIN = {
+    nutrition: { icon: '🥗', tint: 'tint-aqua',   title: 'Nutrition' },
+    exercise:  { icon: '🚶', tint: 'tint-violet', title: 'Movement'  },
+    lifestyle: { icon: '🫁', tint: 'tint-rose',   title: 'Lifestyle & monitoring' },
+  };
+  const PRIORITY = { urgent: 'pill-critical', high: 'pill-warning', normal: 'pill-neutral' };
+%>
+
+<div class="card reveal">
+  <div class="card-head">
+    <div>
+      <div class="card-title"><span class="ico">🧮</span> Daily targets for where you are</div>
+      <div class="card-sub">
+        What to aim for — not what you have had. This app has no food diary, so it does not
+        pretend to know.
+      </div>
     </div>
-  <% }) %>
+  </div>
+  <div class="grid grid-3">
+    <% for (const t of plan.targets) { %>
+      <div class="row-item">
+        <div>
+          <b style="font-size:13px"><%= t.label %> · <span style="color:var(--brand)"><%= t.amount %></span></b>
+          <small><%= t.why %></small>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (plan.hydration.avgLitres !== null) { %>
+    <div class="alert <%= plan.hydration.pct >= 100 ? 'alert-good' : 'alert-warning' %>" style="margin-top:14px">
+      <span class="aico">💧</span>
+      <div><b>Water — the one figure here that is measured</b>
+      You have averaged <%= plan.hydration.avgLitres %> L a day across <%= plan.hydration.days %> logged
+      days, against a target of <%= plan.hydration.targetLitres %> L. That is <%= plan.hydration.pct %>%.</div>
+    </div>
+  <% } %>
+</div>
+
+<% for (const key of ['nutrition', 'exercise', 'lifestyle']) { %>
+  <% const d = DOMAIN[key]; const items = plan[key]; %>
+  <% if (items.length) { %>
+    <div class="card mt reveal">
+      <div class="card-head">
+        <div>
+          <div class="card-title"><span class="ico"><%= d.icon %></span> <%= d.title %></div>
+          <div class="card-sub"><%= items.length %> for you right now</div>
+        </div>
+      </div>
+      <% for (const r of items) { %>
+        <div class="row-item">
+          <div class="row-ico <%= d.tint %>"><%= d.icon %></div>
+          <div>
+            <b style="font-size:13.5px">
+              <%= r.title %>
+              <% if (r.priority !== 'normal') { %>
+                <span class="pill <%= PRIORITY[r.priority] %>" style="margin-left:6px"><%= r.priority %></span>
+              <% } %>
+            </b>
+            <small style="display:block; margin-top:4px; line-height:1.6"><%= r.text %></small>
+            <small style="display:block; margin-top:5px; color:var(--ink-3); font-style:italic">
+              Why you: <%= r.why %>
+            </small>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+<% } %>
+
+<div class="alert alert-neutral mt reveal">
+  <span class="aico">🧭</span>
+  <div><b>How this was built</b><%= plan.method %></div>
 </div>
 
 <div class="alert alert-warning mt reveal">

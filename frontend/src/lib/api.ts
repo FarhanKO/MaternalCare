@@ -7,21 +7,34 @@ import type { Symptom } from '@/data/symptoms';
 import type { Reminder } from '@/data/reminders';
 import type { Patient } from '@/data/doctor';
 import {
-  RequestRefused, type Appointment, type CareDocument, type CareTeamMember,
+  RequestRefused, type Appointment, type AppointmentChange, type CareDocument,
+  type CareEnding, type CareEndingSummary, type CareReason, type CareTeamMember,
   type DocumentKind, type DoctorThread, type Message, type MotherThread,
   type MessageKind, type PayMethod, type Plan, type RankedDoctor, type SlotOffer,
   type UpcomingVisit,
 } from '@/data/care';
 import type { Guardian, SosAlert } from '@/data/sos';
 import type {
-  ChildState, DailyLogState, Milestone, Pregnancy, ServerPost, ServerProfile,
-  Vaccination, VaccinationStats, VitalAlert, VitalReading, WeightGain,
+  CarePlan, ChildState, DailyLogState, Milestone, Pregnancy, ReportGroup, ReportReason,
+  RiskView, ServerPost, ServerProfile, Vaccination, VaccinationStats, VitalAlert,
+  VitalReading, WeightGain,
 } from '@/data/records';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
 /** Absolute URL for a document's bytes — the API host is a different origin in dev. */
 export const fileUrl = (path: string) => `${BASE.replace(/\/api$/, '')}${path}`;
+
+/** An error the server blamed on one named answer. */
+export class FieldError extends Error {
+  field?: string;
+
+  constructor(message: string, field?: string) {
+    super(message);
+    this.name = 'FieldError';
+    this.field = field;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -32,13 +45,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // the server explains itself ("That is not a dialable number"); showing
     // "PATCH /sos/emergency-number failed (400)" instead helps nobody
     let message = `${init?.method ?? 'GET'} ${path} failed (${res.status})`;
+    let field: string | undefined;
     try {
       const body = await res.json();
       if (body?.error) message = body.error;
+      // a validation failure names the answer that was wrong, so a form can
+      // point at that input rather than blaming the whole page
+      if (typeof body?.field === 'string') field = body.field;
     } catch {
       /* not JSON — keep the generic message */
     }
-    throw new Error(message);
+    throw new FieldError(message, field);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -59,6 +76,20 @@ export const api = {
    */
   getPregnancy: () =>
     request<Envelope<{ pregnancy: Pregnancy | null }>>('/me').then((r) => r.data.pregnancy),
+
+  /**
+   * Her reading language, stored on the account so it follows her to another
+   * device — and so the server knows which language to compose her care plan
+   * and risk assessment in.
+   */
+  getLanguage: () =>
+    request<Envelope<{ language: 'en' | 'bn' }>>('/me/language').then((r) => r.data.language),
+
+  setLanguage: (language: 'en' | 'bn') =>
+    request<Envelope<{ language: 'en' | 'bn' }>>('/me/language', {
+      method: 'PATCH',
+      body: JSON.stringify({ language }),
+    }).then((r) => r.data.language),
 
   setStage: (stage: LifeStage) =>
     request<Envelope<{ stage: LifeStage }>>('/me', {
@@ -101,6 +132,47 @@ export const api = {
   deleteReminder: (id: string) =>
     request<void>(`/reminders/${id}`, { method: 'DELETE' }),
 
+  /**
+   * Her personalised nutrition, movement and lifestyle plan.
+   *
+   * Built server-side from her stage, her risk assessment, her conditions and
+   * her own log, so the client renders it rather than deciding any of it.
+   */
+  getGuidance: () => request<Envelope<CarePlan>>('/guidance').then((r) => r.data),
+
+  /** The same plan, for a clinician reading a patient's record. */
+  getPatientGuidance: (patientId: string) =>
+    request<Envelope<CarePlan>>(`/patients/${patientId}/guidance`).then((r) => r.data),
+
+  /* -------------------------------------------- risk assessment (F13) */
+
+  /**
+   * Both readings of her risk: the transparent rule engine, and the
+   * scikit-learn classifier behind the FastAPI service. `model` is null when
+   * that service is not running — the rules always answer.
+   */
+  getRisk: () =>
+    request<Envelope<RiskView> & { meta: { service: { up: boolean; trainedOnRows: number | null } } }>(
+      '/risk',
+    ).then((r) => ({ ...r.data, service: r.meta.service })),
+
+  getPatientRisk: (patientId: string) =>
+    request<Envelope<RiskView>>(`/patients/${patientId}/risk`).then((r) => r.data),
+
+  /** How the model was trained and how well it scores. */
+  getRiskModelCard: () =>
+    request<Envelope<Record<string, unknown>>>('/risk/model').then((r) => r.data),
+
+  /** "What if my numbers were these" — both engines, on hypothetical readings. */
+  simulateRisk: (body: {
+    age?: number; systolic: number; diastolic: number;
+    sugar: number; tempC: number; heartBpm?: number;
+  }) =>
+    request<Envelope<RiskView>>('/risk/simulate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
   /* ------------------------------------------------ finding a doctor */
 
   getDoctors: () => request<Envelope<RankedDoctor[]>>('/doctors').then((r) => r.data),
@@ -111,9 +183,94 @@ export const api = {
       `/doctors/recommended${stage ? `?stage=${stage}` : ''}`,
     ).then((r) => ({ doctors: r.data, bookable: r.meta.bookable })),
 
+  /**
+   * A clinician signing themselves up. Resolves to the row a mother will see
+   * them as; rejects with a `field` naming whichever answer came back wrong,
+   * so the form can point at it instead of saying "check your details".
+   */
+  registerDoctor: (body: {
+    name: string; specialty: string; qualification: string; years: number;
+    email: string; phone: string; licenseNo: string;
+  }) =>
+    request<Envelope<RankedDoctor>>('/doctors/register', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
   getSlots: (doctorId: string, date: string) =>
     request<Envelope<{ date: string; times: string[] }>>(`/doctors/${doctorId}/slots?date=${date}`)
       .then((r) => r.data),
+
+  /* --------------------------- rescheduling, cancelling, ending (F11) */
+
+  /**
+   * Move an appointment. Rejects with SLOT_TAKEN when somebody else took the
+   * time while she was choosing, which the dialog treats as "pick again"
+   * rather than as a failure.
+   */
+  rescheduleAppointment: (
+    id: string,
+    body: {
+      date: string; time: string; reason?: string;
+      side?: 'mother' | 'doctor'; doctorId?: string;
+    },
+  ) =>
+    request<Envelope<Appointment>>(`/appointments/${id}/reschedule`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  /** Everywhere an appointment has been moved from. */
+  getAppointmentChanges: (id: string) =>
+    request<Envelope<AppointmentChange[]>>(`/appointments/${id}/changes`).then((r) => r.data),
+
+  /** Why one side may cancel — the same list the model validates against. */
+  getCancelReasons: (side: 'mother' | 'doctor' = 'mother') =>
+    request<Envelope<CareReason[]>>(`/cancel-reasons?side=${side}`).then((r) => r.data),
+
+  /** Cancel a visit, with a reason. */
+  cancelAppointment: (
+    id: string,
+    body: { reason: string; note?: string; side?: 'mother' | 'doctor'; doctorId?: string },
+  ) =>
+    request<Envelope<Appointment>>(`/appointments/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  /* ------------------------------ ending the care relationship */
+
+  /** The reasons one side may give, and whether a written note is required. */
+  getEndingReasons: (side: 'mother' | 'doctor' = 'mother') =>
+    request<Envelope<{ side: string; noteRequired: boolean; options: CareReason[] }>>(
+      `/care-endings/reasons?side=${side}`,
+    ).then((r) => r.data),
+
+  /** She ends it with one of her clinicians. */
+  endCare: (doctorId: string, body: { reason: string; note?: string }) =>
+    request<Envelope<CareEnding>>(`/care-endings/${doctorId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  /** Her own record of endings, both directions. */
+  getMyCareEndings: () =>
+    request<Envelope<CareEnding[]>>('/care-endings').then((r) => r.data),
+
+  /** A clinician ends it with a patient. A written note is required here. */
+  endCareWithPatient: (
+    doctorId: string,
+    patientId: string,
+    body: { reason: string; note: string },
+  ) =>
+    request<Envelope<CareEnding>>(`/doctors/${doctorId}/care-endings/${patientId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data),
+
+  /** Why patients have left this clinician, with the reasons counted. */
+  getDoctorCareEndings: (doctorId: string) =>
+    request<Envelope<CareEndingSummary>>(`/doctors/${doctorId}/care-endings`).then((r) => r.data),
 
   getAppointments: () =>
     request<Envelope<Appointment[]>>('/appointments').then((r) => r.data),
@@ -168,9 +325,6 @@ export const api = {
     request<Envelope<UpcomingVisit[]>>(`/doctors/${doctorId}/upcoming?within=${within}`)
       .then((r) => r.data),
 
-  cancelAppointment: (id: string) =>
-    request<Envelope<Appointment>>(`/appointments/${id}`, { method: 'DELETE' }).then((r) => r.data),
-
   /* clinician side of the same conversation */
   getDoctorRequests: (doctorId: string) =>
     request<Envelope<Appointment[]>>(`/doctors/${doctorId}/appointments`).then((r) => r.data),
@@ -197,6 +351,15 @@ export const api = {
   /** Weight gain against the range recommended for her starting BMI. */
   getWeightGain: () => request<Envelope<WeightGain | null>>('/weight-gain').then((r) => r.data),
 
+  /**
+   * Addresses another device on this network can reach the API on. Only the
+   * server knows these — the browser sees whichever origin it happened to use.
+   */
+  getNetwork: () =>
+    request<Envelope<{ port: number; origins: string[]; interfaces: { name: string; address: string }[] }>>(
+      '/network',
+    ).then((r) => r.data),
+
   /* --------------------------------------------------- vitals */
 
   /** Every stored reading, oldest first, plus the latest and any alerts. */
@@ -208,7 +371,7 @@ export const api = {
   /** Log a reading. Send only the measurements actually taken. */
   addVital: (reading: {
     date?: string; systolic?: number; diastolic?: number;
-    sugar?: number; weightKg?: number; tempC?: number;
+    sugar?: number; weightKg?: number; tempC?: number; fetalBpm?: number;
   }) =>
     request<Envelope<VitalReading>>('/vitals', {
       method: 'POST',
@@ -219,7 +382,9 @@ export const api = {
 
   getDailyLog: () => request<Envelope<DailyLogState>>('/daily-log').then((r) => r.data),
 
-  saveDailyLog: (patch: { mood?: string; kicks?: number; waterLitres?: number }) =>
+  saveDailyLog: (patch: {
+    mood?: string; kicks?: number; waterLitres?: number; sleepHours?: number;
+  }) =>
     request<Envelope<DailyLogState>>('/daily-log', {
       method: 'PUT',
       body: JSON.stringify(patch),
@@ -232,9 +397,11 @@ export const api = {
     if (opts.limit) q.set('limit', String(opts.limit));
     if (opts.offset) q.set('offset', String(opts.offset));
     if (opts.topic && opts.topic !== 'All') q.set('topic', opts.topic);
-    return request<Envelope<ServerPost[]> & { meta: { total: number } }>(
+    return request<Envelope<ServerPost[]> & {
+      meta: { total: number; reasons: ReportReason[] }
+    }>(
       `/community/posts?${q}`,
-    ).then((r) => ({ posts: r.data, total: r.meta.total }));
+    ).then((r) => ({ posts: r.data, total: r.meta.total, reasons: r.meta.reasons }));
   },
 
   createPost: (body: { title: string; body?: string; topic?: string; image?: string }) =>
@@ -255,6 +422,43 @@ export const api = {
       body: JSON.stringify({ delta }),
     }).then((r) => r.data),
 
+  /**
+   * Report a post or a comment. Rejects with a 409-backed FieldError when this
+   * member has already reported the same thing, which the board treats as a
+   * state rather than a failure.
+   */
+  reportContent: (
+    target: 'posts' | 'comments',
+    id: string,
+    body: { reason: string; detail?: string },
+  ) =>
+    request<Envelope<{ id: string; state: string; reason: string }>>(
+      `/community/${target}/${id}/report`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ).then((r) => r.data),
+
+  /* ------------------------------------------------------ moderation */
+
+  /** The clinician's queue, grouped by the item reported. */
+  getReports: (state: 'open' | 'upheld' | 'dismissed' | 'all' = 'open') =>
+    request<Envelope<ReportGroup[]> & { meta: { open: number; urgent: number } }>(
+      `/moderation/reports?state=${state}`,
+    ).then((r) => ({ groups: r.data, open: r.meta.open, urgent: r.meta.urgent })),
+
+  getReportCount: () =>
+    request<Envelope<{ open: number }>>('/moderation/count').then((r) => r.data.open),
+
+  /** Uphold or dismiss every open report against one item. */
+  resolveReport: (
+    target: 'post' | 'comment',
+    id: string,
+    body: { action: 'uphold' | 'dismiss'; note?: string; doctorId?: string },
+  ) =>
+    request<Envelope<{ target: string; id: string; action: string; reportsClosed: number }>>(
+      `/moderation/${target}s/${id}/resolve`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ).then((r) => r.data),
+
   /* --------------------------------------------------------- child */
 
   getChild: () => request<Envelope<ChildState | null>>('/child').then((r) => r.data),
@@ -266,6 +470,15 @@ export const api = {
   getVaccinations: () =>
     request<Envelope<Vaccination[]> & { meta: VaccinationStats }>('/vaccinations')
       .then((r) => ({ rows: r.data, stats: r.meta })),
+
+  /** File a card as evidence for one dose. Returns the refreshed list. */
+  uploadVaccinationCard: (id: string, body: {
+    dataUrl: string; originalName?: string; title?: string; takenOn?: string;
+  }) =>
+    request<Envelope<Vaccination[]> & { meta: VaccinationStats }>(`/vaccinations/${id}/card`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => ({ rows: r.data, stats: r.meta })),
 
   markVaccinationDone: (id: string) =>
     request<Envelope<Vaccination[]> & { meta: VaccinationStats }>(`/vaccinations/${id}/done`, {
@@ -307,6 +520,29 @@ export const api = {
 
   removeGuardian: (id: string) => request<void>(`/guardians/${id}`, { method: 'DELETE' }),
 
+  /**
+   * The health report, as PDF bytes.
+   *
+   * Fetched rather than linked so the button can show that something is
+   * happening — the server draws charts and embeds every filed document, which
+   * takes long enough that a silent link feels broken.
+   *
+   * `patientId` switches it from "my record" to "this patient's", which is the
+   * only difference between the mother's copy and the clinician's.
+   */
+  async getReport(patientId?: string): Promise<{ blob: Blob; filename: string }> {
+    const path = patientId ? `/patients/${patientId}/report.pdf` : '/report.pdf';
+    const res = await fetch(`${BASE}${path}`);
+    if (!res.ok) {
+      let message = 'Could not build the report';
+      try { message = (await res.json())?.error ?? message; } catch { /* not JSON */ }
+      throw new Error(message);
+    }
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = /filename="([^"]+)"/.exec(disposition);
+    return { blob: await res.blob(), filename: match?.[1] ?? 'maternalcare-report.pdf' };
+  },
+
   /** Open alerts across the clinician's caseload. */
   getDoctorSos: (doctorId: string) =>
     request<Envelope<SosAlert[]>>(`/doctors/${doctorId}/sos`).then((r) => r.data),
@@ -334,6 +570,18 @@ export const api = {
     request<Envelope<CareDocument[]> & { meta: Record<DocumentKind, number> }>(
       `/patients/${patientId}/documents`,
     ).then((r) => ({ documents: r.data, counts: r.meta })),
+
+  /**
+   * A clinician filing a scan or result onto a patient's record. `uploadedBy`
+   * is what tells the two of them apart on the timeline.
+   */
+  uploadPatientDocument: (patientId: string, body: {
+    kind: DocumentKind; title: string; note?: string;
+    dataUrl: string; originalName?: string; takenOn?: string; uploadedBy: string;
+  }) => request<Envelope<CareDocument>>(`/patients/${patientId}/documents`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then((r) => r.data),
 
   /* ------------------------------------------------------- messaging */
 

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Activity } from 'lucide-react';
+import { Activity, Mail, type LucideIcon } from 'lucide-react';
 
 interface FooterLink {
   label: string;
@@ -13,7 +13,7 @@ const groups: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Platform',
     links: [
-      { label: 'Dashboard', to: '/mother' },
+      { label: 'Health Plan', to: '/health-plan' },
       { label: 'Health trends', to: '/mother?tab=vitals' },
       { label: 'Reminders', to: '/mother?tab=reminders' },
       { label: 'Community', to: '/mother?tab=community' },
@@ -22,7 +22,7 @@ const groups: { title: string; links: FooterLink[] }[] = [
   {
     title: 'For care teams',
     links: [
-      { label: 'Doctor portal', to: '/doctor' },
+      { label: 'Consultants', to: '/consultants' },
       { label: 'Patients', to: '/doctor?tab=patients' },
       { label: 'Schedule', to: '/doctor?tab=schedule' },
       { label: 'Reports', to: '/doctor?tab=reports' },
@@ -34,9 +34,17 @@ const groups: { title: string; links: FooterLink[] }[] = [
       { label: 'Our story', to: '/about' },
       { label: 'Features', hash: 'features' },
       { label: 'How it works', hash: 'journey' },
-      { label: 'Get started', to: '/register' },
+      { label: 'Contact us', to: '/contact' },
     ],
   },
+];
+
+/**
+ * The details people look for at the bottom of a page. We run online-only for
+ * now, so there is no address here — add one when there is somewhere to visit.
+ */
+const CONTACT: { icon: LucideIcon; text: string; href?: string }[] = [
+  { icon: Mail, text: 'hello@maternalcare.app', href: 'mailto:hello@maternalcare.app' },
 ];
 
 export function Footer() {
@@ -81,6 +89,20 @@ export function Footer() {
               <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-soft">
                 A calmer, more connected way to care for mothers and children — from pregnancy to early childhood.
               </p>
+              <ul className="mt-5 space-y-2 text-sm">
+                {CONTACT.map((c) => (
+                  <li key={c.text} className="flex items-center gap-2.5 text-ink-soft">
+                    <c.icon className="h-4 w-4 flex-none text-brand-500" strokeWidth={2.1} />
+                    {c.href ? (
+                      <a href={c.href} className="font-medium transition-colors hover:text-brand-600">
+                        {c.text}
+                      </a>
+                    ) : (
+                      <span className="font-medium">{c.text}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             {groups.map((g) => (

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createTimeline, stagger } from 'animejs';
-import { ArrowRight, Baby, Calendar, ChevronDown, HeartPulse, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, Baby, BellRing, Calendar, ChevronDown, HeartPulse, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { LiquidButton } from '@/components/ui/LiquidButton';
@@ -35,6 +35,13 @@ const WSIZE = {
   md: { pad: 'px-3.5 py-2.5', box: 'h-8 w-8', icon: 'h-4 w-4', title: 'text-[13px]', sub: 'text-[11px]' },
   lg: { pad: 'px-4 py-3', box: 'h-9 w-9', icon: 'h-[18px] w-[18px]', title: 'text-sm', sub: 'text-[12px]' },
 };
+
+/** The three lines that close our story — a reading, an alert, a prediction. */
+const BEHIND = [
+  { icon: Activity, lead: 'measurement', tail: 'a mother', tone: ROSE },
+  { icon: BellRing, lead: 'alert', tail: 'a family', tone: PEACH },
+  { icon: Sparkles, lead: 'prediction', tail: 'an opportunity to protect a future', tone: SAGE },
+];
 
 const VALUES = [
   { icon: HeartPulse, title: 'Clinician-reviewed', sub: 'Guidance you can trust, at every stage.', tone: ROSE },
@@ -163,34 +170,121 @@ export function About() {
             <div className="mt-6 grid gap-10 md:grid-cols-[1.05fr_1fr] md:gap-16">
               <Reveal delay={0.05}>
                 <h2 className="text-balance text-3xl font-extrabold leading-[1.12] tracking-tight text-ink sm:text-4xl lg:text-5xl">
-                  Relentlessly focused on care for <span className="font-serif italic font-medium text-brand-600">every mother and child</span>
+                  Because care should begin{' '}
+                  <span className="font-serif italic font-medium text-brand-600">before there is a crisis</span>.
                 </h2>
               </Reveal>
               <Reveal delay={0.1}>
                 <div className="space-y-4 text-lg leading-relaxed text-ink-soft">
                   <p>
-                    MaternalCare+ brings pregnancy tracking, your baby’s growth, AI-guided insight and your
-                    care team into one calm, private place — from the first heartbeat to the first steps.
+                    Pregnancy is more than nine months of waiting for a baby. It is a journey filled with
+                    questions, changes, uncertainty, and moments when a mother simply needs to know that
+                    someone is paying attention.
                   </p>
                   <p className="text-ink-muted">
-                    Built with clinicians and designed for peace of mind, it adapts to your journey and stage —
-                    keeping the information focused and the experience reassuring, never cold or clinical.
+                    Yet for too many mothers, care can feel fragmented. Important health information is
+                    scattered. Warning signs may go unnoticed. Support can be difficult to reach. And
+                    sometimes, help comes only after something has already gone wrong.
                   </p>
-                  <p className="text-ink-muted">
-                    Because more informed, better-supported mothers lead to healthier babies. Every mother cared
-                    for. Every child given the brightest start.
-                  </p>
+                  <p className="font-semibold text-ink">We believe it should be different.</p>
                 </div>
               </Reveal>
             </div>
 
-            {/* emotional closing line */}
-            <Reveal delay={0.15}>
-              <p className="mt-16 text-balance text-center font-serif text-3xl italic leading-snug text-ink sm:text-4xl">
-                To every mother. Through every journey. <span className="text-gradient not-italic">We’re with you.</span>
+            {/* the founding idea — set apart as a pull quote */}
+            <Reveal delay={0.12}>
+              <figure className="mt-14 overflow-hidden rounded-4xl border border-white/60 bg-white/55 px-7 py-10 shadow-soft backdrop-blur-md sm:px-12 sm:py-12">
+                <figcaption className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
+                  MaternalCare+ was created around a simple idea
+                </figcaption>
+                <blockquote className="mt-4 text-balance font-serif text-3xl italic leading-snug text-ink sm:text-4xl">
+                  A mother should never have to navigate this journey{' '}
+                  <span className="text-gradient not-italic">alone</span>.
+                </blockquote>
+              </figure>
+            </Reveal>
+
+            <Reveal delay={0.14}>
+              <div className="mx-auto mt-14 max-w-3xl space-y-4 text-lg leading-relaxed text-ink-soft">
+                <p>
+                  We bring maternal and child health monitoring, personalised guidance, healthcare
+                  professionals and intelligent risk awareness together in one place — helping mothers stay
+                  informed about their health while giving healthcare providers a clearer picture of the
+                  people they care for.
+                </p>
+                <p className="text-ink-muted">But our goal goes beyond monitoring.</p>
+              </div>
+            </Reveal>
+
+            {/* reactive → proactive */}
+            <Reveal delay={0.16}>
+              <div className="mt-10 grid items-stretch gap-4 sm:grid-cols-[1fr_auto_1fr]">
+                <div className="rounded-3xl border border-white/60 bg-white/45 p-6 shadow-soft backdrop-blur-md">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-faint">Care today</div>
+                  <div className="mt-2 text-xl font-bold text-ink-muted">Reactive</div>
+                  <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
+                    Waiting for problems to appear before anyone can respond.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center">
+                  <span className="grid h-11 w-11 place-items-center rounded-full border border-white/60 bg-white/70 shadow-soft backdrop-blur-md">
+                    <ArrowRight className="h-5 w-5 rotate-90 text-brand-600 sm:rotate-0" />
+                  </span>
+                </div>
+                <div className="rounded-3xl border border-brand-200/70 bg-gradient-to-br from-brand-50/90 to-white/60 p-6 shadow-soft backdrop-blur-md">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Where we are going</div>
+                  <div className="mt-2 text-xl font-bold text-ink">Proactive</div>
+                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                    Recognising risks early, understanding what they mean, and creating opportunities to act
+                    before they become something more serious.
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.18}>
+              <p className="mx-auto mt-14 max-w-2xl text-balance text-center text-xl leading-relaxed text-ink-soft sm:text-2xl">
+                Because technology should not replace the human side of healthcare.{' '}
+                <span className="font-semibold text-ink">It should strengthen it.</span>
               </p>
             </Reveal>
-            <Reveal delay={0.2}>
+
+            {/* behind every measurement is a person */}
+            <div className="mt-12 grid gap-4 sm:grid-cols-3">
+              {BEHIND.map((b, i) => (
+                <Reveal key={b.lead} delay={0.2 + 0.05 * i}>
+                  <div className="h-full rounded-3xl border border-white/60 bg-white/55 p-6 shadow-soft backdrop-blur-md">
+                    <span className="grid h-11 w-11 place-items-center rounded-2xl" style={{ background: `${b.tone}33` }}>
+                      <b.icon className="h-5 w-5" style={{ color: INK }} />
+                    </span>
+                    <p className="mt-4 text-[15px] leading-relaxed text-ink-muted">
+                      Behind every {b.lead}
+                      <br />
+                      is <span className="font-bold text-ink">{b.tail}</span>.
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+
+            <Reveal delay={0.32}>
+              <p className="mx-auto mt-14 max-w-3xl text-balance text-center text-lg leading-relaxed text-ink-soft">
+                We are building MaternalCare+ for every mother who deserves to feel seen, supported and cared
+                for — and for every child who deserves the healthiest possible beginning.
+              </p>
+            </Reveal>
+
+            {/* emotional closing line */}
+            <Reveal delay={0.36}>
+              <p className="mt-14 text-balance text-center font-serif text-3xl italic leading-snug text-ink sm:text-4xl">
+                Every mother deserves the best care.
+                <br />
+                Every child deserves the best start.
+                <br />
+                <span className="text-gradient not-italic">We’re here for both.</span>
+              </p>
+            </Reveal>
+            <Reveal delay={0.4}>
               <div className="mt-9 flex justify-center">
                 <LiquidButton size="lg" onClick={() => navigate('/register')} iconRight={<ArrowRight className="h-[18px] w-[18px]" />}>
                   Start your journey

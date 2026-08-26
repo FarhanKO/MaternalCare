@@ -73,6 +73,7 @@ exports.saveDailyLog = async (req, res) => {
       mood: req.body?.mood,
       kicks: req.body?.kicks,
       waterLitres: req.body?.waterLitres,
+      sleepHours: req.body?.sleepHours,
     });
     const [history, summary] = await Promise.all([
       dailyLogModel.history(id, 14),

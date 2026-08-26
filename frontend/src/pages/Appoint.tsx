@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarDays, CheckCircle2, Clock,
-  Info, Lock, MapPin, MessageCircle, ReceiptText, SearchX, ShieldQuestion, Star,
+  Info, Lock, MessageCircle, ReceiptText, SearchX, ShieldQuestion, Star,
   Stethoscope, Users,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -120,8 +120,9 @@ function Hero({ from, onBook, loading, auto }: {
                 </>
               ) : (
                 <>
-                  Direct access to obstetricians, paediatricians and nutritionists who are ranked by
-                  what they are qualified in and how much room is left on their list.{' '}
+                  Direct access to obstetricians, paediatricians and nutritionists, ordered for you
+                  by what they are qualified in, how much room is left on their list, how fast they
+                  answer and how they are rated — nothing for you to filter.{' '}
                   <span className="font-semibold text-ink">
                     Pay the consultation fee and the slot is confirmed on the spot
                   </span>{' '}
@@ -275,8 +276,19 @@ function ClinicianCard({ doctor, picked, level, onPick }: {
           <div className="text-[12px] font-semibold text-ink-muted">{doctor.specialty}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-semibold text-ink-faint">
             <span className="inline-flex items-center gap-1"><Award className="h-3 w-3" />{doctor.qualification}</span>
-            <span className="inline-flex items-center gap-1"><Star className="h-3 w-3" />{doctor.rating}</span>
-            <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{doctor.distanceKm} km</span>
+            {/* an unrated clinician says so rather than showing a zero, which
+                reads as a bad score instead of an absent one */}
+            <span className="inline-flex items-center gap-1">
+              <Star className="h-3 w-3" />{doctor.rating == null ? 'Not rated yet' : doctor.rating}
+            </span>
+            {doctor.replyHours != null && doctor.answered >= 2 && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {doctor.replyHours <= 24
+                  ? 'Replies within a day'
+                  : `Replies in ~${Math.round(doctor.replyHours / 24)} days`}
+              </span>
+            )}
           </div>
         </div>
         {/*
@@ -306,7 +318,7 @@ function ClinicianCard({ doctor, picked, level, onPick }: {
       </div>
 
       <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-ink-muted">
-        <span>{doctor.hospital}</span>
+        <span>{doctor.years} years in practice</span>
         <span>{doctor.openings} slot{doctor.openings === 1 ? '' : 's'} left this cycle</span>
       </div>
     </button>
@@ -406,6 +418,35 @@ export function Appoint() {
     requestAnimationFrame(() =>
       flowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }, []);
+
+  /**
+   * The free route: ask, and wait for the clinician to accept.
+   *
+   * This used to live on the mother's own Doctor tab, attached to the ranked
+   * list that has since moved to the Consultants page. It belongs here — the
+   * two ways of getting an appointment should sit next to each other, so the
+   * difference between them is a choice rather than a hidden door.
+   */
+  const [requesting, setRequesting] = useState(false);
+  const requestFree = async () => {
+    if (!doctor || !time) return;
+    setRequesting(true);
+    setRefusal(null);
+    try {
+      const appt = await api.requestAppointment({ doctorId: doctor.id, date, time, reason });
+      setBooked(appt);
+      setStep('done');
+    } catch (err) {
+      if (err instanceof RequestRefused) {
+        setRefusal({ message: err.message, alternatives: err.alternatives });
+        api.getSlots(doctor.id, date).then((sl) => setTimes(sl.times)).catch(() => {});
+      } else {
+        setRefusal({ message: (err as Error).message, alternatives: [] });
+      }
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   const pay = async () => {
     if (!doctor || !time) return;
@@ -584,7 +625,7 @@ export function Appoint() {
                       <div>
                         <div className="text-sm font-extrabold text-ink">{doctor.name}</div>
                         <div className="text-[11px] font-semibold text-ink-muted">
-                          {doctor.specialty} · {doctor.hospital}
+                          {doctor.specialty} · {doctor.qualification}
                         </div>
                       </div>
                       <button
@@ -688,21 +729,40 @@ export function Appoint() {
                       ))}
                     </div>
 
-                    <div className="mt-5 flex items-center justify-between gap-3">
-                      <span className="text-[11px] font-semibold text-ink-muted">
-                        {taka(doctor.feeBdt)} · payable now
-                      </span>
-                      {/* a button that looks live but does nothing is worse
-                          than one that says why it cannot be pressed */}
+                    {/* two ways out of this step, priced honestly */}
+                    <div className="mt-5 border-t border-white/60 pt-4">
                       {time ? (
-                        <LiquidButton
-                          onClick={() => setStep('pay')}
-                          iconRight={<ArrowRight className="h-4 w-4" />}
-                        >
-                          Continue
-                        </LiquidButton>
+                        <div className="flex flex-col gap-2.5 sm:flex-row">
+                          <button
+                            onClick={requestFree}
+                            disabled={requesting}
+                            className="flex-1 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-left transition hover:bg-white disabled:opacity-60"
+                          >
+                            <span className="block text-sm font-extrabold text-ink">
+                              {requesting ? 'Sending…' : 'Ask for this slot'}
+                            </span>
+                            <span className="mt-0.5 block text-[11px] font-semibold text-ink-muted">
+                              Free · nothing is booked until they accept
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => setStep('pay')}
+                            className="flex-1 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-3 text-left text-white shadow-[0_10px_30px_-8px_rgba(63,102,240,0.55)] transition hover:brightness-105"
+                          >
+                            <span className="flex items-center gap-1.5 text-sm font-extrabold">
+                              Pay {taka(doctor.feeBdt)} and confirm
+                              <ArrowRight className="h-4 w-4" />
+                            </span>
+                            <span className="mt-0.5 block text-[11px] font-semibold text-white/80">
+                              The slot is yours straight away
+                            </span>
+                          </button>
+                        </div>
                       ) : (
-                        <span className="cursor-not-allowed rounded-2xl bg-ink/8 px-5 py-3 text-sm font-bold text-ink-faint">
+                        /* a button that looks live but does nothing is worse
+                           than one that says why it cannot be pressed */
+                        <span className="block cursor-not-allowed rounded-2xl bg-ink/8 px-5 py-3 text-center text-sm font-bold text-ink-faint">
                           Choose a time to continue
                         </span>
                       )}
@@ -859,24 +919,36 @@ export function Appoint() {
                       initial={{ scale: 0.6, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ delay: 0.1, type: 'spring', stiffness: 220, damping: 18 }}
-                      className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-emerald-500/15 text-emerald-600"
+                      className={cn('mx-auto grid h-16 w-16 place-items-center rounded-3xl',
+                        booked.status === 'requested'
+                          ? 'bg-amber-500/15 text-amber-600'
+                          : 'bg-emerald-500/15 text-emerald-600')}
                     >
                       <BadgeCheck className="h-8 w-8" />
                     </motion.span>
 
+                    {/* a paid slot is confirmed; a free one is not, and saying
+                        otherwise would be the one lie this screen must not tell */}
                     <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
-                      You have a doctor
+                      {booked.status === 'requested' ? 'Your request is with them' : 'You have a doctor'}
                     </h2>
                     <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-ink-muted">
-                      {booked.doctorName} is expecting you. This is confirmed — there is no request
-                      waiting for anyone to accept.
+                      {booked.status === 'requested'
+                        ? `${booked.doctorName} has your request. Nothing is booked until they accept — you will see their answer on your Doctor tab.`
+                        : `${booked.doctorName} is expecting you. This is confirmed — there is no request waiting for anyone to accept.`}
                     </p>
 
                     <div className="mx-auto mt-5 max-w-sm space-y-2 text-left">
                       {[
-                        { icon: Stethoscope, label: booked.doctorName, sub: `${booked.specialty} · ${booked.hospital}` },
+                        { icon: Stethoscope, label: booked.doctorName, sub: booked.specialty },
                         { icon: CalendarDays, label: prettyDate(booked.date), sub: booked.reason },
-                        { icon: Clock, label: prettyTime(booked.time), sub: 'Please arrive ten minutes early' },
+                        {
+                          icon: Clock,
+                          label: prettyTime(booked.time),
+                          sub: booked.status === 'requested'
+                            ? 'The time you asked for'
+                            : 'Please arrive ten minutes early',
+                        },
                       ].map((r) => (
                         <div key={r.label} className="flex items-start gap-2.5 rounded-2xl bg-white/60 px-3.5 py-2.5">
                           <r.icon className="mt-0.5 h-4 w-4 flex-none text-brand-500" />

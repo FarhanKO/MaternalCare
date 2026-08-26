@@ -52,6 +52,8 @@ const toDTO = (r) => ({
   takenOn: r.taken_on,
   uploadedAt: r.uploaded_at,
   uploadedBy: r.uploaded_by || 'mother',
+  /** set when this document is the card evidencing a particular dose */
+  vaccinationId: r.vaccination_id != null ? String(r.vaccination_id) : undefined,
   /** where the client fetches the bytes */
   url: `/api/documents/${r.id}/file`,
 });
@@ -85,6 +87,7 @@ module.exports = {
    */
   async create(userId, {
     kind, title, note, dataUrl, originalName, takenOn, uploadedBy = 'mother',
+    vaccinationId = null,
   }) {
     if (!KINDS.includes(kind)) throw new DocumentError(`Unknown document kind: ${kind}`, 'BAD_KIND');
 
@@ -99,13 +102,36 @@ module.exports = {
     const row = await db.insert(
       `INSERT INTO documents
          (user_id, kind, title, note, file_name, original_name, mime, size,
-          taken_on, uploaded_at, uploaded_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          taken_on, uploaded_at, uploaded_by, vaccination_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [userId, kind, label, (note || '').trim() || null, fileName,
         originalName || null, mime, buffer.length, date,
-        new Date().toISOString(), uploadedBy],
+        new Date().toISOString(), uploadedBy,
+        vaccinationId != null ? Number(vaccinationId) : null],
     );
     return toDTO(row);
+  },
+
+  /**
+   * The cards attached to each of these vaccinations, keyed by dose id.
+   *
+   * One query for the whole list rather than one per dose — the vaccination
+   * screen shows twelve of them at once.
+   */
+  async forVaccinations(ids) {
+    if (!ids?.length) return new Map();
+    const rows = await db.sql(
+      `SELECT * FROM documents WHERE vaccination_id = ANY($1::int[])
+       ORDER BY taken_on DESC, id DESC`,
+      [ids.map(Number)],
+    );
+    const grouped = new Map();
+    for (const r of rows) {
+      const key = String(r.vaccination_id);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(toDTO(r));
+    }
+    return grouped;
   },
 
   async find(id) {

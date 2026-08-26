@@ -1,13 +1,18 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, ArrowLeft, ArrowRight, Mail, Lock, ShieldCheck, KeyRound } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, Check, Mail, Lock, ShieldCheck, KeyRound } from 'lucide-react';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { FloatingInput } from '@/components/ui/FloatingInput';
 import { spring, fadeUp, staggerContainer } from '@/lib/motion';
 
 export function SignIn() {
   const [submitting, setSubmitting] = useState(false);
+  // a clinician arrives here straight from a registration that really did
+  // write their row; landing them on a blank form with no acknowledgement
+  // reads as though it failed
+  const [params] = useSearchParams();
+  const justRegistered = params.get('registered') === '1';
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -76,6 +81,19 @@ export function SignIn() {
             <motion.p variants={fadeUp} className="mt-2 text-[15px] text-ink-soft">
               Sign in to continue your care journey.
             </motion.p>
+
+            {justRegistered && (
+              <motion.div
+                variants={fadeUp}
+                className="mt-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-800"
+              >
+                <Check className="mt-0.5 h-4 w-4 flex-none" strokeWidth={3} />
+                <span>
+                  You are registered, and you are already listed — mothers can see you
+                  and send you requests from now on.
+                </span>
+              </motion.div>
+            )}
 
             <motion.form variants={fadeUp} onSubmit={onSubmit} className="mt-8 space-y-4">
               <FloatingInput

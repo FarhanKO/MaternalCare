@@ -17,6 +17,7 @@ const toDTO = (v) => ({
   sugar: v.sugar,
   weightKg: v.weight_kg,
   tempC: v.temp_c,
+  fetalBpm: v.fetal_bpm,
 });
 
 exports.index = async (req, res, next) => {
@@ -41,7 +42,9 @@ exports.index = async (req, res, next) => {
  * took her blood pressure should not have to invent a glucose number to save it.
  */
 exports.create = async (req, res) => {
-  const { date, systolic, diastolic, sugar, weightKg, tempC } = req.body || {};
+  const {
+    date, systolic, diastolic, sugar, weightKg, tempC, fetalBpm,
+  } = req.body || {};
   const num = (v) => (v === undefined || v === null || v === '' ? null : Number(v));
 
   try {
@@ -53,6 +56,7 @@ exports.create = async (req, res) => {
       sugar: num(sugar),
       weight_kg: num(weightKg),
       temp_c: num(tempC),
+      fetal_bpm: num(fetalBpm),
     };
     if (Object.entries(reading).every(([k, v]) => k === 'date' || v === null)) {
       return res.status(400).json({ error: 'A reading needs at least one measurement' });

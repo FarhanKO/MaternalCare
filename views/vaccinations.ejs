@@ -76,10 +76,15 @@
     <p style="font-size:13px; color:var(--ink-2); line-height:1.65">
       Keep official vaccine cards and supporting documents attached to each dose for doctor visits and travel.
     </p>
-    <label class="btn btn-glass" style="margin-top:14px; width:100%; border-style:dashed; border-color:rgba(124,92,240,0.35)">
-      📎 Upload card (PDF / photo)
-      <input type="file" hidden onchange="showToast('Document attached to your record', '📎')">
-    </label>
+    <!--
+      This was a file input whose only behaviour was a toast saying the card had
+      been attached. Nothing was uploaded and nothing was stored — it claimed to
+      have done the one thing it had not done. Cards are filed against a dose in
+      the app, where the upload actually reaches the server.
+    -->
+    <a href="/mother?tab=reminders" class="btn btn-glass" style="margin-top:14px; width:100%">
+      📎 File a card against a dose →
+    </a>
   </div>
   <div class="card hoverable reveal reveal-d2">
     <div class="card-head"><div><div class="card-title"><span class="ico">📖</span> Why it matters</div></div></div>

@@ -1,4 +1,4 @@
-/* MaternityCare+ — shared interactions */
+/* MaternalCare+ — shared interactions */
 (function () {
   // Scroll-reveal
   const io = new IntersectionObserver(
@@ -99,8 +99,8 @@
       const done = (locText) => {
         status.innerHTML =
           `<div class="alert alert-good" style="margin-top:14px"><span class="aico">✅</span><div>` +
-          `<b>SOS alert sent</b>Your location (${locText}) was shared with your 3 emergency contacts ` +
-          `and the nearest 24/7 maternity hospital was notified.</div></div>`;
+          `<b>SOS alert sent</b>Your location (${locText}) was shared with your ` +
+          `emergency contacts.</div></div>`;
         window.showToast("Emergency alert sent to your contacts", "🚨");
       };
       if (navigator.geolocation) {

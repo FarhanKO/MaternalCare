@@ -1,7 +1,7 @@
 <%- include('partials/head', { title: 'Emergency SOS' }) %>
 <%- include('partials/shell-start', {
       heading: 'Emergency SOS 🚨',
-      sub: 'One touch shares your live location with contacts and nearby hospitals',
+      sub: 'One touch shares your live location with the contacts you chose',
       toast: null }) %>
 
 <div class="grid grid-3">
@@ -49,25 +49,20 @@
   <div class="card hoverable reveal reveal-d2">
     <div class="card-head">
       <div>
-        <div class="card-title"><span class="ico">🏥</span> Nearby facilities</div>
-        <div class="card-sub">Sorted by distance from you</div>
+        <div class="card-title"><span class="ico">⚠️</span> When to go in</div>
+        <div class="card-sub">The signs that mean now, not tomorrow</div>
       </div>
     </div>
-    <% for (const h of hospitals) { %>
-      <div class="row-item">
-        <div class="row-ico tint-aqua">🏥</div>
-        <div>
-          <b style="font-size:13px"><%= h.name %></b>
-          <small>
-            <%= h.distance_km %> km away
-            <% if (h.open24) { %> · <span style="color:var(--success-text)">Open 24/7</span><% } %>
-            <% if (h.ambulance) { %> · 🚑 Ambulance<% } %>
-          </small>
-        </div>
-        <div class="right"><button class="btn btn-ghost btn-sm" onclick="showToast('Opening directions to <%= h.name %>', '🗺️')">Route →</button></div>
-      </div>
-    <% } %>
 
+    <%
+      /*
+        A list of named hospitals used to sit here, with distances and phone
+        numbers from a table nobody was maintaining. It has been removed: this
+        service is online and has no way to know which door is open tonight,
+        and a wrong number on this page costs a woman the minutes she has.
+        What is left is the national number and the contacts she chose.
+      */
+    %>
     <div class="alert alert-critical" style="margin-top:14px">
       <span class="aico">⚠️</span>
       <div><b>Warning signs — seek help immediately</b>

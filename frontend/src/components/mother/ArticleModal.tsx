@@ -156,6 +156,104 @@ function Diagram({ kind }: { kind: DiagramKind }) {
     );
   }
 
+  if (kind === 'nausea') {
+    // the curve every book describes: climbing to week 9, gone by the second
+    // trimester for most people. Drawn as the shape rather than a claim.
+    const week = (w: number) => 30 + ((w - 4) / 16) * 250;
+    const marks = [4, 9, 14, 20];
+    return (
+      <svg viewBox="0 0 320 150" className="h-full w-full">
+        <motion.path d="M30 118 H296" {...stroke} strokeWidth={2.5} {...draw} />
+        <motion.path d="M30 118 V26" {...stroke} strokeWidth={2.5} {...draw} />
+        {/* the curve */}
+        <motion.path
+          d="M30 112 Q64 96 92 48 Q112 18 128 44 Q152 84 196 106 Q244 118 292 116"
+          {...stroke} stroke={SOFT} strokeWidth={3} {...draw}
+        />
+        {/* peak marker */}
+        <motion.circle cx={week(9)} cy="34" r="5" fill={SOFT}
+          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.8 }} />
+        <text x={week(9)} y="22" fontSize="10" fill={SOFT} fontWeight="800" textAnchor="middle">peaks ~week 9</text>
+        {/* week ticks */}
+        {marks.map((w) => (
+          <g key={w}>
+            <motion.path d={`M${week(w)} 118 v6`} {...stroke} strokeWidth={1.5} opacity={0.5} {...draw} />
+            <text x={week(w)} y="136" fontSize="9" fill={INK} opacity="0.55" fontWeight="700" textAnchor="middle">
+              w{w}
+            </text>
+          </g>
+        ))}
+        <text x="14" y="70" fontSize="9" fill={INK} opacity="0.5" fontWeight="700"
+          transform="rotate(-90 14 70)" textAnchor="middle">how bad</text>
+        <text x="250" y="100" fontSize="9.5" fill={ACCENT} fontWeight="700" textAnchor="middle">usually eases</text>
+      </svg>
+    );
+  }
+
+  if (kind === 'scan') {
+    return (
+      <svg viewBox="0 0 320 150" className="h-full w-full">
+        {/* the probe's fan of sound */}
+        <motion.path d="M44 26 L20 120 L116 120 Z" {...stroke} opacity={0.35} {...draw} />
+        <motion.path d="M38 20 h14 v10 h-14 z" {...stroke} strokeWidth={2.5} {...draw} />
+        {/* baby, curled */}
+        <motion.circle cx="66" cy="80" r="17" {...stroke} stroke={ACCENT} {...draw} />
+        <motion.path d="M66 97 q22 6 20 24" {...stroke} stroke={ACCENT} {...draw} />
+        {/* the measurement itself — crown to rump */}
+        <motion.path d="M50 66 L92 116" {...stroke} stroke={SOFT} strokeWidth={2.5} strokeDasharray="5 4" {...draw} />
+        <motion.circle cx="50" cy="66" r="3.5" fill={SOFT} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.8 }} />
+        <motion.circle cx="92" cy="116" r="3.5" fill={SOFT} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.9 }} />
+        <text x="150" y="46" fontSize="11" fill={SOFT} fontWeight="800">crown to rump</text>
+        <text x="150" y="64" fontSize="9.5" fill={INK} opacity="0.6" fontWeight="600">one length, measured</text>
+        <text x="150" y="78" fontSize="9.5" fill={INK} opacity="0.6" fontWeight="600">three times and averaged</text>
+        <motion.path d="M150 90 H292" {...stroke} strokeWidth={1.5} opacity={0.3} {...draw} />
+        <text x="150" y="108" fontSize="11" fill={ACCENT} fontWeight="800">→ your due date</text>
+        <text x="150" y="124" fontSize="9.5" fill={INK} opacity="0.6" fontWeight="600">every later date counts</text>
+        <text x="150" y="136" fontSize="9.5" fill={INK} opacity="0.6" fontWeight="600">from this one</text>
+      </svg>
+    );
+  }
+
+  if (kind === 'movements') {
+    // deliberately two different patterns, both normal — the point of the
+    // article is that the change matters, not the count
+    const bars = [11, 14, 9, 13, 12, 15, 10];
+    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return (
+      <svg viewBox="0 0 320 150" className="h-full w-full">
+        <motion.path d="M28 116 H188" {...stroke} strokeWidth={2.5} {...draw} />
+        {bars.map((v, i) => (
+          <motion.rect
+            key={i}
+            x={34 + i * 22}
+            y={116 - v * 5}
+            width="13"
+            rx="3"
+            height={v * 5}
+            fill={i === 6 ? SOFT : '#c6d9ff'}
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            style={{ transformOrigin: `${40 + i * 22}px 116px` }}
+            transition={{ delay: 0.15 + i * 0.06, duration: 0.4 }}
+          />
+        ))}
+        {days.map((d, i) => (
+          <text key={i} x={40.5 + i * 22} y="130" fontSize="9" fill={INK} opacity="0.5"
+            fontWeight="700" textAnchor="middle">{d}</text>
+        ))}
+        <text x="28" y="26" fontSize="10" fill={INK} opacity="0.6" fontWeight="700">her own pattern</text>
+        <motion.path d="M200 40 H298" {...stroke} strokeWidth={1.5} opacity={0.3} {...draw} />
+        <text x="200" y="34" fontSize="11" fill={ACCENT} fontWeight="800">no magic number</text>
+        <text x="200" y="60" fontSize="9.5" fill={INK} opacity="0.65" fontWeight="600">ten is not a target —</text>
+        <text x="200" y="74" fontSize="9.5" fill={INK} opacity="0.65" fontWeight="600">some babies do more,</text>
+        <text x="200" y="88" fontSize="9.5" fill={INK} opacity="0.65" fontWeight="600">some fewer, every day</text>
+        <motion.circle cx="206" cy="106" r="4" fill={SOFT} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.9 }} />
+        <text x="216" y="110" fontSize="10" fill={SOFT} fontWeight="800">a change is the signal</text>
+        <text x="200" y="128" fontSize="9.5" fill={INK} opacity="0.65" fontWeight="600">call the same day, not tomorrow</text>
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 320 150" className="h-full w-full">
       <motion.path d="M40 110 q50 -60 100 -20 q46 36 96 -32" {...stroke} stroke={ACCENT} {...draw} />

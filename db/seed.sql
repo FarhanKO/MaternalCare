@@ -11,9 +11,10 @@
 BEGIN;
 
 TRUNCATE sos_notifications, sos_alerts, documents, messages, reminders,
-  symptoms, daily_logs, emergency_contacts, appointments, vitals,
+  symptoms, daily_logs, emergency_contacts,
+  care_terminations, appointment_changes, appointments, vitals,
   growth_records, milestones, children, pregnancies, vaccinations,
-  hospitals, post_comments, posts, articles, doctors, users
+  content_reports, post_comments, posts, articles, doctors, users
   RESTART IDENTITY CASCADE;
 
 /* ------------------------------------------------------------- mothers */
@@ -62,26 +63,40 @@ FROM (VALUES
 ) AS v(d, sys, dia, sug, wt, tmp);
 
 /* The caseload: five fortnightly readings each, so every sparkline has a
-   real trend and the triage rules have something to sort on. */
+   real trend and the triage rules have something to sort on.
+
+   Glucose is per-row rather than the single `95 + i` ramp it used to be. That
+   ramp put every mother on the caseload at 99 mg/dL, one point over the
+   threshold the risk engine uses — so the personalised care plan opened with
+   the same carbohydrate advice for all of them and looked like it ignored who
+   they were. It was reading them correctly; they were identical. Each woman
+   now carries the numbers her recorded condition implies: Shirin's glucose is
+   genuinely diabetic, Nusrat's problem is her pressure and not her sugar, and
+   the mothers with nothing on their record read normal on both. */
 INSERT INTO vitals (user_id, date, systolic, diastolic, sugar, weight_kg, temp_c)
-SELECT u.id, CURRENT_DATE - ((4 - i) * 14), sys, dia, 95 + i, 60 + i * 0.7, 36.8
+SELECT u.id, CURRENT_DATE - ((4 - i) * 14), sys, dia, sug, 60 + i * 0.7, 36.8
 FROM (VALUES
-  ('Nusrat Jahan',   0, 124, 85), ('Nusrat Jahan',   1, 128, 87),
-  ('Nusrat Jahan',   2, 133, 89), ('Nusrat Jahan',   3, 138, 91),
-  ('Nusrat Jahan',   4, 142, 93),
-  ('Farhana Rahim',  0, 108, 62), ('Farhana Rahim',  1, 109, 64),
-  ('Farhana Rahim',  2, 111, 66), ('Farhana Rahim',  3, 110, 68),
-  ('Farhana Rahim',  4, 110, 70),
-  ('Priya Sengupta', 0, 118, 76), ('Priya Sengupta', 1, 121, 78),
-  ('Priya Sengupta', 2, 124, 80), ('Priya Sengupta', 3, 126, 82),
-  ('Priya Sengupta', 4, 128, 84),
-  ('Maria Gomes',    0, 110, 64), ('Maria Gomes',    1, 112, 66),
-  ('Maria Gomes',    2, 111, 68), ('Maria Gomes',    3, 113, 70),
-  ('Maria Gomes',    4, 112, 72),
-  ('Shirin Akter',   0, 126, 82), ('Shirin Akter',   1, 130, 84),
-  ('Shirin Akter',   2, 133, 86), ('Shirin Akter',   3, 136, 88),
-  ('Shirin Akter',   4, 138, 90)
-) AS t(nm, i, sys, dia)
+  -- gestational hypertension: pressure climbing, sugar untroubled
+  ('Nusrat Jahan',   0, 124, 85,  84), ('Nusrat Jahan',   1, 128, 87,  86),
+  ('Nusrat Jahan',   2, 133, 89,  85), ('Nusrat Jahan',   3, 138, 91,  87),
+  ('Nusrat Jahan',   4, 142, 93,  86),
+  -- second pregnancy, nothing on her record: normal on both
+  ('Farhana Rahim',  0, 108, 62,  80), ('Farhana Rahim',  1, 109, 64,  82),
+  ('Farhana Rahim',  2, 111, 66,  81), ('Farhana Rahim',  3, 110, 68,  83),
+  ('Farhana Rahim',  4, 110, 70,  82),
+  -- anaemia is not a glucose or pressure problem, and should not read as one
+  ('Priya Sengupta', 0, 118, 76,  86), ('Priya Sengupta', 1, 121, 78,  85),
+  ('Priya Sengupta', 2, 124, 80,  88), ('Priya Sengupta', 3, 126, 82,  86),
+  ('Priya Sengupta', 4, 128, 84,  87),
+  -- first pregnancy, week 12, well
+  ('Maria Gomes',    0, 110, 64,  79), ('Maria Gomes',    1, 112, 66,  81),
+  ('Maria Gomes',    2, 111, 68,  80), ('Maria Gomes',    3, 113, 70,  82),
+  ('Maria Gomes',    4, 112, 72,  81),
+  -- gestational diabetes: this is what the diagnosis actually looks like
+  ('Shirin Akter',   0, 126, 82, 112), ('Shirin Akter',   1, 130, 84, 118),
+  ('Shirin Akter',   2, 133, 86, 124), ('Shirin Akter',   3, 136, 88, 129),
+  ('Shirin Akter',   4, 138, 90, 133)
+) AS t(nm, i, sys, dia, sug)
 JOIN users u ON u.name = t.nm;
 
 /* --------------------------------------------------------------- child */
@@ -138,40 +153,63 @@ FROM (VALUES
 
 /* ----------------------------------------------------------- clinicians */
 
-INSERT INTO doctors (name, specialty, hospital, rating, distance_km,
-                     available, patients, qualification, years, capacity) VALUES
-  ('Dr. Lena Ortiz',    'Obstetrics & Maternal Medicine', 'MaternalCare+ Clinic · Room 204',
-   4.9, 0.8, TRUE,  22, 'MBBS, MRCOG, MD (Maternal Medicine)', 15, 30),
-  ('Dr. Nusrat Kabir',  'Obstetrics & Gynaecology', 'City Maternity Hospital',
-   4.9, 1.2, TRUE,  26, 'MBBS, FCPS (Obs & Gynae)', 12, 28),
-  ('Dr. Farzana Karim', 'Obstetrics & Gynaecology', 'Popular Diagnostic Centre',
-   4.5, 4.2, TRUE,  14, 'MBBS, DGO', 7, 35),
-  ('Dr. Sara Ahmed',    'Maternal-Fetal Medicine', 'Square Hospital',
-   4.7, 3.1, TRUE,  24, 'MBBS, FCPS, MD (Fetal Medicine)', 18, 24),
-  ('Dr. Kamal Hossain', 'Paediatrics', 'Green Life Children Clinic',
-   4.8, 2.4, TRUE,  19, 'MBBS, MRCPCH, DCH', 11, 32),
-  ('Dr. Rafiq Islam',   'Nutrition & Dietetics', 'Wellness Care Center',
-   4.6, 1.8, TRUE,  12, 'MBBS, MPH (Nutrition)', 6, 40),
+-- The seeded roster. Everyone here has a licence number and an email because
+-- the registration form asks for both, and a seed that cannot satisfy its own
+-- constraints is a seed that hides them. The licences are obviously fictional
+-- for the same reason the phone numbers are absent: this is demo data, and it
+-- should not be mistakable for a real clinician's registration.
+INSERT INTO doctors (name, specialty, rating,
+                     available, patients, qualification, years, capacity,
+                     email, license_no) VALUES
+  ('Dr. Lena Ortiz',    'Obstetrics & Maternal Medicine',
+   4.9, TRUE,  22, 'MBBS, MRCOG, MD (Maternal Medicine)', 15, 30,
+   'lena.ortiz@demo.maternalcare.app',     'DEMO-BMDC-1001'),
+  ('Dr. Nusrat Kabir',  'Obstetrics & Gynaecology',
+   4.9, TRUE,  26, 'MBBS, FCPS (Obs & Gynae)', 12, 28,
+   'nusrat.kabir@demo.maternalcare.app',   'DEMO-BMDC-1002'),
+  ('Dr. Farzana Karim', 'Obstetrics & Gynaecology',
+   4.5, TRUE,  14, 'MBBS, DGO', 7, 35,
+   'farzana.karim@demo.maternalcare.app',  'DEMO-BMDC-1003'),
+  ('Dr. Sara Ahmed',    'Maternal-Fetal Medicine',
+   4.7, TRUE,  24, 'MBBS, FCPS, MD (Fetal Medicine)', 18, 24,
+   'sara.ahmed@demo.maternalcare.app',     'DEMO-BMDC-1004'),
+  ('Dr. Kamal Hossain', 'Paediatrics',
+   4.8, TRUE,  19, 'MBBS, MRCPCH, DCH', 11, 32,
+   'kamal.hossain@demo.maternalcare.app',  'DEMO-BMDC-1005'),
+  ('Dr. Rafiq Islam',   'Nutrition & Dietetics',
+   4.6, TRUE,  12, 'MBBS, MPH (Nutrition)', 6, 40,
+   'rafiq.islam@demo.maternalcare.app',    'DEMO-BMDC-1006'),
+  ('Dr. Mahmuda Hasan', 'Perinatal Mental Health',
+   4.7, TRUE,  16, 'MBBS, FCPS (Psychiatry)', 9, 26,
+   'mahmuda.hasan@demo.maternalcare.app',  'DEMO-BMDC-1007'),
   -- deliberately on leave, so the "no doctor available" path can be demonstrated
-  ('Dr. Tanvir Alam',   'Paediatric Neurology', 'National Children Hospital',
-   4.8, 5.0, FALSE,  8, 'MBBS, MD (Paediatric Neurology)', 14, 20);
+  ('Dr. Tanvir Alam',   'Paediatric Neurology',
+   4.8, FALSE,  8, 'MBBS, MD (Paediatric Neurology)', 14, 20,
+   'tanvir.alam@demo.maternalcare.app',    'DEMO-BMDC-1008');
 
-INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
+-- `resp` is how many hours the clinician took to answer, and it is not
+-- decoration: the ranking scores how fast a doctor replies, read from exactly
+-- these two timestamps. Left NULL, as it was, every clinician scored the same
+-- neutral middle and the term did nothing on a fresh database. The lags differ
+-- per clinician on purpose, so the ordering visibly reflects them.
+INSERT INTO appointments (user_id, doctor_id, date, time, reason, status,
+                          requested_at, responded_at)
 SELECT (SELECT id FROM users WHERE name = 'Ayesha Rahman'),
        d.id, CURRENT_DATE + t.off, t.tm, t.reason, t.status,
-       now() - (abs(t.off) || ' days')::interval
+       now() - (abs(t.off) || ' days')::interval,
+       now() - (abs(t.off) || ' days')::interval + (t.resp || ' hours')::interval
 -- Dr. Lena Ortiz is the clinician the portal signs in as, so she is Ayesha's
 -- obstetrician. Without that relationship her request inbox, her SOS alerts
 -- and the mother's care team would all be empty on a fresh database.
 FROM (VALUES
-  ('Dr. Lena Ortiz',     4, '10:30 AM', 'Antenatal check-up — Week 29',   'accepted'),
-  ('Dr. Sara Ahmed',    17, '09:00 AM', 'Anomaly ultrasound scan',        'accepted'),
-  ('Dr. Kamal Hossain', 26, '11:15 AM', 'Zara''s 15-month wellness visit','accepted'),
-  ('Dr. Lena Ortiz',   -24, '10:00 AM', 'Antenatal check-up — Week 25',   'completed'),
-  ('Dr. Rafiq Islam',  -38, '04:30 PM', 'Nutrition plan review',          'completed'),
-  ('Dr. Lena Ortiz',   -52, '10:00 AM', 'Antenatal check-up — Week 21',   'completed'),
-  ('Dr. Kamal Hossain',-80, '12:00 PM', 'Zara''s 12-month check-up',      'completed')
-) AS t(doc, off, tm, reason, status)
+  ('Dr. Lena Ortiz',     4, '10:30 AM', 'Antenatal check-up — Week 29',   'accepted',   3),
+  ('Dr. Sara Ahmed',    17, '09:00 AM', 'Anomaly ultrasound scan',        'accepted',  30),
+  ('Dr. Kamal Hossain', 26, '11:15 AM', 'Zara''s 15-month wellness visit','accepted',  52),
+  ('Dr. Lena Ortiz',   -24, '10:00 AM', 'Antenatal check-up — Week 25',   'completed',  2),
+  ('Dr. Rafiq Islam',  -38, '04:30 PM', 'Nutrition plan review',          'completed',  7),
+  ('Dr. Lena Ortiz',   -52, '10:00 AM', 'Antenatal check-up — Week 21',   'completed',  5),
+  ('Dr. Kamal Hossain',-80, '12:00 PM', 'Zara''s 12-month check-up',      'completed', 61)
+) AS t(doc, off, tm, reason, status, resp)
 JOIN doctors d ON d.name = t.doc;
 
 -- One waiting request so the clinician's inbox has something to answer, and
@@ -301,10 +339,42 @@ FROM (VALUES
 ) AS c(title, author, role, body, hrs)
 JOIN posts p ON p.title = c.title;
 
-INSERT INTO hospitals (name, distance_km, phone, ambulance, open24) VALUES
-  ('City Maternity Hospital',    1.2, '+880 2-XXXXXXX', TRUE,  TRUE),
-  ('Square Hospital',            3.1, '+880 2-XXXXXXX', TRUE,  TRUE),
-  ('Green Life Children Clinic', 2.4, '+880 2-XXXXXXX', FALSE, TRUE),
-  ('Popular Diagnostic Centre',  4.2, '+880 2-XXXXXXX', TRUE,  FALSE);
+/* ------------------------------------------------ reported content */
+/*
+ * One post that is exactly what the reporting feature exists to catch, one
+ * report against it, and a clinician already correcting it in the replies.
+ *
+ * Seeding this is deliberate. Without it the moderation queue is empty on a
+ * fresh database and the feature cannot be seen working at all — and the
+ * realistic case is not abuse or spam, it is a well-meaning mother repeating
+ * something dangerous she was told. It is left `open` rather than resolved so
+ * there is a decision waiting to be made.
+ */
+INSERT INTO posts (author, role, week, topic, title, body, hearts, created_at)
+VALUES ('Rehana K.', 'mother', 31, 'Symptoms',
+        'My BP tablets were making me tired so I stopped them',
+        'My mother-in-law said these tablets are not needed and they weaken the baby. I have not taken them for a week and I feel much better. Anyone else stopped theirs?',
+        2, now() - interval '5 hours');
+
+INSERT INTO post_comments (post_id, author, role, body, created_at)
+SELECT p.id, 'Dr. Lena Ortiz', 'doctor',
+       'Please start them again today and call your clinic. Blood pressure medication in pregnancy is treating something you cannot feel — feeling better off them is expected and is not a sign it was unnecessary. Stopping carries a real risk of pre-eclampsia for you and the baby.',
+       now() - interval '3 hours'
+FROM posts p WHERE p.title = 'My BP tablets were making me tired so I stopped them';
+
+INSERT INTO content_reports (post_id, reporter_id, reason, detail, created_at)
+SELECT p.id,
+       (SELECT id FROM users WHERE name = 'Farhana Rahim'),
+       'medical-misinformation',
+       'She is telling other people to stop their blood pressure medication.',
+       now() - interval '4 hours'
+FROM posts p WHERE p.title = 'My BP tablets were making me tired so I stopped them';
+
+/*
+ * A `hospitals` seed sat here: four real institutions with placeholder phone
+ * numbers, feeding a "nearby facilities" list on the emergency page. Both are
+ * gone. This platform has no relationship with any of them, and an emergency
+ * screen must not carry a directory nobody is keeping accurate.
+ */
 
 COMMIT;

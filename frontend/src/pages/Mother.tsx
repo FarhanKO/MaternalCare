@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Activity, Apple, ArrowRight, Baby, Bell, CalendarDays, Check, ChevronLeft, ChevronRight,
+  Activity, Apple, ArrowRight, Baby, CalendarDays, Check, ChevronLeft, ChevronRight, FileText,
   CalendarClock, Clock, Droplet, GlassWater, HeartPulse, Lightbulb, Minus, Moon, Plus, RefreshCw,
   Ruler, Scale, ShieldAlert, Smile, Sparkles, Stethoscope, TrendingUp, Utensils,
 } from 'lucide-react';
@@ -19,10 +19,19 @@ import { MotherTabs, type MotherTab } from '@/components/mother/MotherTabs';
 import { CommunitySection } from '@/components/mother/CommunitySection';
 import { FindDoctorSection } from '@/components/mother/FindDoctorSection';
 import { RemindersSection } from '@/components/mother/RemindersSection';
+import { VaccinationRecord } from '@/components/mother/VaccinationRecord';
+import { CarePlan } from '@/components/mother/CarePlan';
+import { RiskPanel } from '@/components/mother/RiskPanel';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
+import { DailyCheckIn } from '@/components/mother/DailyCheckIn';
+import { OutOfRange, RangeChip } from '@/components/mother/OutOfRange';
+import { ReportButton } from '@/components/ui/ReportButton';
+import { NotificationBell } from '@/components/mother/NotificationBell';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { checkInStatus } from '@/lib/checkin';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useVitalSeries } from '@/hooks/useVitalSeries';
 import { usePregnancy } from '@/hooks/usePregnancy';
@@ -126,11 +135,6 @@ const HR = [
   { d: 'W25', bpm: 151 }, { d: 'W26', bpm: 148 },
 ];
 
-const KICKS = [
-  { d: 'Mon', n: 9 }, { d: 'Tue', n: 14 }, { d: 'Wed', n: 11 }, { d: 'Thu', n: 16 },
-  { d: 'Fri', n: 13 }, { d: 'Sat', n: 18 }, { d: 'Sun', n: 12 },
-];
-
 const SLEEP = [
   { d: 'Mon', h: 7.2 }, { d: 'Tue', h: 6.4 }, { d: 'Wed', h: 8.1 }, { d: 'Thu', h: 7.6 },
   { d: 'Fri', h: 6.9 }, { d: 'Sat', h: 8.4 }, { d: 'Sun', h: 7.8 },
@@ -147,13 +151,14 @@ const MOOD = [
   { name: 'Anxious', value: 12, color: C.rose },
 ];
 
-const NUTRIENTS = [
-  { name: 'Folate', pct: 92, color: C.brand },
-  { name: 'Iron', pct: 78, color: C.aqua },
-  { name: 'Calcium', pct: 85, color: C.rose },
-  { name: 'Protein', pct: 70, color: C.peach },
-  { name: 'Omega-3', pct: 64, color: C.mint },
-];
+/*
+ * A NUTRIENTS constant lived here — Folate 92%, Iron 78%, Calcium 85% — drawn
+ * as progress bars under the heading "Nutrition today · % of daily goal".
+ * There is no food logging anywhere in this app, so not one of those numbers
+ * could have been measured. A bar is a claim of measurement. It is now the
+ * CarePlan section, which separates what to aim for from what she has
+ * actually logged.
+ */
 
 const APPTS = [
   { date: 'Dec 20', title: 'Growth ultrasound', who: 'Dr. Lena Ortiz', type: 'Scan', tint: C.brand },
@@ -591,6 +596,8 @@ export function Mother() {
   const { status, symptoms, reminders, saveSymptoms, endSymptomEntry, changeReminders } = useDashboardData();
   // the trend charts, built from her stored readings rather than fixtures
   const vitals = useVitalSeries();
+  /** the daily check-in sheet — opened from the bell or from "View all" */
+  const [checkInOpen, setCheckInOpen] = useState(false);
   // one source for "what week is she in" — every mention below reads this
   const { pregnancy } = usePregnancy();
   const week = pregnancy?.week ?? 0;
@@ -652,9 +659,20 @@ export function Mother() {
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            <button aria-label="Notifications" className="grid h-11 w-11 place-items-center rounded-2xl glass-strong text-ink-soft transition-colors hover:text-ink">
-              <Bell className="h-5 w-5" />
-            </button>
+            <LanguageToggle />
+            <NotificationBell
+              sosActive={!!liveAlert}
+              vitalAlerts={vitals.alerts}
+              pendingSymptoms={pendingReview}
+              reminders={nextUp}
+              checkIn={checkInStatus(vitals.today, vitals.logHistory, vitals.readings)}
+              onAction={(a) => {
+                if (a === 'sos') setSosOpen(true);
+                else if (a === 'checkin') setCheckInOpen(true);
+                else if (a === 'symptoms') setLogOpen(true);
+                else if (a === 'reminders') setApptOpen(true);
+              }}
+            />
 
             {/* emergency SOS — always one tap away */}
             <motion.button
@@ -767,8 +785,11 @@ export function Mother() {
         <div className="mt-8">
           <Reveal className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-extrabold tracking-tight text-ink">My daily insights · Today</h2>
-            <button className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
-              View all <ChevronRight className="h-4 w-4" />
+            <button
+              onClick={() => setCheckInOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
+            >
+              Update all <ChevronRight className="h-4 w-4" />
             </button>
           </Reveal>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -781,8 +802,11 @@ export function Mother() {
                 onKeyDown={(e: any) => (e.key === 'Enter' || e.key === ' ') && setLogOpen(true)}
                 className="relative flex h-full flex-col overflow-hidden p-5"
               >
-                {/* drifting beams appear only when there are symptoms awaiting a check-in */}
-                {pendingReview.length > 0 && <BeamsBackground intensity="medium" count={12} />}
+                {/* the card's own weather — always drifting, brighter when something waits */}
+                <BeamsBackground
+                  intensity={pendingReview.length > 0 ? 'strong' : 'medium'}
+                  count={12}
+                />
 
                 <div className="relative flex items-center justify-between">
                   <span className="grid h-10 w-10 place-items-center rounded-2xl" style={{ background: `${C.rose}1f`, color: C.rose }}>
@@ -1053,8 +1077,17 @@ export function Mother() {
         <motion.div key="tab-vitals" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
-        {/* how her gain compares with the range for her starting BMI */}
+        {/* anything currently outside its band, whichever metric it is */}
         <Reveal className="mt-9">
+          <OutOfRange
+            alerts={vitals.alerts}
+            weightGain={vitals.weightGain}
+            loaded={vitals.loaded}
+          />
+        </Reveal>
+
+        {/* how her gain compares with the range for her starting BMI */}
+        <Reveal className="mt-5">
           <WeightGainCard />
         </Reveal>
 
@@ -1111,20 +1144,9 @@ export function Mother() {
 
             {/* blood pressure */}
             <ChartCard title="Blood pressure" sub="Systolic / diastolic" icon={Stethoscope} tint={C.aqua}
-              right={(() => {
-                // the badge reads the same alerts the care team sees, so it
-                // can never say "Normal" over a reading that is not
-                const flagged = vitals.alerts.some((a) => /pressure/i.test(a.metric));
-                if (!vitals.loaded || !vitals.latest) return null;
-                return (
-                  <span className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                    style={flagged
-                      ? { color: '#c0392b', background: 'rgba(220,80,60,0.12)' }
-                      : { color: C.mint, background: `${C.mint}1a` }}>
-                    {flagged ? 'Check with your doctor' : 'Normal'}
-                  </span>
-                );
-              })()}>
+              right={vitals.loaded && vitals.latest
+                ? <RangeChip alerts={vitals.alerts} match={/pressure/i} />
+                : null}>
               {vitals.loaded && vitals.bp.length === 0 ? <NoReadings what="blood pressure" /> : (
               <ResponsiveContainer width="100%" height={190}>
                 <LineChart data={vitals.bp} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
@@ -1140,11 +1162,13 @@ export function Mother() {
               <Legend items={[{ label: 'Systolic', color: C.brand }, { label: 'Diastolic', color: C.aqua }]} />
             </ChartCard>
 
-            {/* fetal heart rate — no column behind this one yet */}
+            {/* fetal heart rate — hers once she has logged one, otherwise a sample */}
             <ChartCard title="Fetal heart rate" sub="Beats per minute" icon={HeartPulse} tint={C.rose}
-              right={<SampleTag />}>
+              right={vitals.fetalHr.length
+                ? <RangeChip alerts={vitals.alerts} match={/fetal heart/i} />
+                : <SampleTag />}>
               <ResponsiveContainer width="100%" height={190}>
-                <AreaChart data={HR} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <AreaChart data={vitals.fetalHr.length ? vitals.fetalHr : HR} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
                     <linearGradient id="hr" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.rose} stopOpacity={0.3} />
@@ -1152,7 +1176,8 @@ export function Mother() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="d" tickLine={false} axisLine={false} tick={axisTick} dy={6} />
-                  <YAxis tickLine={false} axisLine={false} tick={axisTick} width={30} domain={[140, 160]} />
+                  <YAxis tickLine={false} axisLine={false} tick={axisTick} width={30}
+                    domain={vitals.fetalHr.length ? ['dataMin - 10', 'dataMax + 10'] : [140, 160]} />
                   <Tooltip content={<Tip unit="bpm" />} />
                   <Area type="monotone" dataKey="bpm" name="Heart rate" stroke={C.rose} strokeWidth={2.6} fill="url(#hr)" dot={{ r: 3, fill: C.rose }} animationDuration={1400} />
                 </AreaChart>
@@ -1173,11 +1198,11 @@ export function Mother() {
               )}
             </ChartCard>
 
-            {/* sleep — daily_logs has no sleep column yet */}
+            {/* sleep — from her own daily log once she has recorded a night */}
             <ChartCard title="Sleep quality" sub="Hours per night" icon={Moon} tint={C.brand2}
-              right={<SampleTag />}>
+              right={vitals.sleep.length ? undefined : <SampleTag />}>
               <ResponsiveContainer width="100%" height={190}>
-                <BarChart data={SLEEP} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
+                <BarChart data={vitals.sleep.length ? vitals.sleep : SLEEP} margin={{ top: 6, right: 6, left: -2, bottom: 0 }}>
                   <defs>
                     <linearGradient id="sl" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.brand2} />
@@ -1194,9 +1219,9 @@ export function Mother() {
           </div>
         </div>
 
-        {/* THIS WEEK — baby development + nutrients */}
-        <div className="mt-9 grid gap-5 lg:grid-cols-3">
-          <Reveal className="lg:col-span-2">
+        {/* THIS WEEK — baby development */}
+        <div className="mt-9">
+          <Reveal>
             <GlassCard className="flex h-full flex-col gap-6 p-6 sm:flex-row sm:items-center sm:p-8">
               <div className="flex flex-none flex-col items-center">
                 <ProgressRing
@@ -1239,40 +1264,6 @@ export function Mother() {
             </GlassCard>
           </Reveal>
 
-          {/* nutrients */}
-          <Reveal>
-            <GlassCard float className="h-full p-6">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${C.peach}1f`, color: C.peach }}>
-                  <Utensils className="h-[18px] w-[18px]" />
-                </span>
-                <div>
-                  <div className="text-sm font-bold text-ink">Nutrition today</div>
-                  <div className="text-xs text-ink-muted">% of daily goal</div>
-                </div>
-              </div>
-              <div className="mt-5 space-y-4">
-                {NUTRIENTS.map((n) => (
-                  <div key={n.name}>
-                    <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
-                      <span className="text-ink-soft">{n.name}</span>
-                      <span className="text-ink">{n.pct}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-ink/[0.06]">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: n.color }}
-                        initial={{ width: 0 }}
-                        whileInView={{ width: `${n.pct}%` }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          </Reveal>
         </div>
 
         {/* fundal height + mood + hydration */}
@@ -1349,6 +1340,30 @@ export function Mother() {
           </ChartCard>
         </div>
 
+        {/* everything above, as a document to hand a doctor */}
+        <Reveal className="mt-8">
+          <GlassCard className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
+            <span className="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-brand-500/12 text-brand-600">
+              <FileText className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-extrabold text-ink">Health report</div>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-muted">
+                Everything on record as one PDF — your details, the charts above, what you log each
+                day, your consultations, and every prescription and result you have filed, each on
+                its own page with the date it was added.
+              </p>
+            </div>
+            <ReportButton className="flex-none" />
+          </GlassCard>
+        </Reveal>
+
+        {/* the assessment, then the plan that is built out of it */}
+        <RiskPanel />
+
+        {/* the personalised plan, where the fabricated nutrient bars used to be */}
+        <CarePlan />
+
         </motion.div>
         )}
 
@@ -1357,11 +1372,19 @@ export function Mother() {
         <motion.div key="tab-reminders" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
 
+        {/* the vaccination record: mark a dose done, and file the card for it */}
+        <VaccinationRecord />
+
         {/* four reminder groups + today's routine timeline */}
         <RemindersSection
           reminders={reminders}
+          stage={profile.stage}
           onAdd={() => setApptOpen(true)}
           onDelete={(id) => changeReminders(reminders.filter((r) => r.id !== id), reminders)}
+          onAddReminder={(r) => changeReminders(
+            [...reminders, { ...r, id: `v-${Date.now()}` }],
+            reminders,
+          )}
         />
 
         {/* symptom history */}
@@ -1494,6 +1517,15 @@ export function Mother() {
       />
 
       <SosModal open={sosOpen} onClose={() => setSosOpen(false)} onAlertChange={setLiveAlert} />
+
+      <DailyCheckIn
+        open={checkInOpen}
+        onClose={() => setCheckInOpen(false)}
+        today={vitals.today}
+        logHistory={vitals.logHistory}
+        readings={vitals.readings}
+        onSaved={vitals.reload}
+      />
 
       <ProfileModal
         open={profileOpen}

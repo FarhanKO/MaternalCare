@@ -8,6 +8,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import { APPT_META, prettyDate, prettyTime, type Appointment } from '@/data/care';
+import { RescheduleDialog } from '@/components/mother/RescheduleDialog';
 
 const DECLINE_REASONS = [
   'Fully booked that day — please pick another',
@@ -24,6 +25,8 @@ export function RequestInbox({ doctorId, onChange }: { doctorId: string; onChang
   const [items, setItems] = useState<Appointment[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'offline'>('loading');
   const [decliningId, setDecliningId] = useState<string | null>(null);
+  /* offering a different slot rather than declining outright */
+  const [moving, setMoving] = useState<Appointment | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -115,6 +118,19 @@ export function RequestInbox({ doctorId, onChange }: { doctorId: string; onChang
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/*
+                      Offering a different time instead of only yes or no. A
+                      clinician who is busy on Tuesday used to have Decline as
+                      the only way to say so, which sent the mother back to the
+                      end of the queue for a problem that was the clinic's.
+                    */}
+                    <button
+                      onClick={() => setMoving(a)}
+                      disabled={busy === a.id}
+                      className="inline-flex items-center gap-1 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-[12px] font-bold text-ink-soft transition hover:bg-white hover:text-ink"
+                    >
+                      <CalendarDays className="h-3.5 w-3.5" /> Offer another time
+                    </button>
                     <button
                       onClick={() => setDecliningId(decliningId === a.id ? null : a.id)}
                       disabled={busy === a.id}
@@ -205,6 +221,13 @@ export function RequestInbox({ doctorId, onChange }: { doctorId: string; onChang
           </GlassCard>
         </Reveal>
       )}
+      <RescheduleDialog
+        appointment={moving}
+        side="doctor"
+        doctorId={doctorId}
+        onClose={() => setMoving(null)}
+        onMoved={() => load()}
+      />
     </div>
   );
 }

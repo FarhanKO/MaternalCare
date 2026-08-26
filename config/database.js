@@ -1,5 +1,5 @@
 /**
- * MaternityCare+ — Database configuration (Model layer backing store)
+ * MaternalCare+ — Database configuration (Model layer backing store)
  * Uses Node's built-in SQLite driver (node:sqlite) — no native deps.
  * Schema is created on first run and seeded with demo data whose dates
  * are computed relative to "today", so the demo always looks current.

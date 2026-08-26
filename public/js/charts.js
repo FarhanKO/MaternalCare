@@ -1,4 +1,4 @@
-/* MaternityCare+ — chart layer (Chart.js)
+/* MaternalCare+ — chart layer (Chart.js)
    Colors follow the validated data-viz palette:
    series: blue #2a78d6 · orange #eb6834 · aqua #1baf7a
    status: good #0ca30c · warning #fab219 · critical #d03b3b            */

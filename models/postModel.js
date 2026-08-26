@@ -41,11 +41,26 @@ function ago(iso) {
   return days < 7 ? `${days} d ago` : `${Math.round(days / 7)} w ago`;
 }
 
-const toComment = (c) => ({
+/*
+ * A comment a moderator has taken down becomes a tombstone rather than
+ * disappearing. Half a thread is harder to read than a thread with a gap in
+ * it, and a reply that answers something no longer visible misleads everyone
+ * who arrives afterwards.
+ */
+const toComment = (c) => (c.hidden_at ? {
+  id: String(c.id),
+  author: c.author,
+  role: c.role,
+  body: 'This reply was removed by a moderator.',
+  removed: true,
+  removedReason: c.hidden_reason || null,
+  ago: ago(c.created_at),
+} : {
   id: String(c.id),
   author: c.author,
   role: c.role,
   body: c.body,
+  removed: false,
   ago: ago(c.created_at),
 });
 
@@ -62,6 +77,9 @@ function toPost(p, comments) {
     hearts: p.hearts ?? 0,
     clinicianAnswered: Boolean(p.clinician_answered),
     ago: ago(p.created_at),
+    /* set only in the moderator's view; the public board never sees these */
+    removed: Boolean(p.hidden_at),
+    removedReason: p.hidden_at ? (p.hidden_reason || null) : undefined,
     comments,
   };
 }
@@ -100,27 +118,46 @@ module.exports = {
    * Newest first. `limit`/`offset` drive the community's "load more" so the
    * client never pulls the whole board at once.
    */
-  async all({ limit = 20, offset = 0, topic } = {}) {
-    const filtered = topic && topic !== 'All';
-    const rows = filtered
-      ? await db.sql(
-        `SELECT * FROM posts WHERE topic = $3
-         ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
-        [limit, offset, topic],
-      )
-      : await db.sql(
-        'SELECT * FROM posts ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2',
-        [limit, offset],
-      );
+  /**
+   * Newest first, and never anything a moderator has taken down.
+   *
+   * A removed *post* is dropped rather than left as a tombstone — unlike a
+   * comment it is not holding a conversation together, and a board of
+   * "removed" cards is its own kind of noise. `includeHidden` exists for the
+   * moderation queue, which has to see what it is deciding about.
+   */
+  async all({
+    limit = 20, offset = 0, topic, includeHidden = false,
+  } = {}) {
+    const where = [];
+    const args = [limit, offset];
+    if (!includeHidden) where.push('hidden_at IS NULL');
+    if (topic && topic !== 'All') {
+      args.push(topic);
+      where.push(`topic = $${args.length}`);
+    }
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const rows = await db.sql(
+      `SELECT * FROM posts ${clause}
+       ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
+      args,
+    );
 
     const comments = await this.commentsFor(rows.map((r) => r.id));
     return rows.map((p) => toPost(p, comments.get(p.id) ?? []));
   },
 
-  async count(topic) {
-    const row = topic && topic !== 'All'
-      ? await db.one('SELECT count(*) AS c FROM posts WHERE topic = $1', [topic])
-      : await db.one('SELECT count(*) AS c FROM posts');
+  async count(topic, { includeHidden = false } = {}) {
+    const where = [];
+    const args = [];
+    if (!includeHidden) where.push('hidden_at IS NULL');
+    if (topic && topic !== 'All') {
+      args.push(topic);
+      where.push(`topic = $${args.length}`);
+    }
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const row = await db.one(`SELECT count(*) AS c FROM posts ${clause}`, args);
     return row.c;
   },
 
@@ -157,8 +194,10 @@ module.exports = {
   async comment(postId, userId, { author, role = 'mother', body }) {
     const text = String(body || '').trim();
     if (!text) throw new PostError('A comment cannot be empty', 'EMPTY');
-    if (!await db.one('SELECT 1 FROM posts WHERE id = $1', [postId])) {
-      throw new PostError('That post no longer exists', 'NOT_FOUND');
+    const post = await db.one('SELECT hidden_at FROM posts WHERE id = $1', [postId]);
+    if (!post) throw new PostError('That post no longer exists', 'NOT_FOUND');
+    if (post.hidden_at) {
+      throw new PostError('This post was removed by a moderator', 'REMOVED');
     }
 
     await db.tx(async (t) => {
@@ -179,7 +218,7 @@ module.exports = {
   /** Toggling is the client's business; the model just applies the delta. */
   async heart(postId, delta = 1) {
     await db.run(
-      'UPDATE posts SET hearts = GREATEST(0, hearts + $2) WHERE id = $1',
+      'UPDATE posts SET hearts = GREATEST(0, hearts + $2) WHERE id = $1 AND hidden_at IS NULL',
       [postId, delta],
     );
     return this.find(postId);

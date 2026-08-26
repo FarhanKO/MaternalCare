@@ -1,3 +1,5 @@
+import type { CareDocument } from '@/data/care';
+
 /**
  * Shapes for the data that used to live only in the browser — the community
  * board, her profile, her daily self-reporting — plus the child records that
@@ -23,12 +25,14 @@ export interface DailyLogEntry {
   mood?: string;
   kicks?: number;
   waterLitres?: number;
+  sleepHours?: number;
 }
 
 export interface DailyLogSummary {
   days: number;
   avgWaterLitres: number | null;
   avgKicks: number | null;
+  avgSleepHours: number | null;
   commonMood: string | null;
 }
 
@@ -47,6 +51,11 @@ export interface ServerComment {
   role: 'mother' | 'doctor';
   body: string;
   ago: string;
+  /** true where a moderator took it down; `body` is then the tombstone */
+  removed?: boolean;
+  removedReason?: string | null;
+  /** whether the signed-in member has already reported this */
+  reported?: boolean;
 }
 
 export interface ServerPost {
@@ -63,6 +72,44 @@ export interface ServerPost {
   clinicianAnswered: boolean;
   ago: string;
   comments: ServerComment[];
+  /** whether the signed-in member has already reported this */
+  reported?: boolean;
+}
+
+/** Why something is being reported, as the server defines it. */
+export interface ReportReason {
+  key: string;
+  label: string;
+  hint: string;
+}
+
+/** One item in the clinician's moderation queue, with everything to decide on. */
+export interface ReportGroup {
+  key: string;
+  target: 'post' | 'comment';
+  postId: string;
+  commentId: string | null;
+  content: {
+    author: string;
+    role: 'mother' | 'doctor';
+    title: string | null;
+    body: string;
+    image: string | null;
+    hidden: boolean;
+  };
+  reports: {
+    id: string;
+    reason: string;
+    reasonLabel: string;
+    detail: string;
+    state: 'open' | 'upheld' | 'dismissed';
+    createdAt: string;
+    reporter: string;
+    reviewNote: string | null;
+  }[];
+  /** summed severity of the reasons given */
+  weight: number;
+  urgent: boolean;
 }
 
 /* ------------------------------------------------------------- child */
@@ -125,6 +172,8 @@ export interface Vaccination {
   dueDate: string;
   status: 'done' | 'due' | 'upcoming';
   completedOn?: string;
+  /** cards filed as evidence for this dose */
+  cards: CareDocument[];
 }
 
 export interface VaccinationStats {
@@ -166,6 +215,7 @@ export interface VitalReading {
   sugar: number | null;
   weightKg: number | null;
   tempC: number | null;
+  fetalBpm: number | null;
 }
 
 export interface VitalAlert {
@@ -196,4 +246,95 @@ export interface WeightGain {
   totalRange: { low: number; high: number };
   status: 'below' | 'on-track' | 'above';
   note: string;
+}
+
+/* ------------------------------------------------- the care plan (F14) */
+
+export type Advice = {
+  domain: 'nutrition' | 'exercise' | 'lifestyle';
+  priority: 'urgent' | 'high' | 'normal';
+  title: string;
+  text: string;
+  /** the reading that produced this item — what makes it personal */
+  why: string;
+};
+
+export interface NutrientTarget {
+  key: string;
+  label: string;
+  amount: string;
+  why: string;
+  /** true where a general figure has been replaced by "ask your doctor" */
+  flagged?: boolean;
+}
+
+export interface CarePlan {
+  stage: string;
+  week: number | null;
+  trimester: number | null;
+  risk: {
+    level: 'low' | 'medium' | 'high';
+    label: string;
+    score: number;
+    drivers: { name: string; points: number; detail: string }[];
+  } | null;
+  conditions: { key: string; label: string }[];
+  targets: NutrientTarget[];
+  nutrition: Advice[];
+  exercise: Advice[];
+  lifestyle: Advice[];
+  /** the only intake figure the app can honestly show, because she logs it */
+  hydration: {
+    targetLitres: number;
+    avgLitres: number | null;
+    days: number;
+    pct: number | null;
+  };
+  /** what the plan was built from, in her own terms */
+  basis: string[];
+  method: string;
+}
+
+
+/* ------------------------------------------------- risk assessment (F13) */
+
+export interface RuleAssessment {
+  score: number;
+  level: 'low' | 'medium' | 'high';
+  label: string;
+  factors: { name: string; points: number; detail: string }[];
+}
+
+/** What the FastAPI classifier said, when it could be reached. */
+export interface ModelAssessment {
+  available: boolean;
+  /** set instead of a prediction when the reading is outside its training range */
+  refused?: boolean;
+  reason?: string;
+  level?: 'low' | 'medium' | 'high';
+  label?: string;
+  confidence?: number;
+  probabilities?: Record<string, number>;
+  /** features it had to stand in for, and readings it pulled into range */
+  imputed?: string[];
+  clamped?: { field: string; given: number; used: number }[];
+  quality?: {
+    trained_on_rows: number;
+    cv_f1_macro: number;
+    test_accuracy: number;
+    caveat: string;
+  };
+}
+
+export interface RiskView {
+  rules: RuleAssessment | null;
+  model: ModelAssessment | null;
+  comparison: {
+    agreement: 'agree' | 'model-higher' | 'rules-higher' | 'unavailable';
+    note: string | null;
+  };
+  readings?: {
+    age: number; systolic: number; diastolic: number;
+    sugar: number; tempC: number; heartBpm: number | null; week: number;
+  };
 }

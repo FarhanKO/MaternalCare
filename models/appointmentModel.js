@@ -12,8 +12,15 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const doctorModel = require('./doctorModel');
+const careEndingModel = require('./careEndingModel');
 
 const OPEN = ['requested', 'accepted'];
+/**
+ * How many times a mother may move one appointment before she has to speak to
+ * the clinic. Without a limit an appointment can be pushed indefinitely while
+ * holding a queue position everybody behind it is waiting on.
+ */
+const MOVE_LIMIT = 3;
 const DAY = 86400000;
 
 // Calendar dates are local to the clinic. toISOString() would shift the day in
@@ -141,12 +148,18 @@ function waitingDays(row) {
  * SQL, so building the DTO needs no further queries.
  */
 const WITH_DOCTOR = `
-  SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital,
+  SELECT a.*, d.name AS doctor_name, d.specialty, d.qualification,
          CASE WHEN a.status = 'requested' THEN
            (SELECT count(*) + 1 FROM appointments q
              WHERE q.doctor_id = a.doctor_id AND q.status = 'requested'
                AND q.requested_at < a.requested_at)
-         ELSE 0 END AS queue_position
+         ELSE 0 END AS queue_position,
+         (SELECT count(*) FROM appointment_changes ch
+           WHERE ch.appointment_id = a.id)                AS move_count,
+         (SELECT ch.from_date || ' ' || COALESCE(ch.from_time, '')
+            FROM appointment_changes ch
+           WHERE ch.appointment_id = a.id
+           ORDER BY ch.created_at DESC LIMIT 1)           AS last_moved_from
   FROM appointments a
   JOIN doctors d ON d.id = a.doctor_id
 `;
@@ -157,7 +170,7 @@ function toDTO(row) {
     doctorId: String(row.doctor_id),
     doctorName: row.doctor_name ?? 'Unknown clinician',
     specialty: row.specialty ?? '',
-    hospital: row.hospital ?? '',
+    qualification: row.qualification ?? '',
     patientId: String(row.user_id),
     date: row.date,
     time: row.time,
@@ -171,6 +184,23 @@ function toDTO(row) {
     plan: row.plan || undefined,
     /** the date her month of messaging runs out, on a chat plan */
     chatUntil: row.chat_until || undefined,
+    /*
+     * Why it was cancelled, and by whom. `status = 'cancelled'` on its own is
+     * the difference between "she found it too expensive" and "she went into
+     * labour", and the clinic used to see only the empty slot.
+     */
+    cancellation: row.cancelled_at
+      ? {
+        by: row.cancelled_by,
+        reason: row.cancel_reason,
+        reasonLabel: CANCEL_REASONS[row.cancelled_by]?.[row.cancel_reason] ?? row.cancel_reason,
+        note: row.cancel_note || undefined,
+        at: row.cancelled_at,
+      }
+      : undefined,
+    /** how many times it has been moved, and where from */
+    moves: Number(row.move_count ?? 0),
+    movedFrom: row.last_moved_from || undefined,
     payment: row.paid_at
       ? {
         feeBdt: row.fee_bdt,
@@ -181,6 +211,34 @@ function toDTO(row) {
       : undefined,
   };
 }
+
+/**
+ * Why an appointment is being cancelled.
+ *
+ * Two vocabularies, because the two sides are not cancelling for the same
+ * kinds of reason and offering a mother "clinic emergency" would be noise.
+ * Free text is always available underneath; these exist so the clinic can
+ * count something, which a text box alone never gives you.
+ */
+const CANCEL_REASONS = {
+  mother: {
+    unwell: 'I am unwell or in hospital',
+    clash: 'Something clashed — work, childcare, travel',
+    'no-transport': 'I cannot get there',
+    cost: 'The cost is too much right now',
+    'seen-elsewhere': 'I have been seen somewhere else',
+    'no-longer-needed': 'I no longer need this appointment',
+    other: 'Another reason',
+  },
+  doctor: {
+    emergency: 'Called to an emergency',
+    unwell: 'I am unwell',
+    'clinic-closed': 'The clinic is closed that day',
+    'wrong-specialty': 'This needs a different specialty',
+    'needs-sooner': 'This should be seen sooner',
+    other: 'Another reason',
+  },
+};
 
 /** Payment rails a Bangladeshi clinic actually takes. */
 const PAY_METHODS = ['bkash', 'nagad', 'card'];
@@ -207,26 +265,17 @@ module.exports = {
    * request flow and are kept working alongside it.
    */
 
-  async doctors({ specialty, availableOnly } = {}) {
-    const where = [];
-    const args = [];
-    if (specialty && specialty !== 'All') {
-      args.push(`%${specialty}%`);
-      where.push(`specialty ILIKE $${args.length}`);
-    }
-    if (availableOnly) where.push('available = TRUE');
-    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    return db.sql(`SELECT * FROM doctors ${clause} ORDER BY rating DESC`, args);
-  },
-
-  async specialties() {
-    const rows = await db.sql('SELECT DISTINCT specialty FROM doctors ORDER BY specialty');
-    return rows.map((r) => r.specialty);
-  },
+  /*
+   * `doctors({ specialty, availableOnly })` and `specialties()` lived here to
+   * fill a dropdown and a checkbox on the EJS directory, and ordered what
+   * came back by rating alone. Both pages rank through doctorModel.recommend
+   * now, which reads the same four things those controls exposed and weighs
+   * them against each other, so there is nothing left for a filter to do.
+   */
 
   async forUser(userId) {
     return db.sql(`
-      SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital
+      SELECT a.*, d.name AS doctor_name, d.specialty, d.qualification
       FROM appointments a JOIN doctors d ON d.id = a.doctor_id
       WHERE a.user_id = $1
       ORDER BY CASE a.status WHEN 'requested' THEN 0 WHEN 'accepted' THEN 1
@@ -236,7 +285,7 @@ module.exports = {
 
   async upcoming(userId, limit = 3) {
     return db.sql(`
-      SELECT a.*, d.name AS doctor_name, d.specialty, d.hospital
+      SELECT a.*, d.name AS doctor_name, d.specialty, d.qualification
       FROM appointments a JOIN doctors d ON d.id = a.doctor_id
       WHERE a.user_id = $1 AND a.status = 'accepted'
       ORDER BY a.date ASC LIMIT $2
@@ -305,6 +354,9 @@ module.exports = {
        VALUES ($1,$2,$3,$4,$5,'requested',$6) RETURNING id`,
       [userId, doctorId, date, time, reason || 'Antenatal appointment', new Date().toISOString()],
     );
+    // booking with someone she previously left resumes that pairing rather
+    // than leaving an ended relationship sitting under an active appointment
+    await careEndingModel.resume(userId, doctorId);
     return this.find(row.id);
   },
 
@@ -351,6 +403,7 @@ module.exports = {
         'Confirmed on payment of the consultation fee',
         priced.priceBdt, pay, paymentReference(), chosen, chatUntil],
     );
+    await careEndingModel.resume(userId, doctorId);
     return this.find(row.id);
   },
 
@@ -378,7 +431,7 @@ module.exports = {
   async imminentForDoctor(doctorId, minutes = 60) {
     const rows = await db.sql(`
       SELECT a.*, u.name AS patient_name,
-             d.name AS doctor_name, d.specialty, d.hospital,
+             d.name AS doctor_name, d.specialty, d.qualification,
              0 AS queue_position
       FROM appointments a
       JOIN users u   ON u.id = a.user_id
@@ -412,15 +465,137 @@ module.exports = {
 
   /** The mother withdraws, which frees the slot again. */
   async withdraw(id, userId) {
-    const row = await db.one(
-      'SELECT * FROM appointments WHERE id = $1 AND user_id = $2', [id, userId],
-    );
+    return this.cancelWithReason(id, {
+      by: 'mother', userId, reason: 'other', note: null,
+    });
+  },
+
+  /* ------------------------------------------ rescheduling & cancelling */
+
+  CANCEL_REASONS,
+  MOVE_LIMIT,
+
+  /** The reason list for one side, shaped for a client to render. */
+  cancelReasons(side) {
+    const set = CANCEL_REASONS[side] || CANCEL_REASONS.mother;
+    return Object.entries(set).map(([key, label]) => ({ key, label }));
+  },
+
+  /**
+   * Move an appointment to a different slot.
+   *
+   * Both sides can do it, and the rules are almost the same — the difference
+   * is that a mother is limited to MOVE_LIMIT moves before she has to talk to
+   * the clinic, and a clinician is not. Without that, an appointment can be
+   * pushed indefinitely and the queue position it holds becomes meaningless
+   * to everybody behind it.
+   *
+   * A paid, confirmed booking stays confirmed through a move: she has already
+   * paid for the consultation, and making her pay again to change the day
+   * would be a charge for the clinic's convenience.
+   */
+  async reschedule(id, {
+    by, userId, doctorId, date, time, reason,
+  }) {
+    if (!['mother', 'doctor'].includes(by)) throw new Error(`Unknown side: ${by}`);
+
+    const row = by === 'mother'
+      ? await db.one('SELECT * FROM appointments WHERE id = $1 AND user_id = $2', [id, userId])
+      : await db.one('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [id, doctorId]);
     if (!row) return null;
-    if (!OPEN.includes(row.status)) throw new Error('That appointment is already closed');
+
+    if (!OPEN.includes(row.status)) {
+      throw new NotBookableError('Only an open appointment can be moved');
+    }
+    if (row.date === date && row.time === time) {
+      throw new NotBookableError('That is the slot it is already in');
+    }
+
+    if (by === 'mother') {
+      const { c } = await db.one(
+        'SELECT count(*) AS c FROM appointment_changes WHERE appointment_id = $1 AND moved_by = $2',
+        [id, 'mother'],
+      );
+      if (Number(c) >= MOVE_LIMIT) {
+        throw new NotBookableError(
+          `This appointment has already been moved ${MOVE_LIMIT} times — please message the clinic instead`,
+        );
+      }
+    }
+
+    // the same check a new booking gets: the clinician must still be taking
+    // people, the date must not have passed, and the slot must be free
+    await ensureSlotFree(row.doctor_id, date, time);
+
+    return db.tx(async (t) => {
+      await t.run(
+        `INSERT INTO appointment_changes
+           (appointment_id, moved_by, from_date, from_time, to_date, to_time, reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [id, by, row.date, row.time, date, time,
+          String(reason || '').trim().slice(0, 500) || null],
+      );
+      /*
+       * A clinician moving a confirmed visit puts it back to 'requested': the
+       * mother agreed to a time, and a different time is a different
+       * agreement. She sees it as something to confirm rather than finding
+       * out at the door.
+       */
+      const status = by === 'doctor' && row.status === 'accepted' && !row.paid_at
+        ? 'requested'
+        : row.status;
+      await t.run(
+        'UPDATE appointments SET date = $2, time = $3, status = $4 WHERE id = $1',
+        [id, date, time, status],
+      );
+      return true;
+    }).then(() => this.find(id));
+  },
+
+  /**
+   * Cancel with a reason, from either side.
+   *
+   * Replaces a bare `status = 'cancelled'` that recorded nothing at all. The
+   * reason has to come from that side's list so it can be counted; the note
+   * is free text and optional.
+   */
+  async cancelWithReason(id, {
+    by, userId, doctorId, reason, note,
+  }) {
+    if (!['mother', 'doctor'].includes(by)) throw new Error(`Unknown side: ${by}`);
+    if (!CANCEL_REASONS[by][reason]) {
+      throw new NotBookableError('Choose a reason for the cancellation');
+    }
+
+    const row = by === 'mother'
+      ? await db.one('SELECT * FROM appointments WHERE id = $1 AND user_id = $2', [id, userId])
+      : await db.one('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [id, doctorId]);
+    if (!row) return null;
+    if (!OPEN.includes(row.status)) throw new NotBookableError('That appointment is already closed');
 
     await db.run(
-      "UPDATE appointments SET status = 'cancelled', responded_at = now() WHERE id = $1", [id],
+      `UPDATE appointments
+          SET status = 'cancelled', responded_at = now(), cancelled_at = now(),
+              cancelled_by = $2, cancel_reason = $3, cancel_note = $4
+        WHERE id = $1`,
+      [id, by, reason, String(note || '').trim().slice(0, 1000) || null],
     );
     return this.find(id);
+  },
+
+  /** Every move an appointment has been through, oldest first. */
+  async changes(id) {
+    const rows = await db.sql(
+      'SELECT * FROM appointment_changes WHERE appointment_id = $1 ORDER BY created_at ASC',
+      [id],
+    );
+    return rows.map((r) => ({
+      id: String(r.id),
+      movedBy: r.moved_by,
+      from: { date: r.from_date, time: r.from_time },
+      to: { date: r.to_date, time: r.to_time },
+      reason: r.reason || undefined,
+      at: r.created_at,
+    }));
   },
 };

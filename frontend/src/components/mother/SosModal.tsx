@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BellRing, Check, Clock, Crosshair, Download, Hospital, MapPin, Pencil, Phone, Plus,
+  Ambulance, BellRing, Check, Clock, Crosshair, Download, MapPin, Pencil, Phone, Plus,
   ShieldCheck, Smartphone, Trash2, TriangleAlert, UserPlus, X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -109,6 +109,24 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
   const [phone, setPhone] = useState('');
 
   const [copied, setCopied] = useState<string | null>(null);
+  /**
+   * The address a guardian's phone can actually reach. API_ORIGIN is whatever
+   * this browser used, which on the development machine is localhost — an
+   * address that means "this phone" once the link is opened on one. The server
+   * is the only thing that knows its LAN addresses, so it is asked.
+   */
+  const [lanOrigin, setLanOrigin] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getNetwork()
+      .then((n) => { if (!cancelled) setLanOrigin(n.origins[0] ?? null); })
+      .catch(() => { /* fall back to API_ORIGIN below */ });
+    return () => { cancelled = true; };
+  }, []);
+  /** localhost is fine in this tab and useless in the link */
+  const reachable = /localhost|127\.0\.0\.1/.test(API_ORIGIN) && lanOrigin
+    ? lanOrigin
+    : API_ORIGIN;
   const [emergencyNumber, setEmergencyNumber] = useState(DEFAULT_EMERGENCY);
   const [editingNumber, setEditingNumber] = useState(false);
   const [numberDraft, setNumberDraft] = useState(DEFAULT_EMERGENCY);
@@ -218,7 +236,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
   const shareLink = async (g: Guardian) => {
     // the server address travels with the link: inside the APK "localhost"
     // is the phone, so it can never be compiled into the app
-    const url = `${GUARDIAN_APP_URL}/?t=${g.token}&api=${encodeURIComponent(`${API_ORIGIN}/api`)}`;
+    const url = `${GUARDIAN_APP_URL}/?t=${g.token}&api=${encodeURIComponent(`${reachable}/api`)}`;
     const text = `Here is your Guardian app link. Open it on your phone and add it to your home screen — you will be alerted the moment I need help.`;
     try {
       if (navigator.share) {
@@ -459,6 +477,17 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                         </div>
                       </div>
 
+                      {/*
+                        A "Nearest hospitals" list stood here, fed from a table
+                        of four named institutions with placeholder numbers.
+                        Removed with the table: this service is online, it has
+                        no affiliation with any of them, and it cannot know
+                        which door is open tonight. On this screen a wrong
+                        number is not a small inaccuracy — it is the minutes
+                        she had. What is left is the national number and the
+                        people she chose herself.
+                      */}
+
                       <a
                         href={`tel:${emergencyNumber}`}
                         className="flex items-center justify-center gap-2 rounded-3xl bg-gradient-to-br from-rose-500 to-rose-600 py-3.5 text-sm font-extrabold text-white shadow-[0_10px_30px_-8px_rgba(225,29,72,0.5)]"
@@ -612,7 +641,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                               href={`tel:${emergencyNumber}`}
                               className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-white/60 px-3 py-2.5 transition hover:bg-white"
                             >
-                              <Hospital className="h-4 w-4 flex-none text-rose-600" />
+                              <Ambulance className="h-4 w-4 flex-none text-rose-600" />
                               <span className="min-w-0">
                                 <span className="block truncate text-[12px] font-bold text-ink">
                                   Call {emergencyNumber}
@@ -655,7 +684,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                         )}
                       </div>
 
-                      {/* the companion app — designed, not yet shipped */}
+                      {/* the companion app — built and downloadable from here */}
                       <div className="rounded-3xl border border-dashed border-rose-300/70 bg-rose-500/[0.06] p-3.5">
                         <div className="flex items-start gap-2.5">
                           <span className="grid h-10 w-10 flex-none place-items-center rounded-2xl bg-rose-500/15 text-rose-600">
@@ -678,7 +707,7 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
 
                         <div className="mt-2.5 grid grid-cols-2 gap-1.5">
                           <a
-                            href={`${API_ORIGIN}/downloads/guardian.apk`}
+                            href={`${reachable}/downloads/guardian.apk`}
                             download="guardian.apk"
                             className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-rose-600 py-2.5 text-[12px] font-bold text-white transition hover:bg-rose-700"
                           >
@@ -691,6 +720,13 @@ export function SosModal({ open, onClose, onAlertChange }: Props) {
                             <Smartphone className="h-3.5 w-3.5" /> Send links
                           </button>
                         </div>
+                        <p className="mt-1.5 text-[10px] font-semibold leading-relaxed text-ink-soft">
+                          Links will point their app at{' '}
+                          <span className="font-mono text-brand-700">{reachable}</span>
+                          {reachable === API_ORIGIN && /localhost|127\.0\.0\.1/.test(API_ORIGIN)
+                            ? ' — which only works on this computer. Start the server so it can report a network address.'
+                            : '. Their phone must be on the same wifi.'}
+                        </p>
                         <p className="mt-1.5 text-[10px] font-medium leading-relaxed text-ink-faint">
                           Each guardian needs their own link to pair the app. On iPhone they open
                           the link and add it to the Home Screen — Apple does not allow a web app

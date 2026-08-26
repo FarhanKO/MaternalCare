@@ -1,6 +1,5 @@
 /**
- * Content Model — the reading list and hospital directory behind the
- * server-rendered pages.
+ * Content Model — the reading list behind the server-rendered pages.
  *
  * Community posts moved to postModel when the React board needed comments,
  * images and roles that this shape could not hold.
@@ -30,9 +29,5 @@ module.exports = {
        VALUES ($1, 'mother', $2, $3, $4, 0, FALSE, now())`,
       [author, topic ?? null, title, body ?? null],
     );
-  },
-
-  async hospitals() {
-    return db.sql('SELECT * FROM hospitals ORDER BY distance_km ASC');
   },
 };

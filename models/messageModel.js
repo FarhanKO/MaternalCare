@@ -198,7 +198,7 @@ module.exports = {
   async threadsForUser(userId) {
     const sql = THREADS.replaceAll('%GROUP%', 'doctor_id').replaceAll('%OWNER%', 'user_id');
     const rows = await db.sql(
-      `SELECT t.*, d.name, d.specialty, d.hospital
+      `SELECT t.*, d.name, d.specialty, d.qualification
        FROM (${sql}) t
        JOIN doctors d ON d.id = t.counterpart_id
        ORDER BY t.sent_at DESC`,
@@ -209,7 +209,7 @@ module.exports = {
       doctorId: String(r.counterpart_id),
       doctorName: r.name,
       specialty: r.specialty,
-      hospital: r.hospital,
+      qualification: r.qualification || '',
       lastMessage: {
         id: String(r.id),
         doctorId: String(r.counterpart_id),

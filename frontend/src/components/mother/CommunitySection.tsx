@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BadgeCheck, BookOpen, ChevronDown, ChevronRight, ExternalLink, Heart, ImagePlus, MessageCircle,
+  BadgeCheck, BookOpen, ChevronDown, ChevronRight, ExternalLink, Flag, Heart, ImagePlus, MessageCircle,
   Newspaper, Plus, Search, Send, ShieldCheck, Sparkles, Users, X,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -9,6 +9,8 @@ import { Reveal } from '@/components/ui/Reveal';
 import { LiquidButton } from '@/components/ui/LiquidButton';
 import { cn } from '@/lib/cn';
 import { api, fileUrl } from '@/lib/api';
+import { ReportDialog, type ReportTarget } from '@/components/mother/ReportDialog';
+import type { ReportReason } from '@/data/records';
 import type { ServerPost } from '@/data/records';
 import { useProfile } from '@/context/ProfileContext';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
@@ -28,6 +30,10 @@ interface Comment {
   role: Role;
   body: string;
   ago: string;
+  /** taken down by a moderator — `body` is then the tombstone line */
+  removed?: boolean;
+  /** true once this member has reported it */
+  reported?: boolean;
 }
 
 interface Post {
@@ -43,6 +49,8 @@ interface Post {
   clinicianAnswered: boolean;
   ago: string;
   comments: Comment[];
+  /** true once this member has reported it */
+  reported?: boolean;
 }
 
 const TOPICS = ['Second trimester', 'Sleep', 'Nutrition', 'Symptoms', 'Birth prep'];
@@ -227,6 +235,10 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
   // unreachable, so an offline backend degrades to a demo rather than a blank
   const [posts, setPosts] = useState<Post[]>(SEED);
   const [boardLive, setBoardLive] = useState(false);
+  /* reporting: the reasons come from the server so they cannot drift from the
+     ones the moderation queue weighs */
+  const [reasons, setReasons] = useState<ReportReason[]>([]);
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -262,15 +274,18 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
     hearts: p.hearts,
     clinicianAnswered: p.clinicianAnswered,
     ago: p.ago,
+    reported: p.reported,
     comments: p.comments.map((c) => ({
       id: c.id, author: c.author, role: c.role, body: c.body, ago: c.ago,
+      removed: c.removed, reported: c.reported,
     })),
   });
 
   const loadBoard = useCallback(async () => {
     try {
-      const { posts: rows } = await api.getPosts({ limit: 50 });
+      const { posts: rows, reasons: why } = await api.getPosts({ limit: 50 });
       setPosts(rows.map(fromServer));
+      setReasons(why ?? []);
       setBoardLive(true);
     } catch {
       setBoardLive(false);   // keep SEED so the section still reads as a demo
@@ -328,6 +343,20 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
     } catch {
       /* offline — the optimistic comment stands for this session */
     }
+  };
+
+  /**
+   * Once a report is filed, mark that item so the button reads "Reported"
+   * rather than offering an action that would now be refused.
+   */
+  const markReported = (t: ReportTarget) => {
+    setPosts((prev) => prev.map((p) => {
+      if (t.kind === 'posts') return p.id === t.id ? { ...p, reported: true } : p;
+      return {
+        ...p,
+        comments: p.comments.map((c) => (c.id === t.id ? { ...c, reported: true } : c)),
+      };
+    }));
   };
 
   /** Hearts are a toggle in the UI, a delta on the server. */
@@ -553,6 +582,24 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
                           <MessageCircle className="h-4 w-4" />
                           {p.comments.length} {p.comments.length === 1 ? 'reply' : 'replies'}
                         </button>
+
+                        {/*
+                          Deliberately last and deliberately quiet. Reporting
+                          has to be findable without being the loudest thing
+                          on a post somebody wrote about being frightened.
+                        */}
+                        <button
+                          onClick={() => !p.reported && setReporting({
+                            kind: 'posts', id: p.id, preview: p.title, author: p.author,
+                          })}
+                          disabled={p.reported}
+                          title={p.reported ? 'You have reported this' : 'Report this post'}
+                          className={cn('ml-auto inline-flex items-center gap-1.5 text-xs font-semibold transition-colors',
+                            p.reported ? 'text-ink-faint' : 'text-ink-faint hover:text-rose-600')}
+                        >
+                          <Flag className={cn('h-3.5 w-3.5', p.reported && 'fill-current')} />
+                          {p.reported ? 'Reported' : 'Report'}
+                        </button>
                       </div>
 
                       {/* comment thread */}
@@ -582,8 +629,26 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
                                       </span>
                                       <span className="text-[10px] font-medium text-ink-faint">{c.ago}</span>
                                     </div>
-                                    <p className="mt-0.5 text-[12px] leading-relaxed text-ink-soft">{c.body}</p>
+                                    <p className={cn('mt-0.5 text-[12px] leading-relaxed',
+                                      c.removed ? 'italic text-ink-faint' : 'text-ink-soft')}>
+                                      {c.body}
+                                    </p>
                                   </div>
+
+                                  {/* a removed reply has nothing left to report */}
+                                  {!c.removed && (
+                                    <button
+                                      onClick={() => !c.reported && setReporting({
+                                        kind: 'comments', id: c.id, preview: c.body, author: c.author,
+                                      })}
+                                      disabled={c.reported}
+                                      title={c.reported ? 'You have reported this' : 'Report this reply'}
+                                      className={cn('ml-auto self-start rounded-lg p-1 transition-colors',
+                                        c.reported ? 'text-ink-faint' : 'text-ink-faint/60 hover:text-rose-600')}
+                                    >
+                                      <Flag className={cn('h-3 w-3', c.reported && 'fill-current')} />
+                                    </button>
+                                  )}
                                 </motion.div>
                               ))}
 
@@ -796,6 +861,13 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
       </div>
 
       <ArticleModal article={article} onClose={() => setArticle(null)} />
+
+      <ReportDialog
+        target={reporting}
+        reasons={reasons}
+        onClose={() => setReporting(null)}
+        onFiled={markReported}
+      />
     </div>
   );
 }

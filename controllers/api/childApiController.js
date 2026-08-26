@@ -8,6 +8,7 @@
 const childModel = require('../../models/childModel');
 const vaccinationModel = require('../../models/vaccinationModel');
 const userModel = require('../../models/userModel');
+const documentModel = require('../../models/documentModel');
 
 /** Everything the child section needs, in one round trip. */
 exports.show = async (req, res, next) => {
@@ -102,7 +103,7 @@ exports.addGrowth = async (req, res, next) => {
 
 /* ------------------------------------------------------- vaccinations */
 
-const toVax = (v) => ({
+const toVax = (v, cards = []) => ({
   id: String(v.id),
   subject: v.subject,
   name: v.name,
@@ -110,19 +111,63 @@ const toVax = (v) => ({
   dueDate: v.due_date,
   status: v.status,
   completedOn: v.completed_on || undefined,
+  /** the cards filed as evidence for this dose */
+  cards,
 });
+
+/**
+ * The list, with each dose carrying the cards attached to it.
+ *
+ * Marking a dose done is a claim; the card is the proof. Sending them together
+ * means the screen can show both without a second round trip per dose.
+ */
+async function vaxPayload() {
+  const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
+  const cards = await documentModel.forVaccinations(rows.map((r) => r.id));
+  return { data: rows.map((r) => toVax(r, cards.get(String(r.id)) ?? [])), meta };
+}
 
 exports.vaccinations = async (req, res, next) => {
   try {
-    const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
-    res.json({ data: rows.map(toVax), meta });
+    res.json(await vaxPayload());
   } catch (err) { next(err); }
 };
 
 exports.markVaccinationDone = async (req, res, next) => {
   try {
     await vaccinationModel.markDone(req.params.id);
-    const [rows, meta] = await Promise.all([vaccinationModel.all(), vaccinationModel.stats()]);
-    res.json({ data: rows.map(toVax), meta });
+    res.json(await vaxPayload());
   } catch (err) { next(err); }
+};
+
+/**
+ * File a vaccination card against a dose.
+ *
+ * It is stored in the same place as every other document — this only records
+ * which dose it evidences, so the card is still hers if the schedule changes.
+ */
+exports.uploadVaccinationCard = async (req, res, next) => {
+  const { id } = req.params;
+  try {
+    const vax = await vaccinationModel.find(id);
+    if (!vax) return res.status(404).json({ error: 'Vaccination not found' });
+
+    const user = await userModel.current();
+    await documentModel.create(user.id, {
+      kind: 'report',
+      title: req.body?.title?.trim() || `${vax.name}${vax.dose ? ` · ${vax.dose}` : ''} card`,
+      note: 'Vaccination card',
+      dataUrl: req.body?.dataUrl,
+      originalName: req.body?.originalName,
+      takenOn: req.body?.takenOn || vax.completed_on || undefined,
+      uploadedBy: req.body?.uploadedBy || 'mother',
+      vaccinationId: id,
+    });
+    return res.status(201).json(await vaxPayload());
+  } catch (err) {
+    if (err instanceof documentModel.DocumentError) {
+      return res.status(400).json({ error: err.message, code: err.code });
+    }
+    return next(err);
+  }
 };

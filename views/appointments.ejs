@@ -9,25 +9,16 @@
                       'linear-gradient(135deg,#23b8a6,#3ec9e0)', 'linear-gradient(135deg,#ff9d6c,#f5a623)']; %>
 
 <div class="card reveal">
-  <div class="card-head" style="margin-bottom:8px">
+  <div class="card-head" style="margin-bottom:0">
     <div>
-      <div class="card-title"><span class="ico">🔎</span> Doctor directory</div>
-      <div class="card-sub">Filter by specialty and availability</div>
+      <div class="card-title"><span class="ico">🎯</span> Who to see first</div>
+      <div class="card-sub">
+        Ranked for you — what they are qualified in, whether they have room,
+        how fast they answer and how they are rated, weighed together. Nothing
+        to filter: every card says why it sits where it does.
+      </div>
     </div>
   </div>
-  <form method="GET" action="/appointments" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end">
-    <div class="field" style="min-width:230px">
-      <label>Specialty</label>
-      <select name="specialty" onchange="this.form.submit()">
-        <option>All</option>
-        <% for (const s of specialties) { %><option <%= specialty === s ? 'selected' : '' %>><%= s %></option><% } %>
-      </select>
-    </div>
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ink-2); padding-bottom:12px">
-      <input type="checkbox" name="available" value="1" <%= availableOnly ? 'checked' : '' %> onchange="this.form.submit()">
-      Available today only
-    </label>
-  </form>
 </div>
 
 <div class="grid grid-3 mt">
@@ -39,21 +30,34 @@
           <b style="font-size:14.5px"><%= d.name %></b>
           <div style="font-size:12px; color:var(--ink-3); font-weight:600"><%= d.specialty %></div>
         </div>
+        <% if (i === 0 && d.tier === 0) { %><div class="right"><span class="pill pill-good">Best match</span></div><% } %>
       </div>
       <div class="doc-meta">
-        <span class="pill pill-neutral">⭐ <%= d.rating %></span>
-        <span class="pill pill-neutral">📍 <%= d.distance_km %> km</span>
-        <span class="pill <%= d.available ? 'pill-good' : 'pill-warning' %>"><%= d.available ? '● Available today' : '● Next slot tomorrow' %></span>
+        <% if (d.rating != null) { %>
+          <span class="pill pill-neutral">⭐ <%= d.rating %></span>
+        <% } else { %>
+          <span class="pill pill-neutral">New here</span>
+        <% } %>
+        <span class="pill <%= d.bookable ? 'pill-good' : 'pill-warning' %>">
+          <%= d.status === 'open' ? '● Taking requests'
+            : d.status === 'busy' ? '● Nearly full'
+            : d.status === 'full' ? '● List full' : '● On leave' %>
+        </span>
       </div>
-      <div style="font-size:12.5px; color:var(--ink-2); font-weight:600">🏥 <%= d.hospital %> · <%= d.patients %> patients</div>
-      <form method="POST" action="/appointments" style="display:flex; gap:9px; margin-top:2px">
-        <input type="hidden" name="doctor_id" value="<%= d.id %>">
-        <input type="hidden" name="reason" value="Consultation with <%= d.name %>">
-        <input type="date" name="date" class="field" required
-               style="flex:1; padding:9px 12px; border-radius:12px; border:1px solid var(--glass-border-2); background:rgba(255,255,255,0.7); font-size:12.5px"
-               value="<%= new Date(Date.now() + 3*86400000).toISOString().slice(0,10) %>" min="<%= new Date().toISOString().slice(0,10) %>">
-        <button class="btn btn-primary btn-sm">Book</button>
-      </form>
+      <div style="font-size:12.5px; color:var(--ink-2); font-weight:600">🎓 <%= d.qualification || 'Qualifications not listed' %></div>
+      <ul style="margin:0; padding-left:16px; font-size:12px; color:var(--ink-3); font-weight:600; line-height:1.7">
+        <% for (const r of d.reasons.slice(0, 3)) { %><li><%= r %></li><% } %>
+      </ul>
+      <% if (d.bookable) { %>
+        <form method="POST" action="/appointments" style="display:flex; gap:9px; margin-top:2px">
+          <input type="hidden" name="doctor_id" value="<%= d.id %>">
+          <input type="hidden" name="reason" value="Consultation with <%= d.name %>">
+          <input type="date" name="date" class="field" required
+                 style="flex:1; padding:9px 12px; border-radius:12px; border:1px solid var(--glass-border-2); background:rgba(255,255,255,0.7); font-size:12.5px"
+                 value="<%= new Date(Date.now() + 3*86400000).toISOString().slice(0,10) %>" min="<%= new Date().toISOString().slice(0,10) %>">
+          <button class="btn btn-primary btn-sm">Book</button>
+        </form>
+      <% } %>
     </div>
   <% }) %>
 </div>

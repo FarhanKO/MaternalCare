@@ -8,7 +8,7 @@ import {
   Baby,
   BadgeCheck,
   Briefcase,
-  Building2,
+  GraduationCap,
   Calendar,
   HeartPulse,
   Lock,
@@ -24,6 +24,7 @@ import { GlassSelect } from '@/components/ui/GlassSelect';
 import { GlassDatePicker } from '@/components/ui/GlassDatePicker';
 import { cn } from '@/lib/cn';
 import { spring, fadeUp } from '@/lib/motion';
+import { api, FieldError } from '@/lib/api';
 
 type Role = 'mother' | 'doctor';
 
@@ -58,6 +59,8 @@ export function Register() {
   const [docSpecialty, setDocSpecialty] = useState('');
   const [docExp, setDocExp] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  /** whichever answer the server refused, and why */
+  const [fieldError, setFieldError] = useState<{ field?: string; message: string } | null>(null);
 
   const navigate = useNavigate();
   const accent = ROLE_ACCENT[role];
@@ -80,18 +83,52 @@ export function Register() {
     return () => ro.disconnect();
   }, []);
 
-  const onSubmit = (e: FormEvent) => {
+  /**
+   * Years of practice arrives as a band, because nobody wants to be asked for
+   * a number they have to work out. The ranking wants a number, so the band
+   * resolves to its floor — the claim we can actually stand behind.
+   */
+  const yearsFrom = (band: string) => {
+    const first = band.match(/\d+/);
+    return first ? Number(first[0]) : 0;
+  };
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setFieldError(null);
+
+    // Mothers still go straight to onboarding: there is no account system for
+    // them yet, and the questionnaire is what the rest of the app reads.
+    if (role === 'mother') {
+      setSubmitting(true);
+      navigate(`/onboarding?stage=${encodeURIComponent(stage || 'Pregnant')}`);
+      return;
+    }
+
+    // A clinician's registration is real — it writes the row every patient's
+    // list is built from, which is the only way into that list.
+    const form = new FormData(e.currentTarget);
+    const value = (k: string) => String(form.get(k) ?? '').trim();
+
     setSubmitting(true);
-    // demo — no backend yet. Mothers continue to the onboarding questionnaire;
-    // doctors are routed on to sign-in (their account awaits verification).
-    setTimeout(() => {
-      if (role === 'mother') {
-        navigate(`/onboarding?stage=${encodeURIComponent(stage || 'Pregnant')}`);
-      } else {
-        navigate('/signin');
-      }
-    }, 700);
+    try {
+      await api.registerDoctor({
+        name: value('d-name'),
+        specialty: docSpecialty,
+        qualification: value('d-qualification'),
+        years: yearsFrom(docExp),
+        email: value('d-email'),
+        phone: value('d-phone'),
+        licenseNo: value('d-license'),
+      });
+      navigate('/signin?registered=1');
+    } catch (err) {
+      setFieldError({
+        field: err instanceof FieldError ? err.field : undefined,
+        message: err instanceof Error ? err.message : 'Could not complete your registration',
+      });
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -144,7 +181,7 @@ export function Register() {
                 <div className="text-sm">
                   <div className="font-semibold text-white">Private &amp; secure by design</div>
                   <div className="text-white/70">
-                    {role === 'doctor' ? 'Credentials are verified before activation.' : 'Your health data stays encrypted and yours.'}
+                    {role === 'doctor' ? 'Your qualifications go on your public profile.' : 'Your health data stays encrypted and yours.'}
                   </div>
                 </div>
               </div>
@@ -243,13 +280,16 @@ export function Register() {
               ) : (
                 <>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
-                    <FloatingInput id="d-name" label="Full name (Dr.)" icon={<User className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-name" label="Full name (Dr.)" icon={<User className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'name' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp}>
-                    <FloatingInput id="d-email" label="Work email" type="email" autoComplete="email" icon={<Mail className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-email" label="Work email" type="email" autoComplete="email" icon={<Mail className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'email' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp}>
-                    <FloatingInput id="d-phone" label="Phone number" type="tel" icon={<Phone className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-phone" label="Phone number" type="tel" icon={<Phone className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'phone' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
                     <FloatingInput id="d-password" label="Password" type="password" autoComplete="new-password" icon={<Lock className="h-[18px] w-[18px]" />} accent={accent} required />
@@ -261,18 +301,23 @@ export function Register() {
                       accent={accent}
                       value={docSpecialty}
                       onChange={setDocSpecialty}
+                      // worded as the existing roster words them, so a
+                      // registration reads alongside the clinicians already
+                      // listed rather than as a near-duplicate of one
                       options={[
-                        'Gynecologist & Obstetrician',
-                        'Pediatrician',
+                        'Obstetrics & Gynaecology',
+                        'Obstetrics & Maternal Medicine',
                         'Maternal-Fetal Medicine',
-                        'General Physician',
-                        'Nutritionist',
-                        'Other',
+                        'Paediatrics',
+                        'Perinatal Mental Health',
+                        'Nutrition & Dietetics',
+                        'General Practice',
                       ]}
                     />
                   </motion.div>
                   <motion.div variants={fadeUp}>
-                    <FloatingInput id="d-license" label="Medical license no." icon={<BadgeCheck className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-license" label="Medical licence no. (BM&DC)" icon={<BadgeCheck className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'licenseNo' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp}>
                     <GlassSelect
@@ -284,15 +329,38 @@ export function Register() {
                       options={['0–2 years', '3–5 years', '6–10 years', '10+ years']}
                     />
                   </motion.div>
+                  {/*
+                    This slot used to ask for a hospital. It asks for
+                    qualifications instead, and that is not a cosmetic swap:
+                    what you are trained in is worth more than half the score
+                    that decides where you appear on a mother's list, and it
+                    is the one thing only you can tell us. Free text on
+                    purpose — you write what is on your certificate, not what
+                    fits our dropdown.
+                  */}
                   <motion.div variants={fadeUp} className="sm:col-span-2">
-                    <FloatingInput id="d-hospital" label="Hospital / clinic" icon={<Building2 className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-qualification" label="Qualifications, as on your certificate" icon={<GraduationCap className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'qualification' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
                     <div className="flex items-start gap-2.5 rounded-2xl border border-peach-200 bg-peach-50 px-4 py-3 text-[13px] text-peach-700">
                       <ShieldCheck className="mt-0.5 h-4 w-4 flex-none" />
-                      <span>Your medical credentials will be reviewed and verified before your account is activated.</span>
+                      <span>
+                        Your name, specialty, qualifications and licence number go on your
+                        public profile, and mothers are shown them when choosing. Nobody
+                        is checking them against a register yet — so put down what you can
+                        stand behind.
+                      </span>
                     </div>
                   </motion.div>
+                  {/* an error the server did not pin on one field still has to land somewhere */}
+                  {fieldError && !fieldError.field && (
+                    <motion.div variants={fadeUp} className="sm:col-span-2">
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">
+                        {fieldError.message}
+                      </div>
+                    </motion.div>
+                  )}
                 </>
               )}
 

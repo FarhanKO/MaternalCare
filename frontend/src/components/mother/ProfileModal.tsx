@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useProfile } from '@/context/ProfileContext';
+import { ReportButton } from '@/components/ui/ReportButton';
 
 interface CareMember { name: string; role: string; initials: string; tint: string }
 
@@ -321,9 +322,20 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
                 ))}
               </div>
 
+              {/* her whole record as one document, from the place she comes to
+                  when she is looking for her own details */}
+              <div className="mt-5 rounded-2xl border border-white/60 bg-white/55 p-3.5">
+                <div className="text-[13px] font-bold text-ink">Health report</div>
+                <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-ink-muted">
+                  Your details, vitals, daily log, consultations and every filed prescription and
+                  result — as one PDF to take to an appointment.
+                </p>
+                <ReportButton className="mt-2.5 w-full" />
+              </div>
+
               <button
                 onClick={onClose}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700"
               >
                 <LogOut className="h-[18px] w-[18px]" /> Sign out
               </button>

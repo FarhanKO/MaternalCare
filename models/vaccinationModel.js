@@ -26,6 +26,10 @@ module.exports = {
     return s;
   },
 
+  async find(id) {
+    return db.one('SELECT * FROM vaccinations WHERE id = $1', [id]);
+  },
+
   async markDone(id) {
     await db.run(
       "UPDATE vaccinations SET status = 'done', completed_on = CURRENT_DATE WHERE id = $1",

@@ -23,7 +23,7 @@ const db = require('../config/db');
   for (const t of ['users', 'doctors', 'pregnancies', 'vitals', 'children',
     'growth_records', 'milestones', 'vaccinations', 'appointments', 'symptoms',
     'reminders', 'daily_logs', 'emergency_contacts', 'articles', 'posts',
-    'post_comments', 'hospitals']) {
+    'post_comments']) {
     const { count } = await db.one(`SELECT count(*) AS count FROM ${t}`);
     console.log(`  ${String(count).padStart(4)}  ${t}`);
   }
