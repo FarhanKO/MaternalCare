@@ -134,6 +134,7 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
     email: '__probe__registrant@example.invalid',
     phone: '01700000000',
     licenseNo: LICENCE,
+    password: 'probe-password-2026',
   });
   check('doctorModel.register writes a usable row',
     signedUp && signedUp.qualification.includes('FCPS') && signedUp.bookable === true,
@@ -154,6 +155,7 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
       email: 'someone.else@example.invalid',
       phone: '01700000000',
       licenseNo: LICENCE,
+      password: 'probe-password-2026',
     });
   } catch (err) { dupLicence = err; }
   check('  refuses a licence number already registered',
@@ -165,6 +167,7 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
     await doctorModel.register({
       name: 'Dr. No Letters', specialty: 'Paediatrics', qualification: '',
       email: 'x@example.invalid', phone: '01700000000', licenseNo: '__probe__-LIC-9002',
+      password: 'probe-password-2026',
     });
   } catch (err) { blank = err; }
   check('  refuses a registration with no qualifications',
@@ -172,6 +175,7 @@ const check = (label, cond, detail = '') => (cond ? ok(label, detail) : bad(labe
 
   // put the roster back exactly as it was found
   await db.run('DELETE FROM doctors WHERE license_no LIKE $1', ['__probe__%']);
+  await db.run('DELETE FROM users WHERE email LIKE $1', ['%__probe__%']);
   const restored = await doctorModel.all();
   check('  probe registrations cleaned up', restored.length === docs.length,
     `${restored.length} clinicians`);

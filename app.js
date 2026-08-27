@@ -1,16 +1,21 @@
 /**
  * MaternalCare+ — application entry point (MVC architecture)
- *   Models      → /models       (data access + domain logic, SQLite-backed)
- *   Views       → /views        (EJS templates)  +  /frontend (React client)
+ *   Models      → /models       (data access + domain logic, PostgreSQL-backed)
+ *   Views       → /frontend     (React client)
  *   Controllers → /controllers  (request handling, wired via /routes)
  *
- * Two View layers share one Model layer:
- *   • routes/web.js → server-rendered EJS pages
- *   • routes/api.js → JSON consumed by the React SPA in /frontend
+ * This process is the Model and Controller layers plus the API that carries
+ * them to the View. It serves no pages of its own.
+ *
+ * It used to serve a second, server-rendered View from /views: the same
+ * records as EJS pages, on the same port. They were written before there was
+ * any authentication and never gained it — an anonymous GET /vitals returned a
+ * patient's name, her glucose reading and a clinical alert, straight past the
+ * guard that protects every /api route. They are gone rather than retrofitted;
+ * one View is one place for that mistake to be made.
  */
 const express = require('express');
 const path = require('path');
-const routes = require('./routes/web');
 const apiRoutes = require('./routes/api');
 
 const session = require('./middleware/session');
@@ -21,6 +26,16 @@ const PORT = process.env.PORT || 3000;
 // companion app (5174). Override with a comma-separated CLIENT_ORIGIN.
 const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN
   || 'http://localhost:5173,http://localhost:5174').split(',').map((s) => s.trim());
+
+// Normal JSON should stay small. Document, image and message uploads have
+// their own model-level byte limits and are the only routes allowed above it.
+const LARGE_JSON_PATH = /^\/api\/(?:documents(?:\/|$)|messages(?:\/|$)|community\/posts$|vaccinations\/\d+\/card$)/;
+const smallJson = express.json({ limit: '256kb' });
+const largeJson = express.json({ limit: '12mb' });
+app.use((req, res, next) => {
+  const isNormalApi = req.path.startsWith('/api/') && !LARGE_JSON_PATH.test(req.path);
+  return (isNormalApi ? smallJson : largeJson)(req, res, next);
+});
 
 // The guardian app has to be opened on a real phone to test install,
 // vibration and audio, so in development a private-network origin on either
@@ -34,14 +49,14 @@ function allowedOrigin(origin) {
   return null;
 }
 
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
 // documents arrive as base64 data URLs, which inflate ~4/3 over the 5 MB cap
-app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
+/*
+ * Still served: the guardian APK that SosModal links to for download, under
+ * public/downloads. The stylesheet and scripts that used to live here belonged
+ * to the EJS pages and went with them.
+ */
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/vendor/chartjs', express.static(path.join(__dirname, 'node_modules', 'chart.js', 'dist')));
 
 // Allow the Vite dev server to call the API during development
 app.use('/api', (req, res, next) => {
@@ -70,20 +85,23 @@ app.use('/api', (req, res, next) => {
 app.use(session.attach());
 
 app.use('/api', apiRoutes);
-app.use(routes);
 
-// 404
-app.use((req, res) => res.status(404).render('404', { page: '' }));
+/*
+ * 404. JSON, because everything reaching this process is either an API call or
+ * a request for a static file — the pages live in the React client on its own
+ * origin, and it renders its own not-found screen.
+ */
+app.use((req, res) => res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }));
 
 // Global error handler middleware
 app.use((err, req, res, next) => {
-  console.error('[server error]', err);
-  if (req.originalUrl.startsWith('/api')) {
-    return res.status(err.status || 500).json({
-      error: err.message || 'Internal Server Error',
-    });
+  if (err.type === 'entity.too.large' || err.code === 'LIMIT_STRING') {
+    return res.status(413).json({ error: 'That request is too large', code: 'PAYLOAD_TOO_LARGE' });
   }
-  res.status(err.status || 500).render('404', { page: '', error: err.message });
+  console.error('[server error]', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+  });
 });
 
 const server = app.listen(PORT, () => {
