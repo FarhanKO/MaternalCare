@@ -18,6 +18,8 @@ interface Props {
   band: { label: string; tone: string };
 }
 
+const TRIMESTER = [null, 'first', 'second', 'third'];
+
 const BLOOD_GROUPS = ['A+', 'A−', 'B+', 'B−', 'O+', 'O−', 'AB+', 'AB−'];
 
 const CARE_TEAM: CareMember[] = [
@@ -26,13 +28,13 @@ const CARE_TEAM: CareMember[] = [
 ];
 
 const MENU = [
-  { icon: Pencil, label: 'Edit profile', hint: 'Name, photo, due date' },
+  { icon: Pencil, label: 'Edit profile', hint: 'Name, photo, bio' },
   { icon: ShieldCheck, label: 'Privacy & data', hint: 'Who can see your records' },
 ];
 
 export function ProfileModal({ open, onClose, score, band }: Props) {
   const { name, avatar, initials, bio, details, setAvatar, setBio, setDetail } = useProfile();
-  const { week, dueDate, bloodGroup, age } = details;
+  const { week, dueDate, trimester, bloodGroup, age } = details;
   const [editingBio, setEditingBio] = useState(false);
   const [draftBio, setDraftBio] = useState(bio);
   const [editingFact, setEditingFact] = useState<null | 'week' | 'dueDate' | 'bloodGroup' | 'age'>(null);
@@ -53,11 +55,22 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
     reader.readAsDataURL(file);
   };
 
+  /*
+   * Week and due date are computed from her LMP on the server, so they are
+   * shown rather than offered for editing — the pencil used to imply she could
+   * correct them, and typing a new number changed the screen and nothing else.
+   * They disappear entirely for a mother who has no pregnancy to have a week
+   * of, instead of the 26 this panel used to show everybody.
+   */
   const facts = [
-    { key: 'week' as const, icon: Baby, label: 'Week', value: `${week}`, type: 'number' as const, min: 1, max: 42 },
-    { key: 'dueDate' as const, icon: CalendarDays, label: 'Due', value: dueDate, type: 'text' as const },
-    { key: 'bloodGroup' as const, icon: Droplet, label: 'Blood', value: bloodGroup, type: 'select' as const },
-    { key: 'age' as const, icon: Ruler, label: 'Age', value: `${age}`, type: 'number' as const, min: 12, max: 60 },
+    ...(week !== null
+      ? [{ key: 'week' as const, icon: Baby, label: 'Week', value: `${week}`, editable: false, type: 'number' as const, min: 1, max: 42 }]
+      : []),
+    ...(dueDate
+      ? [{ key: 'dueDate' as const, icon: CalendarDays, label: 'Due', value: dueDate, editable: false, type: 'text' as const, min: undefined, max: undefined }]
+      : []),
+    { key: 'bloodGroup' as const, icon: Droplet, label: 'Blood', value: bloodGroup || '—', editable: true, type: 'select' as const, min: undefined, max: undefined },
+    { key: 'age' as const, icon: Ruler, label: 'Age', value: age === null ? '—' : `${age}`, editable: true, type: 'number' as const, min: 12, max: 60 },
   ];
 
   if (typeof document === 'undefined') return null;
@@ -155,7 +168,14 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
                 <div className="mt-3 text-xl font-extrabold leading-tight tracking-tight text-ink">{name}</div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
                   <span className="rounded-full bg-rose-500/12 px-2 py-0.5 text-[10px] font-bold text-rose-600">Mother</span>
-                  <span className="text-[11px] font-semibold text-ink-muted">Week {week} · second trimester</span>
+                  {/* the trimester was written here as "second" for everybody,
+                      including the mothers who were not pregnant at all */}
+                  {week !== null && (
+                    <span className="text-[11px] font-semibold text-ink-muted">
+                      Week {week}
+                      {trimester ? ` · ${TRIMESTER[trimester]} trimester` : ''}
+                    </span>
+                  )}
                 </div>
 
                 {/* bio */}
@@ -238,7 +258,7 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
                     transition={{ delay: 0.12 + i * 0.05, duration: 0.35 }}
                     className="group relative rounded-2xl border border-white/60 bg-white/55 py-3 text-center transition hover:border-brand-300 hover:bg-white"
                   >
-                    {editingFact === f.key ? (
+                    {editingFact === f.key && f.editable ? (
                       f.type === 'select' ? (
                         <select
                           autoFocus
@@ -265,19 +285,30 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
                           className="w-full bg-transparent text-center text-sm font-extrabold text-ink outline-none"
                         />
                       )
-                    ) : (
+                    ) : f.editable ? (
                       <button onClick={() => setEditingFact(f.key)} className="w-full" aria-label={`Edit ${f.label}`}>
                         <f.icon className="mx-auto h-3.5 w-3.5 text-ink-faint" />
                         <span className="mt-1 block text-sm font-extrabold leading-none text-ink">{f.value}</span>
                         <span className="mt-1 block text-[9px] font-bold uppercase tracking-wider text-ink-faint">{f.label}</span>
                         <Pencil className="absolute right-1.5 top-1.5 h-2.5 w-2.5 text-ink-faint opacity-0 transition group-hover:opacity-100" />
                       </button>
+                    ) : (
+                      // derived from her record, so there is nothing here to edit
+                      <div className="w-full">
+                        <f.icon className="mx-auto h-3.5 w-3.5 text-ink-faint" />
+                        <span className="mt-1 block text-sm font-extrabold leading-none text-ink">{f.value}</span>
+                        <span className="mt-1 block text-[9px] font-bold uppercase tracking-wider text-ink-faint">{f.label}</span>
+                      </div>
                     )}
                   </motion.div>
                 ))}
               </div>
 
-              <p className="mt-2 text-center text-[10px] font-semibold text-ink-faint">Tap any value to edit it</p>
+              <p className="mt-2 text-center text-[10px] font-semibold text-ink-faint">
+                {week !== null
+                  ? 'Tap your blood group or age to edit. Week and due date come from your record.'
+                  : 'Tap any value to edit it'}
+              </p>
 
               {/* care team */}
               <div className="mt-5">

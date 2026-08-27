@@ -86,6 +86,45 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).render('404', { page: '', error: err.message });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n  MaternalCare+ running →  http://localhost:${PORT}\n`);
+});
+
+/*
+ * Why the process is made to say something before it goes.
+ *
+ * Node ends the process on an unhandled promise rejection, and an Express app
+ * is almost nothing but promises. Left alone it exits with no output at all:
+ * the server is simply gone between one request and the next. A browser can
+ * only see a connection that refused, so it reports "Failed to fetch" - which
+ * reads like a fault in the page, and sends whoever is debugging into the
+ * wrong half of the codebase. These handlers cost nothing, and mean a crash
+ * always leaves a reason behind it.
+ */
+server.on('error', (err) => {
+  console.error('');
+  if (err.code === 'EADDRINUSE') {
+    console.error(`  [fatal] port ${PORT} is already in use - another copy of the`);
+    console.error('          server is probably still running. Stop it, or set PORT.');
+  } else {
+    console.error('  [fatal] the server could not start:', err.message);
+  }
+  console.error('');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('');
+  console.error('  [fatal] unhandled promise rejection - the server is stopping:');
+  console.error(reason instanceof Error ? reason.stack : reason);
+  console.error('');
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('');
+  console.error('  [fatal] uncaught exception - the server is stopping:');
+  console.error(err.stack || err.message);
+  console.error('');
+  process.exit(1);
 });

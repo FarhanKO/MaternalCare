@@ -34,6 +34,21 @@ export class NotSignedIn extends Error {
   }
 }
 
+/**
+ * The server could not be reached at all — it is not running, the machine is
+ * offline, or something between here and there dropped the connection.
+ *
+ * fetch() rejects with a bare "TypeError: Failed to fetch" for every one of
+ * those. That is the browser narrating its own internals, and it tells the
+ * person reading it nothing they can act on. This carries a sentence that does.
+ */
+export class ServerUnreachable extends Error {
+  constructor() {
+    super('Cannot reach the MaternalCare+ server. Check that it is running, then try again.');
+    this.name = 'ServerUnreachable';
+  }
+}
+
 /** An error the server blamed on one named answer. */
 export class FieldError extends Error {
   field?: string;
@@ -46,17 +61,28 @@ export class FieldError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+  /*
+   * The session is an httpOnly cookie, and the API is a different origin
+   * from the dev server. Without `credentials: 'include'` the browser
+   * neither sends it nor stores the one the login response sets, and every
+   * request arrives anonymous.
+   */
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      ...init,
+    });
+  } catch {
     /*
-     * The session is an httpOnly cookie, and the API is a different origin
-     * from the dev server. Without this the browser neither sends it nor
-     * stores the one the login response sets, and every request arrives
-     * anonymous.
+     * fetch rejects only when the request never completed — nothing
+     * listening, no network, connection dropped mid-flight. Every HTTP
+     * status resolves, 500 included. So reaching here always means "could
+     * not reach it", never "it answered and said no".
      */
-    credentials: 'include',
-    ...init,
-  });
+    throw new ServerUnreachable();
+  }
 
   /*
    * An expired or missing session is not an error the calling screen can do

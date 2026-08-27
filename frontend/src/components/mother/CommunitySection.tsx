@@ -226,7 +226,7 @@ export function CommunitySection({ week, stage = 'pregnant', symptoms = [], lowH
   const news = useMemo(
     () => newsFor(stage, {
       symptoms, week, lowHydration,
-      age: me.details.age, bloodGroup: me.details.bloodGroup,
+      age: me.details.age ?? undefined, bloodGroup: me.details.bloodGroup,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stage, symptomKey, week, lowHydration, me.details.age, me.details.bloodGroup],
