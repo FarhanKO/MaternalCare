@@ -511,7 +511,7 @@ const filled = (v) => {
   console.log('\n  --- life stages ---');
 
   const STAGE_LOGINS = [
-    ['tonima@stage.demo', 'planning'],
+    ['amena@stage.demo', 'planning'],
     ['nabila@stage.demo', 'new-mother'],
     ['orpa@stage.demo', 'parent'],
   ];
@@ -552,7 +552,7 @@ const filled = (v) => {
   check('  and refuses a mood it does not know',
     (await PATCH('/child/log', { mood: '__nope__' })).status === 400);
 
-  await signIn('tonima@stage.demo');
+  await signIn('amena@stage.demo');
   check('  a mother with no child gets 404 from /child/log, not a crash',
     (await GET('/child/log')).status === 404);
 

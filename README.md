@@ -99,7 +99,7 @@ and here; nothing in the application stores, logs or returns it.
 | Account | Email | Stage / role | What it shows |
 |---|---|---|---|
 | Ayesha Rahman | `ayesha@example.com` | pregnant | Week 29. The fullest record — appointments, messages, documents, SOS contacts. |
-| Tonima Haque | `tonima@stage.demo` | planning | Pre-conception. No pregnancy, no countdown. |
+| Amena Chowdhury | `amena@stage.demo` | planning | Pre-conception. No pregnancy, no countdown. |
 | Nabila Karim | `nabila@stage.demo` | new mother | Ayaan at seven weeks, with his own daily log. |
 | Orpa Das | `orpa@stage.demo` | parent | Rehnuma at two and a half, growth and milestones. |
 

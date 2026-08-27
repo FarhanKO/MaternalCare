@@ -9,7 +9,7 @@
  * editing the database by hand.
  *
  *   Ayesha Rahman   pregnant        from seed.sql — not touched here
- *   Tonima Haque    planning        pre-conception, no pregnancy record
+ *   Amena Chowdhury planning        pre-conception, no pregnancy record
  *   Nabila Karim    new-mother      baby seven weeks old
  *   Orpa Das        parent          child two and a half
  *
@@ -37,8 +37,8 @@ const { WHO } = require('../models/data/whoGrowth');
  */
 const STAGES = [
   {
-    name: 'Tonima Haque',
-    email: 'tonima@stage.demo',
+    name: 'Amena Chowdhury',
+    email: 'amena@stage.demo',
     stage: 'planning',
     age: 26,
     blood: 'O+',
@@ -85,8 +85,18 @@ function wobble(seed, i, spread) {
   return ((x - Math.floor(x)) - 0.5) * 2 * spread;
 }
 
+/*
+ * Addresses this script used to seed under.
+ *
+ * The wipe below only removes what is currently in STAGES, so renaming an
+ * account would leave the old row behind — still in the database, still
+ * signed-in-able, and no longer replaced on a re-run. Retiring the address
+ * here keeps the script idempotent across a rename.
+ */
+const RETIRED = ['tonima@stage.demo'];
+
 async function wipe() {
-  const emails = STAGES.map((s) => s.email);
+  const emails = [...STAGES.map((s) => s.email), ...RETIRED];
 
   /* Guard, because getting this wrong once already cost the seeded Ayesha and
      every row that cascaded from her. This script may only ever remove the
