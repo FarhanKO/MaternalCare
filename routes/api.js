@@ -43,7 +43,7 @@ const session = require('../middleware/session');
  *   /community/images  <img> tags cannot send credentials in every context,
  *                and these are already unguessable UUID filenames
  */
-const PUBLIC = [/^\/auth\//, /^\/guardian\//, /^\/network$/, /^\/community\/images\//];
+const PUBLIC = [/^\/auth\//, /^\/guardian\//, /^\/network$/, /^\/community\/images\//, /^\/doctors\/register$/];
 
 router.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next();
@@ -62,18 +62,19 @@ router.get('/me/language', sessionApi.language);
 router.post('/auth/login', authApi.login);
 router.post('/auth/logout', authApi.logout);
 router.get('/auth/session', authApi.session);
+router.post('/auth/register', authApi.register);
 router.post('/auth/password', session.requireUser, authApi.changePassword);
 /* names and emails for the sign-in screen; never the passwords */
 router.get('/auth/demo-accounts', authApi.demoAccounts);
 router.patch('/me/language', sessionApi.setLanguage);
 
 /* patients — the clinician's caseload */
-router.get('/patients', patientApi.index);
-router.get('/patients/:id', patientApi.show);
-router.get('/patients/:id/reminders', patientApi.reminders);
-router.get('/patients/:id/symptoms', patientApi.symptoms);
-router.post('/patients/:id/reminders', patientApi.assign);
-router.get('/patients/:id/guidance', guidanceApi.forPatient);
+router.get('/patients', session.requireRole('clinician'), patientApi.index);
+router.get('/patients/:id', session.requireRole('clinician'), patientApi.show);
+router.get('/patients/:id/reminders', session.requireRole('clinician'), patientApi.reminders);
+router.get('/patients/:id/symptoms', session.requireRole('clinician'), patientApi.symptoms);
+router.post('/patients/:id/reminders', session.requireRole('clinician'), patientApi.assign);
+router.get('/patients/:id/guidance', session.requireRole('clinician'), guidanceApi.forPatient);
 
 /* the personalised nutrition, movement and lifestyle plan */
 router.get('/guidance', guidanceApi.mine);
@@ -82,23 +83,24 @@ router.get('/guidance', guidanceApi.mine);
 router.get('/risk', riskApi.mine);
 router.post('/risk/simulate', riskApi.simulate);
 router.get('/risk/model', riskApi.modelCard);
-router.get('/patients/:id/risk', riskApi.forPatient);
+router.get('/patients/:id/risk', session.requireRole('clinician'), riskApi.forPatient);
 
 /* finding a doctor */
 router.get('/doctors', careApi.doctors);
 router.get('/doctors/recommended', careApi.recommended);
+router.get('/me/doctor', session.requireRole('clinician'), careApi.me);
 // a clinician signing themselves up — the only way a doctor enters the list
 router.post('/doctors/register', careApi.registerDoctor);
 router.get('/doctors/:id/slots', careApi.slots);
 router.get('/doctors/:id/plans', careApi.plans);
-router.get('/doctors/:id/appointments', careApi.doctorAppointments);
+router.get('/doctors/:id/appointments', session.requireRole('clinician'), careApi.doctorAppointments);
 
 /* appointment requests — the mother asks, the doctor answers */
 router.get('/appointments', careApi.myAppointments);
 router.post('/appointments', careApi.requestAppointment);
 /* paid booking — the fee confirms the slot, so there is nothing to answer */
 router.post('/appointments/paid', careApi.payAndBook);
-router.patch('/appointments/:id', careApi.respond);
+router.patch('/appointments/:id', session.requireRole('clinician'), careApi.respond);
 router.delete('/appointments/:id', careApi.cancel);
 /* F11: move an appointment rather than losing your place in the queue */
 router.patch('/appointments/:id/reschedule', careApi.reschedule);
@@ -109,8 +111,8 @@ router.get('/cancel-reasons', careApi.cancelReasons);
 router.get('/care-endings/reasons', careEndingApi.reasons);
 router.get('/care-endings', careEndingApi.mine);
 router.post('/care-endings/:doctorId', careEndingApi.endByMother);
-router.get('/doctors/:doctorId/care-endings', careEndingApi.forDoctor);
-router.post('/doctors/:doctorId/care-endings/:patientId', careEndingApi.endByDoctor);
+router.get('/doctors/:doctorId/care-endings', session.requireRole('clinician'), careEndingApi.forDoctor);
+router.post('/doctors/:doctorId/care-endings/:patientId', session.requireRole('clinician'), careEndingApi.endByDoctor);
 
 /* profile: name, photo, bio — previously lost on every refresh */
 router.get('/profile', profileApi.show);
@@ -122,7 +124,7 @@ router.get('/weight-gain', profileApi.weightGain);
 
 /* the downloadable health report — same document, both sides */
 router.get('/report.pdf', reportApi.mine);
-router.get('/patients/:id/report.pdf', reportApi.forPatient);
+router.get('/patients/:id/report.pdf', session.requireRole('clinician'), reportApi.forPatient);
 
 /* where this server can be reached from — the guardian pairing link needs it */
 router.get('/network', networkApi.index);
@@ -146,9 +148,9 @@ router.get('/community/images/:file', communityApi.image);
 router.post('/community/:target/:id/report', communityApi.report);
 
 /* moderation — the clinician's queue */
-router.get('/moderation/reports', moderationApi.queue);
-router.get('/moderation/count', moderationApi.count);
-router.post('/moderation/:target/:id/resolve', moderationApi.resolve);
+router.get('/moderation/reports', session.requireRole('clinician'), moderationApi.queue);
+router.get('/moderation/count', session.requireRole('clinician'), moderationApi.count);
+router.post('/moderation/:target/:id/resolve', session.requireRole('clinician'), moderationApi.resolve);
 
 /* child: growth, milestones, vaccinations — the React client had no route
    to these, so it drew them from hardcoded arrays */
@@ -177,15 +179,15 @@ router.patch('/sos/emergency-number', sosApi.setEmergencyNumber);
 router.get('/guardians', sosApi.contacts);
 router.post('/guardians', sosApi.addContact);
 router.delete('/guardians/:id', sosApi.removeContact);
-router.get('/doctors/:id/sos', sosApi.forDoctor);
+router.get('/doctors/:id/sos', session.requireRole('clinician'), sosApi.forDoctor);
 
 /* prescriptions & reports */
 router.get('/documents', documentApi.index);
 router.post('/documents', documentApi.create);
 router.get('/documents/:id/file', documentApi.file);
 router.delete('/documents/:id', documentApi.destroy);
-router.get('/patients/:id/documents', documentApi.forPatient);
-router.post('/patients/:id/documents', documentApi.createForPatient);
+router.get('/patients/:id/documents', session.requireRole('clinician'), documentApi.forPatient);
+router.post('/patients/:id/documents', session.requireRole('clinician'), documentApi.createForPatient);
 
 /* messages — the mother/doctor conversation */
 router.get('/care-team', messageApi.careTeam);
@@ -194,11 +196,11 @@ router.post('/messages', messageApi.send);
 /* photographs sent in a thread, streamed from disk */
 router.get('/messages/attachments/:file', messageApi.attachment);
 router.get('/messages/:doctorId', messageApi.thread);
-router.get('/doctors/:id/threads', messageApi.doctorThreads);
-router.get('/doctors/:id/threads/:patientId', messageApi.doctorThread);
-router.post('/doctors/:id/messages', messageApi.doctorSend);
+router.get('/doctors/:id/threads', session.requireRole('clinician'), messageApi.doctorThreads);
+router.get('/doctors/:id/threads/:patientId', session.requireRole('clinician'), messageApi.doctorThread);
+router.post('/doctors/:id/messages', session.requireRole('clinician'), messageApi.doctorSend);
 /* visits about to start — drives the "ready your meeting link" nudge */
-router.get('/doctors/:id/upcoming', messageApi.doctorUpcoming);
+router.get('/doctors/:id/upcoming', session.requireRole('clinician'), messageApi.doctorUpcoming);
 
 /* symptoms */
 router.get('/symptoms', symptomApi.index);

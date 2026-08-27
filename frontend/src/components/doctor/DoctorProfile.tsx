@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { TODAY_SLOTS } from '@/data/doctor';
 import { api } from '@/lib/api';
+import type { Doctor } from '@/data/care';
+import { useAuth } from '@/lib/auth';
 
 const MENU = [
   { icon: ClipboardList, label: 'Caseload settings', hint: 'Capacity and referral rules' },
@@ -14,7 +16,8 @@ const MENU = [
 ];
 
 /** Clinician counterpart to the mother's profile panel — peach themed. */
-export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DoctorProfile({ open, onClose, doctor }: { open: boolean; onClose: () => void; doctor?: Doctor | null }) {
+  const { signOut } = useAuth();
   const [counts, setCounts] = useState({ total: 0, high: 0 });
 
   useEffect(() => {
@@ -89,15 +92,15 @@ export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () =>
                   transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.1 }}
                   className="grid h-24 w-24 place-items-center rounded-3xl border-[3px] border-white bg-gradient-to-br from-peach-400 to-peach-600 text-2xl font-extrabold text-white shadow-[0_10px_30px_-8px_rgba(234,92,29,0.55)]"
                 >
-                  LO
+                  {(doctor?.name || 'Clinician').split(/\s+/).filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
                 </motion.span>
-                <div className="mt-3 text-xl font-extrabold leading-tight tracking-tight text-ink">Dr. Lena Ortiz</div>
+                <div className="mt-3 text-xl font-extrabold leading-tight tracking-tight text-ink">{doctor?.name || 'Clinician profile'}</div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="rounded-full bg-peach-500/15 px-2 py-0.5 text-[10px] font-bold text-peach-700">Obstetrician</span>
-                  <span className="text-[11px] font-semibold text-ink-muted">MaternalCare+ Clinic · Room 204</span>
+                  <span className="rounded-full bg-peach-500/15 px-2 py-0.5 text-[10px] font-bold text-peach-700">{doctor?.specialty || 'Clinician'}</span>
+                  <span className="text-[11px] font-semibold text-ink-muted">{doctor?.years ?? 0} years experience</span>
                 </div>
                 <p className="mt-3 w-full rounded-2xl bg-white/50 px-3.5 py-2.5 text-[12px] font-medium italic leading-relaxed text-ink-soft">
-                  Fifteen years in maternal medicine. Special interest in hypertensive disorders of pregnancy.
+                  {doctor?.qualification || 'Your clinical profile and patient records are linked to this account.'}
                 </p>
               </div>
             </div>
@@ -138,7 +141,7 @@ export function DoctorProfile({ open, onClose }: { open: boolean; onClose: () =>
               </div>
 
               <button
-                onClick={onClose}
+                onClick={() => { void signOut(); onClose(); }}
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700"
               >
                 <LogOut className="h-[18px] w-[18px]" /> Sign out

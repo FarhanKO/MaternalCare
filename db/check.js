@@ -20,8 +20,8 @@ const bad = (label, value) => console.log(`  \x1b[31mFAIL\x1b[0m ${label.padEnd(
     ok('server version', info.version);
     ok('round trip', `${info.latencyMs} ms`);
     ok('tables in public', info.tables);
-    if (info.tables !== 21) {
-      bad('expected 21 tables', `found ${info.tables} — run db/migrations`);
+    if (![25, 26].includes(info.tables)) {
+      bad('expected 25 or 26 tables', `found ${info.tables} — run db/migrations`);
       failures += 1;
     }
   } catch (err) {

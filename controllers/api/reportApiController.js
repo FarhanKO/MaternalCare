@@ -14,6 +14,7 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const reportModel = require('../../models/reportModel');
 const patientModel = require('../../models/patientModel');
+const doctorModel = require('../../models/doctorModel');
 const userModel = require('../../models/userModel');
 
 /* ------------------------------------------------------------- palette */
@@ -622,7 +623,8 @@ exports.mine = async (req, res, next) => {
 exports.forPatient = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await patientModel.exists(id))) {
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || !(await patientModel.existsForDoctor(id, doctor.id))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
     const data = await reportModel.build(id);

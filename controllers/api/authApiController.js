@@ -44,6 +44,22 @@ exports.login = async (req, res, next) => {
   }
 };
 
+/** Create a mother account, sign her in, then let onboarding finish the profile. */
+exports.register = async (req, res, next) => {
+  try {
+    const user = await userModel.registerMother(req.body || {});
+    const token = await authModel.startSession(user.id, req.headers['user-agent']);
+    res.cookie(session.COOKIE, token, session.cookieOptions());
+    context.setUser(user);
+    return res.status(201).json({ data: { user: publicUser(user) } });
+  } catch (err) {
+    if (err.code === 'INVALID_REGISTRATION' || err instanceof authModel.AuthError) {
+      return res.status(400).json({ error: err.message, field: err.field, code: err.code });
+    }
+    return next(err);
+  }
+};
+
 exports.logout = async (req, res, next) => {
   try {
     await authModel.endSession(req.sessionId);

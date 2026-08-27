@@ -65,7 +65,7 @@ exports.create = async (req, res, next) => {
     const user = await userModel.current();
     const pregnancy = await pregnancyModel.forUser(user.id);
     const created = await postModel.create(user.id, {
-      author: req.body?.author || user.name,
+      author: user.name,
       role: 'mother',
       week: pregnancy ? pregnancy.week : undefined,
       topic: req.body?.topic,
@@ -87,8 +87,8 @@ exports.comment = async (req, res, next) => {
     const user = await userModel.current();
     res.status(201).json({
       data: await postModel.comment(req.params.id, user.id, {
-        author: req.body?.author || user.name,
-        role: req.body?.role === 'doctor' ? 'doctor' : 'mother',
+        author: user.name,
+        role: user.role === 'doctor' ? 'doctor' : 'mother',
         body: req.body?.body,
       }),
     });

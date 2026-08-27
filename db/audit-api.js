@@ -109,6 +109,7 @@ async function sweep(when) {
   await db.run("DELETE FROM posts        WHERE title LIKE '__audit__%'");
   await db.run("DELETE FROM documents    WHERE title LIKE '__audit__%'");
   await db.run("DELETE FROM doctors      WHERE license_no LIKE '__audit__%'");
+  await db.run("DELETE FROM users        WHERE email LIKE '__audit__%'");
   await db.run("DELETE FROM vitals       WHERE date  = '2019-01-02'");
   // the table is growth_records; this said `growth` and swallowed the error,
   // so every audit run silently left its probe row behind and the child's
@@ -288,6 +289,7 @@ const filled = (v) => {
     email: '__audit__registrant@example.invalid',
     phone: '01700000000',
     licenseNo: '__audit__-LIC-1',
+    password: 'audit-password-2026',
   });
   check('POST /doctors/register', reg.status === 201 && reg.json?.data?.bookable === true,
     `${reg.json?.data?.name} · ${reg.json?.data?.status} · ৳${reg.json?.data?.feeBdt}`);
@@ -306,6 +308,7 @@ const filled = (v) => {
     email: '__audit__twin@example.invalid',
     phone: '01700000001',
     licenseNo: '__audit__-LIC-1',
+    password: 'audit-password-2026',
   });
   check('  400s on a licence already registered, naming the field',
     dupe.status === 400 && dupe.json?.field === 'licenseNo', dupe.json?.error);
@@ -327,9 +330,11 @@ const filled = (v) => {
   check('  confirmed, not queued', paid.json?.data?.status === 'accepted');
   check('  fee came from the clinician',
     paid.json?.data?.payment?.feeBdt === rec.json.data[0].feeBdt, `৳${paid.json?.data?.payment?.feeBdt}`);
+  await signIn('lena.ortiz@demo.maternalcare.app', 'demo-clinician-2026');
   check('  shows in the clinician diary',
     (await GET(`/doctors/${docId}/appointments`)).json.data
       .some((a) => a.payment?.reference === paid.json.data.payment.reference));
+  await signIn('ayesha@example.com');
 
   /* --------------------------------------- reschedule & cancel (F11) */
   const day = (n) => {
@@ -395,15 +400,19 @@ const filled = (v) => {
     !(await GET('/care-team')).json.data.some((d) => d.doctorId === endDoc));
   check('GET /care-endings', (await GET('/care-endings')).json?.data?.length >= 1);
 
+  await signIn('lena.ortiz@demo.maternalcare.app', 'demo-clinician-2026');
+  const clinicianRoster = await GET('/patients');
+  const doctorPatient = clinicianRoster.json?.data?.[0]?.id;
   const doctorView = await GET(`/doctors/${endDoc}/care-endings`);
   check('GET /doctors/:id/care-endings counts the reasons',
     doctorView.json?.data?.leftByPatients >= 1,
     doctorView.json?.data?.topReasons?.map((r) => `${r.label} x${r.count}`).join(', '));
   check('  a clinician ending it must write a reason',
-    (await POST(`/doctors/1/care-endings/4`, { reason: 'capacity', note: 'no' })).status === 400);
+    (await POST(`/doctors/1/care-endings/${doctorPatient}`, { reason: 'capacity', note: 'no' })).status === 400);
   check('  and then it is accepted',
-    (await POST('/doctors/1/care-endings/4',
+    (await POST(`/doctors/1/care-endings/${doctorPatient}`,
       { reason: 'wrong-specialty', note: '__audit__ referred on to fetal medicine' })).status === 201);
+  await signIn('ayesha@example.com');
 
   const backDay = day(13);
   const freeD = (await GET(`/doctors/${endDoc}/slots?date=${backDay}`)).json.data.times;
@@ -428,11 +437,13 @@ const filled = (v) => {
   check('POST /messages', sent.status === 201 && sent.json?.data?.id);
   const thread = await GET(`/messages/${msgDoc}`);
   check('  lands in the thread', thread.json.data.some((m) => m.body === '__audit__ ping'));
+  await signIn('lena.ortiz@demo.maternalcare.app', 'demo-clinician-2026');
   const docThreads = await GET(`/doctors/${msgDoc}/threads`);
   check('GET /doctors/:id/threads sees it from the other side',
     Array.isArray(docThreads.json?.data) && docThreads.json.data.length > 0);
   check('POST /doctors/:id/messages',
     (await POST(`/doctors/${msgDoc}/messages`, { patientId: '1', body: '__audit__ pong' })).status === 201);
+  await signIn('ayesha@example.com');
 
   /* ------------------------------------------------------- community */
   console.log('\n  --- community ---');
@@ -483,6 +494,7 @@ const filled = (v) => {
   check('  the board now says she reported it',
     (await GET('/community/posts?limit=50')).json.data.find((x) => x.id === postId)?.reported === true);
 
+  await signIn('lena.ortiz@demo.maternalcare.app', 'demo-clinician-2026');
   const queue = await GET('/moderation/reports');
   const group = queue.json?.data?.find((g) => g.postId === postId);
   check('GET /moderation/reports', queue.status === 200 && Boolean(group),
@@ -491,7 +503,7 @@ const filled = (v) => {
   check('  the content travels with the report', group?.content?.title === '__audit__');
 
   const upheld = await POST(`/moderation/posts/${postId}/resolve`, {
-    action: 'uphold', note: '__audit__ decision', doctorId: docId,
+    action: 'uphold', note: '__audit__ decision',
   });
   check('POST /moderation/:target/:id/resolve', upheld.status === 200 && upheld.json?.data?.action === 'uphold',
     `${upheld.json?.data?.reportsClosed} report(s) closed`);
@@ -500,12 +512,13 @@ const filled = (v) => {
   check('  and stops taking replies',
     (await POST(`/community/posts/${postId}/comments`, { body: 'still here?' })).status === 400);
   check('  dismissing puts it back', (await POST(`/moderation/posts/${postId}/resolve`,
-    { action: 'dismiss', note: '__audit__ reversed', doctorId: docId })).status === 200);
+    { action: 'dismiss', note: '__audit__ reversed' })).status === 200);
   check('  it is on the board again',
     (await GET('/community/posts?limit=50')).json.data.some((x) => x.id === postId));
   check('  a bad decision is refused',
     (await POST(`/moderation/posts/${postId}/resolve`, { action: 'incinerate' })).status === 400);
   check('GET /moderation/count', Number.isFinite((await GET('/moderation/count')).json?.data?.open));
+  await signIn('ayesha@example.com');
 
   /* --------------------- the four life stages, each its own account */
   console.log('\n  --- life stages ---');
@@ -738,6 +751,7 @@ const filled = (v) => {
 
   /* -------------------------------------------------------- clinician */
   console.log('\n  --- clinician portal ---');
+  await signIn('lena.ortiz@demo.maternalcare.app', 'demo-clinician-2026');
   const patients = await GET('/patients');
   check('GET /patients', patients.json?.data?.length > 0, `${patients.json?.data?.length} on the caseload`);
   const pid = patients.json.data[0].id;

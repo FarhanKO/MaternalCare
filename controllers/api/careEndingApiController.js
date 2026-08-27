@@ -55,10 +55,11 @@ exports.endByMother = async (req, res, next) => {
 exports.endByDoctor = async (req, res, next) => {
   try {
     const { doctorId, patientId } = req.params;
-    if (!(await doctorModel.exists(doctorId))) {
-      return res.status(404).json({ error: 'Clinician not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(doctorId)) {
+      return res.status(403).json({ error: 'You can only manage your own patients' });
     }
-    if (!(await patientModel.exists(patientId))) {
+    if (!(await patientModel.existsForDoctor(patientId, doctor.id))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
     const ended = await careEndingModel.end({
@@ -96,8 +97,9 @@ exports.mine = async (req, res, next) => {
 exports.forDoctor = async (req, res, next) => {
   try {
     const { doctorId } = req.params;
-    if (!(await doctorModel.exists(doctorId))) {
-      return res.status(404).json({ error: 'Clinician not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(doctorId)) {
+      return res.status(403).json({ error: 'You can only view your own care endings' });
     }
     return res.json({ data: await careEndingModel.forDoctor(doctorId) });
   } catch (err) { return next(err); }

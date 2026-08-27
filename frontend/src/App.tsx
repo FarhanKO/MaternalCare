@@ -48,7 +48,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding" element={<RequireAuth role="mother"><Onboarding /></RequireAuth>} />
           <Route path="/about" element={<About />} />
           <Route path="/health-plan" element={<HealthPlan />} />
           <Route path="/contact" element={<Contact />} />
@@ -60,9 +60,9 @@ export default function App() {
           />
           <Route
             path="/doctor"
-            element={<RequireAuth role={['clinician', 'admin']}><Doctor /></RequireAuth>}
+            element={<RequireAuth role="clinician"><Doctor /></RequireAuth>}
           />
-          <Route path="/appoint" element={<Appoint />} />
+          <Route path="/appoint" element={<RequireAuth role="mother"><Appoint /></RequireAuth>} />
         </Routes>
       </Suspense>
       </div>

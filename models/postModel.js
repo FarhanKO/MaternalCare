@@ -20,6 +20,11 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ROLES = ['mother', 'doctor'];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_COMMENT_BODY = 2000;
+const MAX_POST_TITLE = 160;
+const MAX_POST_BODY = 10000;
+const MAX_TOPIC = 80;
+const MAX_AUTHOR = 80;
 const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 class PostError extends Error {
@@ -171,6 +176,13 @@ module.exports = {
   async create(userId, { author, role = 'mother', week, topic, title, body, imageDataUrl }) {
     const heading = String(title || '').trim();
     if (!heading) throw new PostError('A post needs a title', 'NO_TITLE');
+    if (heading.length > MAX_POST_TITLE) throw new PostError('Post titles must be 160 characters or fewer', 'TOO_LONG');
+    const postBody = String(body || '').trim();
+    if (postBody.length > MAX_POST_BODY) throw new PostError('Post text must be 10,000 characters or fewer', 'TOO_LONG');
+    const postTopic = String(topic || '').trim();
+    if (postTopic.length > MAX_TOPIC) throw new PostError('Post topics must be 80 characters or fewer', 'TOO_LONG');
+    const postAuthor = String(author || 'A mother').trim();
+    if (postAuthor.length > MAX_AUTHOR) throw new PostError('Author names must be 80 characters or fewer', 'TOO_LONG');
     if (!ROLES.includes(role)) throw new PostError(`Unknown role: ${role}`, 'BAD_ROLE');
 
     let imageFile = null;
@@ -184,9 +196,9 @@ module.exports = {
       `INSERT INTO posts (user_id, author, role, week, topic, title, body, image_file,
                           hearts, clinician_answered, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,FALSE,now()) RETURNING *`,
-      [userId ?? null, String(author || 'A mother').trim(), role,
-        Number.isFinite(week) ? week : null, (topic || '').trim() || null,
-        heading, (body || '').trim() || null, imageFile],
+      [userId ?? null, postAuthor || 'A mother', role,
+        Number.isFinite(week) ? week : null, postTopic || null,
+        heading, postBody || null, imageFile],
     );
     return toPost(row, []);
   },
@@ -194,6 +206,9 @@ module.exports = {
   async comment(postId, userId, { author, role = 'mother', body }) {
     const text = String(body || '').trim();
     if (!text) throw new PostError('A comment cannot be empty', 'EMPTY');
+    if (text.length > MAX_COMMENT_BODY) throw new PostError('Comments must be 2,000 characters or fewer', 'TOO_LONG');
+    const commentAuthor = String(author || 'A mother').trim();
+    if (commentAuthor.length > MAX_AUTHOR) throw new PostError('Author names must be 80 characters or fewer', 'TOO_LONG');
     const post = await db.one('SELECT hidden_at FROM posts WHERE id = $1', [postId]);
     if (!post) throw new PostError('That post no longer exists', 'NOT_FOUND');
     if (post.hidden_at) {
@@ -204,7 +219,7 @@ module.exports = {
       await t.run(
         `INSERT INTO post_comments (post_id, user_id, author, role, body, created_at)
          VALUES ($1,$2,$3,$4,$5,now())`,
-        [postId, userId ?? null, String(author || 'A mother').trim(), role, text],
+        [postId, userId ?? null, commentAuthor || 'A mother', role, text],
       );
       // a clinician replying is what marks a question as answered
       if (role === 'doctor') {

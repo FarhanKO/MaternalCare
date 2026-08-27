@@ -17,6 +17,7 @@ const userModel = require('../../models/userModel');
 const pregnancyModel = require('../../models/pregnancyModel');
 const vitalModel = require('../../models/vitalModel');
 const patientModel = require('../../models/patientModel');
+const doctorModel = require('../../models/doctorModel');
 
 /** Build both assessments for one person from their latest readings. */
 async function assess(user, lang = user?.language || 'en') {
@@ -84,7 +85,8 @@ exports.mine = async (req, res, next) => {
 /** A patient's, for the clinician portal. */
 exports.forPatient = async (req, res, next) => {
   try {
-    const patient = await patientModel.find(req.params.id);
+    const doctor = await doctorModel.forUser(req.user.id);
+    const patient = doctor && await patientModel.findForDoctor(req.params.id, doctor.id);
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
     const user = await userModel.find(req.params.id);
     const result = await assess(user);

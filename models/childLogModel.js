@@ -14,6 +14,7 @@
 const db = require('../config/db');
 
 const MOODS = ['Content', 'Fussy', 'Sleepy', 'Playful', 'Unsettled'];
+const MAX_NOTE = 2000;
 
 const pad = (n) => String(n).padStart(2, '0');
 /** Local calendar date — their "today", not UTC's. */
@@ -113,6 +114,8 @@ module.exports = {
   } = {}) {
     if (mood != null && !MOODS.includes(mood)) throw new Error(`Unknown mood: ${mood}`);
     const day = date || todayISO();
+    const noteText = String(note || '').trim();
+    if (noteText.length > MAX_NOTE) throw new Error('Child log notes must be 2,000 characters or fewer');
 
     await db.run(
       `INSERT INTO child_logs (child_id, date, feeds, wet_nappies, sleep_hours, temp_c, mood, note)
@@ -126,7 +129,7 @@ module.exports = {
          note        = COALESCE(EXCLUDED.note,        child_logs.note)`,
       [childId, day,
         feeds ?? null, wetNappies ?? null, sleepHours ?? null,
-        tempC ?? null, mood ?? null, note ?? null],
+        tempC ?? null, mood ?? null, noteText || null],
     );
 
     return this.forDate(childId, day);

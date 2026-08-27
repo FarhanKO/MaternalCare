@@ -150,7 +150,8 @@ exports.attachment = (req, res) => {
 exports.doctorThreads = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(id)) return res.status(403).json({ error: 'You can only open your own conversations' });
     const [data, unread] = await Promise.all([
       messageModel.threadsForDoctor(id),
       messageModel.unreadForDoctor(id),
@@ -162,8 +163,9 @@ exports.doctorThreads = async (req, res, next) => {
 exports.doctorThread = async (req, res, next) => {
   const { id, patientId } = req.params;
   try {
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
-    if (!(await patientModel.exists(patientId))) {
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(id)) return res.status(403).json({ error: 'You can only open your own conversations' });
+    if (!(await patientModel.existsForDoctor(patientId, doctor.id))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
     await messageModel.markRead(patientId, id, 'doctor');
@@ -180,8 +182,9 @@ exports.doctorSend = async (req, res) => {
   const { id } = req.params;
   const { patientId, body, kind, image } = req.body || {};
   try {
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
-    if (!(await patientModel.exists(patientId))) {
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(id)) return res.status(403).json({ error: 'You can only send from your own clinic' });
+    if (!(await patientModel.existsForDoctor(patientId, doctor.id))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
     const asked = ['image', 'call-link'].includes(kind) ? kind : 'text';
@@ -200,7 +203,8 @@ exports.doctorSend = async (req, res) => {
 exports.doctorUpcoming = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(id)) return res.status(403).json({ error: 'You can only view your own schedule' });
     const minutes = Math.min(720, Math.max(5, Number(req.query.within) || 60));
     return res.json({ data: await appointmentModel.imminentForDoctor(id, minutes), meta: { minutes } });
   } catch (err) { return next(err); }

@@ -11,6 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('../config/db');
 const context = require('../config/context');
+const authModel = require('./authModel');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -20,6 +21,40 @@ const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
 const MAX_BIO = 280;
 
 module.exports = {
+  async registerMother({ name, email, phone, password, stage } = {}) {
+    const cleanName = String(name || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
+    const cleanStage = String(stage || 'pregnant').trim();
+    if (cleanName.length < 2 || cleanName.length > 60) {
+      const err = new Error('Please give your full name'); err.code = 'INVALID_REGISTRATION'; err.field = 'name'; throw err;
+    }
+    if (cleanEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+      const err = new Error('That does not look like an email address'); err.code = 'INVALID_REGISTRATION'; err.field = 'email'; throw err;
+    }
+    if (!this.STAGES.includes(cleanStage)) {
+      const err = new Error('Choose your current stage'); err.code = 'INVALID_REGISTRATION'; err.field = 'stage'; throw err;
+    }
+    if (cleanPhone && cleanPhone.replace(/\D/g, '').length < 6) {
+      const err = new Error('Please give a valid phone number'); err.code = 'INVALID_REGISTRATION'; err.field = 'phone'; throw err;
+    }
+    const passwordHash = await authModel.hash(String(password || ''));
+    try {
+      const row = await db.insert(
+        `INSERT INTO users (name, role, email, phone, stage, password_hash)
+         VALUES ($1, 'mother', $2, $3, $4, $5) RETURNING *`,
+        [cleanName, cleanEmail, cleanPhone || null, cleanStage, passwordHash],
+      );
+      return row;
+    } catch (err) {
+      if (err.code === '23505') {
+        const conflict = new Error('An account already exists with that email');
+        conflict.code = 'INVALID_REGISTRATION'; conflict.field = 'email'; throw conflict;
+      }
+      throw err;
+    }
+  },
+
   async find(id) {
     return db.one('SELECT * FROM users WHERE id = $1', [id]);
   },
@@ -150,6 +185,7 @@ module.exports = {
   /** Editable clinical basics shown on the profile panel. */
   async setDetails(id, { bloodGroup, age }) {
     if (bloodGroup !== undefined) {
+      if (String(bloodGroup).trim().length > 10) throw new Error('That blood group is too long');
       await db.run('UPDATE users SET blood_group = $2 WHERE id = $1',
         [id, String(bloodGroup).trim() || null]);
     }

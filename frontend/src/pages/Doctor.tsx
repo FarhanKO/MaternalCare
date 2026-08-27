@@ -33,6 +33,7 @@ import { api } from '@/lib/api';
 import { ReportButton } from '@/components/ui/ReportButton';
 import { ModerationQueue } from '@/components/doctor/ModerationQueue';
 import { CareEndings } from '@/components/doctor/CareEndings';
+import { useAuth } from '@/lib/auth';
 
 const P = { peach: '#fb7534', peachLight: '#ff9159', aqua: '#22b8c4', brand: '#3f66f0', mint: '#2fbf9b', rose: '#e5484d', violet: '#8b7bf3' };
 
@@ -46,9 +47,6 @@ const TABS: DockItem<DocTab>[] = [
   { key: 'moderation', label: 'Moderation', icon: ShieldAlert, hint: 'Content mothers have reported' },
   { key: 'reports', label: 'Reports', icon: ClipboardList, hint: 'Practice analytics' },
 ];
-
-/** The clinician this portal is signed in as; the id is resolved from the API. */
-const ME_NAME = 'Dr. Lena Ortiz';
 
 const axisTick = { fontSize: 11, fill: '#9aa3ba', fontWeight: 600 };
 
@@ -338,6 +336,7 @@ function PatientDrawer({ patient, onClose, onAssign }: { patient: Patient | null
 
 /* ================================ page ================================ */
 export function Doctor() {
+  const { user: account } = useAuth();
   const [params, setParams] = useSearchParams();
   const urlTab = params.get('tab') as DocTab | null;
   // read off TABS rather than a second hardcoded list, which is how
@@ -367,13 +366,12 @@ export function Doctor() {
   useEffect(() => { loadRoster(); }, []);
 
   // resolve our own doctors row so the request inbox reads the right diary
-  const [meId, setMeId] = useState<string | null>(null);
+  const [meDoctor, setMeDoctor] = useState<import('@/data/care').Doctor | null>(null);
+  const meId = meDoctor?.id ?? null;
   const [requestCount, setRequestCount] = useState(0);
   const [messageUnread, setMessageUnread] = useState(0);
   useEffect(() => {
-    api.getDoctors()
-      .then((list) => setMeId(list.find((d) => d.name === ME_NAME)?.id ?? null))
-      .catch(() => setMeId(null));
+    api.getMyDoctor().then(setMeDoctor).catch(() => setMeDoctor(null));
   }, []);
 
   const riskCount = (level: RiskLevel) => roster.filter((p) => p.risk === level).length;
@@ -871,8 +869,8 @@ export function Doctor() {
         onOpenPatient={setSelected}
       />
 
-      <DoctorProfile open={profileOpen} onClose={() => setProfileOpen(false)} />
-      <AssignModal patient={assigning} clinician="Dr. Lena Ortiz" onClose={() => setAssigning(null)} />
+      <DoctorProfile doctor={meDoctor} open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <AssignModal patient={assigning} clinician={meDoctor?.name ?? account?.name ?? 'your clinician'} onClose={() => setAssigning(null)} />
     </>
   );
 }

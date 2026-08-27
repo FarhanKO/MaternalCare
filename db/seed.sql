@@ -32,7 +32,9 @@ INSERT INTO users (name, role, email, age, blood_group, stage, conditions,
   ('Maria Gomes',    'mother', 'maria.gomes@example.com',    22, 'O+', 'pregnant',
    'First pregnancy',                      CURRENT_DATE - 3,  CURRENT_DATE + 25, ''),
   ('Shirin Akter',   'mother', 'shirin.akter@example.com',   37, 'B−', 'pregnant',
-   'Gestational diabetes',                 CURRENT_DATE - 2,  CURRENT_DATE + 4,  '');
+   'Gestational diabetes',                 CURRENT_DATE - 2,  CURRENT_DATE + 4,  ''),
+  ('Dr. Lena Ortiz', 'clinician', 'lena.ortiz@demo.maternalcare.app', NULL, NULL, 'general',
+   '', NULL, NULL, '');
 
 /* --------------------------------------------------------- pregnancies */
 
@@ -192,6 +194,13 @@ INSERT INTO doctors (name, specialty, rating,
   ('Dr. Tanvir Alam',   'Paediatric Neurology',
    4.8, FALSE,  8, 'MBBS, MD (Paediatric Neurology)', 14, 20,
    'tanvir.alam@demo.maternalcare.app',    'DEMO-BMDC-1008');
+
+UPDATE doctors d
+SET user_id = u.id
+FROM users u
+WHERE d.email = 'lena.ortiz@demo.maternalcare.app'
+  AND u.email = d.email
+  AND u.role = 'clinician';
 
 -- `resp` is how many hours the clinician took to answer, and it is not
 -- decoration: the ranking scores how fast a doctor replies, read from exactly

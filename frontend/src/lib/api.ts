@@ -9,7 +9,7 @@ import type { Patient } from '@/data/doctor';
 import {
   RequestRefused, type Appointment, type AppointmentChange, type CareDocument,
   type CareEnding, type CareEndingSummary, type CareReason, type CareTeamMember,
-  type DocumentKind, type DoctorThread, type Message, type MotherThread,
+  type DocumentKind, type Doctor, type DoctorThread, type Message, type MotherThread,
   type MessageKind, type PayMethod, type Plan, type RankedDoctor, type SlotOffer,
   type UpcomingVisit,
 } from '@/data/care';
@@ -179,6 +179,12 @@ export const api = {
       body: JSON.stringify({ stage }),
     }).then((r) => r.data),
 
+  registerMother: (body: { name: string; email: string; phone?: string; password: string; stage: LifeStage }) =>
+    request<Envelope<{ user: AuthUser }>>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then((r) => r.data.user),
+
   /* symptoms */
   getSymptoms: () => request<Envelope<Symptom[]>>('/symptoms').then((r) => r.data),
 
@@ -272,12 +278,14 @@ export const api = {
    */
   registerDoctor: (body: {
     name: string; specialty: string; qualification: string; years: number;
-    email: string; phone: string; licenseNo: string;
+    email: string; phone: string; licenseNo: string; password: string;
   }) =>
     request<Envelope<RankedDoctor>>('/doctors/register', {
       method: 'POST',
       body: JSON.stringify(body),
     }).then((r) => r.data),
+
+  getMyDoctor: () => request<Envelope<Doctor>>('/me/doctor').then((r) => r.data),
 
   getSlots: (doctorId: string, date: string) =>
     request<Envelope<{ date: string; times: string[] }>>(`/doctors/${doctorId}/slots?date=${date}`)
@@ -366,6 +374,7 @@ export const api = {
     const res = await fetch(`${BASE}/appointments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
@@ -391,6 +400,7 @@ export const api = {
     const res = await fetch(`${BASE}/appointments/paid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
@@ -629,7 +639,7 @@ export const api = {
    */
   async getReport(patientId?: string): Promise<{ blob: Blob; filename: string }> {
     const path = patientId ? `/patients/${patientId}/report.pdf` : '/report.pdf';
-    const res = await fetch(`${BASE}${path}`);
+    const res = await fetch(`${BASE}${path}`, { credentials: 'include' });
     if (!res.ok) {
       let message = 'Could not build the report';
       try { message = (await res.json())?.error ?? message; } catch { /* not JSON */ }
@@ -708,6 +718,7 @@ export const api = {
     const res = await fetch(`${BASE}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ doctorId, body, ...opts }),
     });
     const json = await res.json().catch(() => ({}));

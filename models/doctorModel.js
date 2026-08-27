@@ -17,6 +17,7 @@
  * order, each entry saying in words why it sits where it does.
  */
 const db = require('../config/db');
+const authModel = require('./authModel');
 
 /** Consulting times a clinic offers in a day. */
 const SLOT_TIMES = [
@@ -259,6 +260,7 @@ module.exports = {
     const licenseNo = clean(input.licenseNo, 40);
     const email = clean(input.email, 160).toLowerCase();
     const phone = clean(input.phone, 40);
+    const password = String(input.password || '');
     const years = Math.max(0, Math.min(60, Math.round(Number(input.years) || 0)));
 
     if (name.length < 3) throw invalid('name', 'Please give your full name');
@@ -285,15 +287,33 @@ module.exports = {
         : invalid('licenseNo', 'A clinician is already registered under that licence number');
     }
 
-    const row = await db.insert(
-      `INSERT INTO doctors (name, specialty, qualification, years,
-                            email, phone, license_no, available, patients, capacity)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 0, 30)
-       RETURNING id`,
-      [name, specialty, qualification, years, email, phone, licenseNo],
-    );
+    let passwordHash;
+    try { passwordHash = await authModel.hash(password); }
+    catch (err) { throw invalid('password', err.message); }
 
-    return this.find(row.id);
+    try {
+      const row = await db.tx(async (t) => {
+        const user = await t.one(
+          `INSERT INTO users (name, role, email, phone, stage, password_hash)
+           VALUES ($1, 'clinician', $2, $3, 'general', $4) RETURNING id`,
+          [name, email, phone, passwordHash],
+        );
+        return t.one(
+          `INSERT INTO doctors (user_id, name, specialty, qualification, years,
+                                email, phone, license_no, available, patients, capacity)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, 0, 30)
+           RETURNING id`,
+          [user.id, name, specialty, qualification, years, email, phone, licenseNo],
+        );
+      });
+      return this.find(row.id);
+    } catch (err) {
+      if (err.code === '23505') {
+        const conflict = new Error('A clinician is already registered with that email');
+        conflict.code = 'INVALID_REGISTRATION'; conflict.field = 'email'; throw conflict;
+      }
+      throw err;
+    }
   },
 
   async all() {
@@ -303,6 +323,11 @@ module.exports = {
 
   async find(id) {
     const row = await db.one(`${WITH_COUNTS} WHERE d.id = $1`, [id]);
+    return row ? toDTO(row) : null;
+  },
+
+  async forUser(userId) {
+    const row = await db.one(`${WITH_COUNTS} WHERE d.user_id = $1`, [userId]);
     return row ? toDTO(row) : null;
   },
 

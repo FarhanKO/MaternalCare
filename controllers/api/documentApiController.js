@@ -7,6 +7,7 @@ const fs = require('fs');
 const documentModel = require('../../models/documentModel');
 const patientModel = require('../../models/patientModel');
 const userModel = require('../../models/userModel');
+const doctorModel = require('../../models/doctorModel');
 
 const kindFrom = (q) => (documentModel.KINDS.includes(q) ? q : undefined);
 
@@ -70,7 +71,8 @@ exports.file = async (req, res, next) => {
 exports.forPatient = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await patientModel.exists(id))) return res.status(404).json({ error: 'Patient not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || !(await patientModel.existsForDoctor(id, doctor.id))) return res.status(404).json({ error: 'Patient not found' });
     const [data, meta] = await Promise.all([
       documentModel.forUser(id, kindFrom(req.query.kind)),
       documentModel.countsFor(id),
@@ -83,7 +85,8 @@ exports.forPatient = async (req, res, next) => {
 exports.createForPatient = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await patientModel.exists(id))) return res.status(404).json({ error: 'Patient not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || !(await patientModel.existsForDoctor(id, doctor.id))) return res.status(404).json({ error: 'Patient not found' });
     if (!req.body?.uploadedBy) return res.status(400).json({ error: 'uploadedBy is required' });
     return res.status(201).json({ data: await documentModel.create(id, req.body) });
   } catch (err) {

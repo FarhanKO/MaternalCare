@@ -31,6 +31,7 @@ CREATE TABLE users (
   role             TEXT    NOT NULL DEFAULT 'mother'
                              CHECK (role IN ('mother', 'clinician', 'admin')),
   email            TEXT,
+  phone            TEXT,
   age              INTEGER CHECK (age IS NULL OR age BETWEEN 10 AND 70),
   blood_group      TEXT,
   stage            TEXT    NOT NULL DEFAULT 'pregnant'
@@ -47,6 +48,7 @@ CREATE TABLE users (
 
 CREATE TABLE doctors (
   id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
   name          TEXT    NOT NULL,
   specialty     TEXT,
   hospital      TEXT,
@@ -59,6 +61,8 @@ CREATE TABLE doctors (
   years         INTEGER NOT NULL DEFAULT 0,
   capacity      INTEGER NOT NULL DEFAULT 30
 );
+CREATE UNIQUE INDEX doctors_user_key ON doctors (user_id)
+  WHERE user_id IS NOT NULL;
 
 /* ---------------------------------------------------------- pregnancy */
 

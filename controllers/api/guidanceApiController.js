@@ -11,6 +11,7 @@
 const guidanceModel = require('../../models/guidanceModel');
 const userModel = require('../../models/userModel');
 const patientModel = require('../../models/patientModel');
+const doctorModel = require('../../models/doctorModel');
 
 /** Her own plan. */
 exports.mine = async (req, res, next) => {
@@ -27,7 +28,8 @@ exports.forPatient = async (req, res, next) => {
   try {
     // checked against the caseload rather than the users table, so a clinician
     // cannot read a plan for someone who is not their patient by guessing an id
-    if (!(await patientModel.exists(req.params.id))) {
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || !(await patientModel.existsForDoctor(req.params.id, doctor.id))) {
       return res.status(404).json({ error: 'Patient not found' });
     }
     const plan = await guidanceModel.forUser(req.params.id);

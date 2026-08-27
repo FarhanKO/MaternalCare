@@ -17,6 +17,7 @@ const db = require('../config/db');
 const messageModel = require('./messageModel');
 
 const OPEN = 'active';
+const MAX_LOCATION_NOTE = 500;
 /** Bangladesh's national emergency line; overridable per account. */
 const DEFAULT_EMERGENCY = '999';
 
@@ -125,11 +126,16 @@ module.exports = {
   async addContact(userId, { name, relation, phone }) {
     const label = String(name || '').trim();
     if (!label) throw new Error('A guardian needs a name');
+    if (label.length > 80) throw new Error('Guardian names must be 80 characters or fewer');
+    const relationText = String(relation || '').trim();
+    if (relationText.length > 40) throw new Error('Guardian relationships must be 40 characters or fewer');
+    const phoneText = String(phone || '').trim();
+    if (phoneText.length > 40) throw new Error('Guardian phone numbers must be 40 characters or fewer');
 
     const row = await db.insert(
       `INSERT INTO emergency_contacts (user_id, name, relation, phone, access_token)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [userId, label, (relation || '').trim() || null, (phone || '').trim() || null,
+      [userId, label, relationText || null, phoneText || null,
         crypto.randomBytes(18).toString('base64url')],
     );
     return toContact(row);
@@ -196,6 +202,8 @@ module.exports = {
    * pressing twice should not create two incidents.
    */
   async trigger(userId, { lat, lng, accuracy, locationNote } = {}) {
+    const note = String(locationNote || '').trim();
+    if (note.length > MAX_LOCATION_NOTE) throw new Error('SOS location notes must be 500 characters or fewer');
     const existing = await this.active(userId);
     if (existing) return existing;
 
@@ -211,7 +219,7 @@ module.exports = {
           Number.isFinite(lat) ? lat : null,
           Number.isFinite(lng) ? lng : null,
           Number.isFinite(accuracy) ? accuracy : null,
-          locationNote || null],
+          note || null],
       );
 
       for (const doc of clinicians) {

@@ -97,11 +97,29 @@ export function Register() {
     e.preventDefault();
     setFieldError(null);
 
-    // Mothers still go straight to onboarding: there is no account system for
-    // them yet, and the questionnaire is what the rest of the app reads.
     if (role === 'mother') {
+      const form = new FormData(e.currentTarget);
+      const value = (k: string) => String(form.get(k) ?? '').trim();
+      const stageMap: Record<string, 'pregnant' | 'new-mother' | 'parent' | 'planning'> = {
+        Pregnant: 'pregnant',
+        'A new mother (0–12 months)': 'new-mother',
+        'Parent of a young child': 'parent',
+        'Planning a pregnancy': 'planning',
+      };
       setSubmitting(true);
-      navigate(`/onboarding?stage=${encodeURIComponent(stage || 'Pregnant')}`);
+      try {
+        await api.registerMother({
+          name: value('m-name'), email: value('m-email'), phone: value('m-phone'),
+          password: value('m-password'), stage: stageMap[stage] || 'pregnant',
+        });
+        navigate(`/onboarding?stage=${encodeURIComponent(stage || 'Pregnant')}`);
+      } catch (err) {
+        setFieldError({
+          field: err instanceof FieldError ? err.field : undefined,
+          message: err instanceof Error ? err.message : 'Could not complete your registration',
+        });
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -120,6 +138,7 @@ export function Register() {
         email: value('d-email'),
         phone: value('d-phone'),
         licenseNo: value('d-license'),
+        password: value('d-password'),
       });
       navigate('/signin?registered=1');
     } catch (err) {
@@ -250,16 +269,20 @@ export function Register() {
               {role === 'mother' ? (
                 <>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
-                    <FloatingInput id="m-name" label="Full name" icon={<User className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="m-name" label="Full name" icon={<User className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'name' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp}>
-                    <FloatingInput id="m-email" label="Email address" type="email" autoComplete="email" icon={<Mail className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="m-email" label="Email address" type="email" autoComplete="email" icon={<Mail className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'email' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp}>
-                    <FloatingInput id="m-phone" label="Phone number" type="tel" icon={<Phone className="h-[18px] w-[18px]" />} accent={accent} />
+                    <FloatingInput id="m-phone" label="Phone number" type="tel" icon={<Phone className="h-[18px] w-[18px]" />} accent={accent}
+                      error={fieldError?.field === 'phone' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
-                    <FloatingInput id="m-password" label="Password" type="password" autoComplete="new-password" icon={<Lock className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="m-password" label="Password" type="password" autoComplete="new-password" icon={<Lock className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'password' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className={isPregnant ? '' : 'sm:col-span-2'}>
                     <GlassSelect
@@ -292,7 +315,8 @@ export function Register() {
                       error={fieldError?.field === 'phone' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
-                    <FloatingInput id="d-password" label="Password" type="password" autoComplete="new-password" icon={<Lock className="h-[18px] w-[18px]" />} accent={accent} required />
+                    <FloatingInput id="d-password" label="Password" type="password" autoComplete="new-password" icon={<Lock className="h-[18px] w-[18px]" />} accent={accent} required
+                      error={fieldError?.field === 'password' ? fieldError.message : undefined} />
                   </motion.div>
                   <motion.div variants={fadeUp} className="sm:col-span-2">
                     <GlassSelect

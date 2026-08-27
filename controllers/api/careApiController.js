@@ -7,6 +7,14 @@ const doctorModel = require('../../models/doctorModel');
 const appointmentModel = require('../../models/appointmentModel');
 const userModel = require('../../models/userModel');
 
+exports.me = async (req, res, next) => {
+  try {
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor) return res.status(404).json({ error: 'No clinician profile is linked to this account' });
+    return res.json({ data: doctor });
+  } catch (err) { return next(err); }
+};
+
 exports.doctors = async (req, res, next) => {
   try {
     res.json({ data: await doctorModel.all() });
@@ -77,7 +85,8 @@ exports.plans = async (req, res, next) => {
 exports.doctorAppointments = async (req, res, next) => {
   try {
     const { id } = req.params;
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    const mine = await doctorModel.forUser(req.user.id);
+    if (!mine || String(mine.id) !== String(id)) return res.status(403).json({ error: 'You can only open your own clinic inbox' });
     res.json({ data: await appointmentModel.forDoctor(id) });
   } catch (err) { next(err); }
 };
@@ -134,7 +143,9 @@ exports.payAndBook = async (req, res) => {
 exports.respond = async (req, res) => {
   const { status, note } = req.body || {};
   try {
-    const updated = await appointmentModel.respond(req.params.id, status, note);
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor) return res.status(403).json({ error: 'No clinician profile is linked to this account' });
+    const updated = await appointmentModel.respond(req.params.id, status, note, doctor.id);
     if (!updated) return res.status(404).json({ error: 'Request not found' });
     res.json({ data: updated });
   } catch (err) {
@@ -153,10 +164,14 @@ exports.cancel = async (req, res, next) => {
   const side = req.body?.side === 'doctor' ? 'doctor' : 'mother';
   try {
     const user = await userModel.current();
+    const doctor = side === 'doctor' ? await doctorModel.forUser(req.user.id) : null;
+    if (side === 'doctor' && (!doctor || String(doctor.id) !== String(req.body?.doctorId))) {
+      return res.status(403).json({ error: 'You can only cancel appointments from your own clinic' });
+    }
     const cancelled = await appointmentModel.cancelWithReason(req.params.id, {
       by: side,
       userId: user.id,
-      doctorId: req.body?.doctorId,
+      doctorId: doctor?.id,
       reason: req.body?.reason || 'other',
       note: req.body?.note,
     });
@@ -187,10 +202,14 @@ exports.reschedule = async (req, res, next) => {
   const side = req.body?.side === 'doctor' ? 'doctor' : 'mother';
   try {
     const user = await userModel.current();
+    const doctor = side === 'doctor' ? await doctorModel.forUser(req.user.id) : null;
+    if (side === 'doctor' && (!doctor || String(doctor.id) !== String(req.body?.doctorId))) {
+      return res.status(403).json({ error: 'You can only move appointments from your own clinic' });
+    }
     const moved = await appointmentModel.reschedule(req.params.id, {
       by: side,
       userId: user.id,
-      doctorId: req.body?.doctorId,
+      doctorId: doctor?.id,
       date: req.body?.date,
       time: req.body?.time,
       reason: req.body?.reason,

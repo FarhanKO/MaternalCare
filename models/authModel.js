@@ -32,6 +32,8 @@ const KEY_LEN = 64;
 const maxmem = () => 256 * PARAMS.N * PARAMS.r * PARAMS.p * 2;
 
 const SESSION_DAYS = 14;
+const MAX_PASSWORD_LENGTH = 200;
+const MAX_EMAIL_LENGTH = 254;
 
 class AuthError extends Error {
   constructor(message, code) {
@@ -44,13 +46,14 @@ module.exports = {
   AuthError,
   PARAMS,
   SESSION_DAYS,
+  MAX_PASSWORD_LENGTH,
 
   /** `scrypt$N$r$p$salt$hash`, all base64. Self-describing on purpose. */
   async hash(password) {
     if (typeof password !== 'string' || password.length < 8) {
       throw new AuthError('A password needs to be at least 8 characters', 'WEAK');
     }
-    if (password.length > 200) {
+    if (password.length > MAX_PASSWORD_LENGTH) {
       // scrypt cost is independent of input length, but an unbounded body is
       // still a way to make the server do unbounded work
       throw new AuthError('That password is too long', 'TOO_LONG');
@@ -100,6 +103,11 @@ module.exports = {
    */
   async authenticate(email, password) {
     const address = String(email || '').trim().toLowerCase();
+    if (address.length > MAX_EMAIL_LENGTH
+      || typeof password !== 'string'
+      || password.length > MAX_PASSWORD_LENGTH) {
+      throw new AuthError('That email and password do not match an account', 'BAD_LOGIN');
+    }
     const user = address
       ? await db.one('SELECT * FROM users WHERE lower(email) = $1', [address])
       : null;

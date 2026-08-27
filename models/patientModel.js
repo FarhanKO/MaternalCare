@@ -137,8 +137,31 @@ module.exports = {
     return rows.map((u) => toDTO(u, symptoms.get(u.id) ?? []));
   },
 
+  async allForDoctor(doctorId) {
+    const rows = await db.sql(`${ROSTER}
+      AND EXISTS (
+        SELECT 1 FROM appointments a
+        WHERE a.user_id = u.id AND a.doctor_id = $1
+          AND a.status IN ('requested', 'accepted', 'completed')
+      ) ORDER BY u.id`, [doctorId]);
+    const symptoms = await symptomsByPatient(rows.map((r) => r.id));
+    return rows.map((u) => toDTO(u, symptoms.get(u.id) ?? []));
+  },
+
   async find(id) {
     const u = await db.one(`${ROSTER} AND u.id = $1`, [id]);
+    if (!u) return null;
+    const symptoms = await symptomsByPatient([u.id]);
+    return toDTO(u, symptoms.get(u.id) ?? []);
+  },
+
+  async findForDoctor(id, doctorId) {
+    const u = await db.one(`${ROSTER} AND u.id = $1
+      AND EXISTS (
+        SELECT 1 FROM appointments a
+        WHERE a.user_id = u.id AND a.doctor_id = $2
+          AND a.status IN ('requested', 'accepted', 'completed')
+      )`, [id, doctorId]);
     if (!u) return null;
     const symptoms = await symptomsByPatient([u.id]);
     return toDTO(u, symptoms.get(u.id) ?? []);
@@ -148,6 +171,18 @@ module.exports = {
   async exists(id) {
     return Boolean(await db.one(
       "SELECT 1 FROM users WHERE id = $1 AND role = 'mother'", [id],
+    ));
+  },
+
+  async existsForDoctor(id, doctorId) {
+    return Boolean(await db.one(
+      `SELECT 1 FROM users u
+       WHERE u.id = $1 AND u.role = 'mother'
+         AND EXISTS (
+           SELECT 1 FROM appointments a
+           WHERE a.user_id = u.id AND a.doctor_id = $2
+             AND a.status IN ('requested', 'accepted', 'completed')
+         )`, [id, doctorId],
     ));
   },
 };

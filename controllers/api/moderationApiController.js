@@ -42,16 +42,15 @@ exports.count = async (req, res, next) => {
  */
 exports.resolve = async (req, res, next) => {
   try {
-    const { action, note, doctorId } = req.body || {};
-    if (doctorId && !(await doctorModel.exists(doctorId))) {
-      return res.status(400).json({ error: 'Unknown clinician', field: 'doctorId' });
-    }
+    const { action, note } = req.body || {};
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor) return res.status(403).json({ error: 'No clinician profile is linked to this account' });
     const result = await moderationModel.resolve({
       target: req.params.target === 'comments' ? 'comment' : 'post',
       id: req.params.id,
       action,
       note,
-      reviewerId: doctorId ?? null,
+      reviewerId: doctor.id,
     });
     return res.json({ data: result });
   } catch (err) {

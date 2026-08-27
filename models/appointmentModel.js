@@ -21,6 +21,7 @@ const OPEN = ['requested', 'accepted'];
  * holding a queue position everybody behind it is waiting on.
  */
 const MOVE_LIMIT = 3;
+const MAX_REASON = 500;
 const DAY = 86400000;
 
 // Calendar dates are local to the clinic. toISOString() would shift the day in
@@ -28,6 +29,12 @@ const DAY = 86400000;
 const iso = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => iso(new Date());
+
+function cleanReason(value, fallback) {
+  const text = String(value || fallback).trim();
+  if (text.length > MAX_REASON) throw new Error('Appointment reasons must be 500 characters or fewer');
+  return text || fallback;
+}
 
 /** Thrown when the chosen time has gone; carries what is still free. */
 class SlotTakenError extends Error {
@@ -294,10 +301,11 @@ module.exports = {
 
   /** Booked at the desk, so it is confirmed the moment it is written. */
   async book(userId, { doctor_id, date, time, reason }) {
+    const reasonText = cleanReason(reason, 'Antenatal appointment');
     await db.run(
       `INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
        VALUES ($1,$2,$3,$4,$5,'accepted',now())`,
-      [userId, doctor_id, date, time, reason],
+      [userId, doctor_id, date, time, reasonText],
     );
   },
 
@@ -340,6 +348,7 @@ module.exports = {
    * next, because a bare error leaves her stuck.
    */
   async request(userId, doctorId, { date, time, reason }) {
+    const reasonText = cleanReason(reason, 'Antenatal appointment');
     const doctor = await ensureSlotFree(doctorId, date, time);
 
     // one open request per doctor keeps the queue honest
@@ -352,7 +361,7 @@ module.exports = {
     const row = await db.insert(
       `INSERT INTO appointments (user_id, doctor_id, date, time, reason, status, requested_at)
        VALUES ($1,$2,$3,$4,$5,'requested',$6) RETURNING id`,
-      [userId, doctorId, date, time, reason || 'Antenatal appointment', new Date().toISOString()],
+      [userId, doctorId, date, time, reasonText, new Date().toISOString()],
     );
     // booking with someone she previously left resumes that pairing rather
     // than leaving an ended relationship sitting under an active appointment
@@ -372,6 +381,7 @@ module.exports = {
    * body cannot buy a consultant's slot at a junior's price.
    */
   async bookPaid(userId, doctorId, { date, time, reason, method, plan }) {
+    const reasonText = cleanReason(reason, 'Paid consultation');
     const pay = String(method || '').toLowerCase();
     if (!PAY_METHODS.includes(pay)) throw new Error('Choose how you want to pay');
 
@@ -399,7 +409,7 @@ module.exports = {
           fee_bdt, payment_method, payment_ref, paid_at, plan, chat_until)
        VALUES ($1,$2,$3,$4,$5,'accepted',$6,$6,$7,$8,$9,$10,$6,$11,$12)
        RETURNING id`,
-      [userId, doctorId, date, time, reason || 'Paid consultation', now,
+      [userId, doctorId, date, time, reasonText, now,
         'Confirmed on payment of the consultation fee',
         priced.priceBdt, pay, paymentReference(), chosen, chatUntil],
     );
@@ -450,9 +460,12 @@ module.exports = {
   },
 
   /** The doctor answers. A decline carries a reason the mother will read. */
-  async respond(id, status, note) {
+  async respond(id, status, note, doctorId) {
     if (!['accepted', 'declined'].includes(status)) throw new Error(`Cannot set status ${status}`);
-    const row = await db.one('SELECT * FROM appointments WHERE id = $1', [id]);
+    const row = await db.one(
+      `SELECT * FROM appointments WHERE id = $1${doctorId ? ' AND doctor_id = $2' : ''}`,
+      doctorId ? [id, doctorId] : [id],
+    );
     if (!row) return null;
     if (row.status !== 'requested') throw new Error('That request has already been answered');
 

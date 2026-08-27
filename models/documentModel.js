@@ -17,6 +17,10 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const KINDS = ['prescription', 'report'];
 const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_TITLE = 160;
+const MAX_NOTE = 2000;
+const MAX_ORIGINAL_NAME = 255;
+const MAX_UPLOADED_BY = 80;
 
 /** What a phone camera or a clinic scanner realistically produces. */
 const MIME_EXT = {
@@ -92,11 +96,22 @@ module.exports = {
     if (!KINDS.includes(kind)) throw new DocumentError(`Unknown document kind: ${kind}`, 'BAD_KIND');
 
     const { mime, buffer } = decodeDataUrl(dataUrl);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(takenOn || '') ? takenOn : todayISO();
+    const label = String(title || '').trim();
+    if (label.length > MAX_TITLE) throw new DocumentError('Document titles must be 160 characters or fewer', 'TOO_LONG');
+    const noteText = String(note || '').trim();
+    if (noteText.length > MAX_NOTE) throw new DocumentError('Document notes must be 2,000 characters or fewer', 'TOO_LONG');
+    const original = String(originalName || '').trim();
+    if (original.length > MAX_ORIGINAL_NAME) throw new DocumentError('File names must be 255 characters or fewer', 'TOO_LONG');
+    const filer = String(uploadedBy || 'mother').trim();
+    if (filer.length > MAX_UPLOADED_BY) throw new DocumentError('The uploader name is too long', 'TOO_LONG');
+
+    // Validate every text field before creating a file, so rejected uploads
+    // cannot leave unreferenced bytes behind in data/uploads.
     const fileName = `${crypto.randomUUID()}.${MIME_EXT[mime]}`;
     fs.writeFileSync(path.join(UPLOAD_DIR, fileName), buffer);
 
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(takenOn || '') ? takenOn : todayISO();
-    const label = String(title || '').trim()
+    const fallbackLabel = label
       || (kind === 'prescription' ? 'Prescription' : 'Report');
 
     const row = await db.insert(
@@ -104,9 +119,9 @@ module.exports = {
          (user_id, kind, title, note, file_name, original_name, mime, size,
           taken_on, uploaded_at, uploaded_by, vaccination_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [userId, kind, label, (note || '').trim() || null, fileName,
-        originalName || null, mime, buffer.length, date,
-        new Date().toISOString(), uploadedBy,
+      [userId, kind, fallbackLabel, noteText || null, fileName,
+        original || null, mime, buffer.length, date,
+        new Date().toISOString(), filer || 'mother',
         vaccinationId != null ? Number(vaccinationId) : null],
     );
     return toDTO(row);

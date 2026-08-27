@@ -95,7 +95,8 @@ exports.removeContact = async (req, res, next) => {
 exports.forDoctor = async (req, res, next) => {
   const { id } = req.params;
   try {
-    if (!(await doctorModel.exists(id))) return res.status(404).json({ error: 'Clinician not found' });
+    const doctor = await doctorModel.forUser(req.user.id);
+    if (!doctor || String(doctor.id) !== String(id)) return res.status(403).json({ error: 'You can only view your own patient alerts' });
     return res.json({ data: await sosModel.openForDoctor(id) });
   } catch (err) { return next(err); }
 };

@@ -35,8 +35,9 @@ recorded in Supabase's own migration history.
 
 | File | What it does |
 |---|---|
-| `0001_initial_schema.sql` | All 21 tables, 19 foreign keys, 20 CHECK constraints, 32 indexes |
+| `0001_initial_schema.sql` | Base schema; later numbered migrations add current features |
 | `0002_lock_down_postgrest_access.sql` | Enables RLS everywhere and revokes the PostgREST role grants |
+| `0016_accounts_and_doctor_links.sql` | Adds registration phone data, links doctors to clinician accounts, preserves legacy tables during upgrade |
 
 Apply either from **Supabase → SQL Editor**, or with `psql` against
 `DATABASE_URL`.
@@ -48,7 +49,8 @@ Apply either from **Supabase → SQL Editor**, or with `psql` against
 
 ## 3. What is in there
 
-**21 tables.**
+**25 tables after a fresh reset.** An upgraded database may temporarily show 26
+because the deprecated `hospitals` table is preserved rather than destroyed.
 
 | Area | Tables |
 |---|---|
@@ -58,7 +60,8 @@ Apply either from **Supabase → SQL Editor**, or with `psql` against
 | Care | `appointments`, `reminders`, `documents`, `messages` |
 | Her own logging | `symptoms`, `daily_logs` |
 | Emergency | `emergency_contacts`, `sos_alerts`, `sos_notifications` |
-| Community & content | `posts`, `post_comments`, `articles`, `hospitals` |
+| Community & content | `posts`, `post_comments`, `articles`, `content_reports` |
+| Platform | `sessions`, `care_terminations`, `appointment_changes` |
 
 Four of those hold data that previously only existed in the browser and
 disappeared on refresh: `post_comments`, `daily_logs` (mood, kicks,
@@ -72,14 +75,14 @@ Supabase exposes the `public` schema through PostgREST, reachable with the
 Left alone, that key can read every row in the database.
 
 This project does not use PostgREST at all. It connects as the table owner
-over `pg`. So `0002` enables RLS on all 21 tables and creates **no
+over `pg`. So `0002` enables RLS on the base tables and creates **no
 policies**, which denies PostgREST everything, and additionally revokes the
 `anon` and `authenticated` grants.
 
 Verified after applying:
 
 ```
-rls_enabled_tables            21
+rls_enabled_tables            25
 grants_left_to_public_roles    0
 anon_can_read_users        false
 authed_can_read_sos        false
@@ -87,7 +90,7 @@ app_role_can_read           true
 app_role_can_write          true
 ```
 
-Supabase's linter will report 21 INFO notices reading *"RLS enabled, no
+Supabase's linter will report INFO notices reading *"RLS enabled, no
 policy"*. That is the intended state, not a problem to fix. If a browser is
 ever pointed straight at Supabase, real policies must be written first.
 

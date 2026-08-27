@@ -37,11 +37,14 @@ module.exports = {
   async create(userId, {
     name, intensity = 'mid', daysPresent = 1, confirmedToday = true, fromVoice = false,
   }) {
+    const label = String(name || '').trim();
+    if (!label) throw new Error('A symptom name is required');
+    if (label.length > 80) throw new Error('Symptom names must be 80 characters or fewer');
     const row = await db.insert(
       `INSERT INTO symptoms
          (user_id, name, intensity, days_present, confirmed_today, from_voice, logged_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [userId, name, intensity, daysPresent, confirmedToday, fromVoice, new Date().toISOString()],
+      [userId, label, intensity, daysPresent, confirmedToday, fromVoice, new Date().toISOString()],
     );
     return toDTO(row);
   },
@@ -74,6 +77,7 @@ module.exports = {
    * journal and the other half deleted.
    */
   async replaceAll(userId, list) {
+    if (list.length > 50) throw new Error('You can record at most 50 symptoms at once');
     await db.tx(async (t) => {
       await t.run('DELETE FROM symptoms WHERE user_id = $1', [userId]);
       for (const s of list) {

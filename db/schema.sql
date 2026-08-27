@@ -33,6 +33,7 @@ CREATE TABLE users (
   role             TEXT    NOT NULL DEFAULT 'mother'
                              CHECK (role IN ('mother', 'clinician', 'admin')),
   email            TEXT,
+  phone            TEXT,
   age              INTEGER CHECK (age IS NULL OR age BETWEEN 10 AND 70),
   blood_group      TEXT,
   stage            TEXT    NOT NULL DEFAULT 'pregnant'
@@ -59,6 +60,7 @@ CREATE TABLE users (
 -- how far they are from a mother who has not signed up yet.
 CREATE TABLE doctors (
   id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
   name          TEXT    NOT NULL,
   specialty     TEXT,
   -- NULL until they have been rated; the ranking holds an unrated clinician
@@ -80,6 +82,8 @@ CREATE UNIQUE INDEX doctors_license_key ON doctors (lower(license_no))
   WHERE license_no IS NOT NULL;
 CREATE UNIQUE INDEX doctors_email_key   ON doctors (lower(email))
   WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX doctors_user_key ON doctors (user_id)
+  WHERE user_id IS NOT NULL;
 
 /* ---------------------------------------------------------- pregnancy */
 

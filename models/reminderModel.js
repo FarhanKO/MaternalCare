@@ -49,11 +49,17 @@ module.exports = {
     if (!KINDS.includes(kind)) throw new Error(`Unknown reminder kind: ${kind}`);
     if (!REPEATS.includes(repeat)) throw new Error(`Unknown repeat: ${repeat}`);
     if (!title || !at) throw new Error('Reminder needs a title and a due time');
+    const titleText = String(title).trim();
+    const noteText = String(note || '').trim();
+    if (titleText.length > 160) throw new Error('Reminder titles must be 160 characters or fewer');
+    if (noteText.length > 1000) throw new Error('Reminder notes must be 1,000 characters or fewer');
+    const assignedText = String(assignedBy || '').trim();
+    if (assignedText.length > 80) throw new Error('The assigning clinician name is too long');
 
     const row = await db.insert(
       `INSERT INTO reminders (user_id, kind, title, note, due_at, repeat, assigned_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [userId, kind, title, note || null, at, repeat, assignedBy],
+      [userId, kind, titleText, noteText || null, at, repeat, assignedText || null],
     );
     return toDTO(row);
   },
