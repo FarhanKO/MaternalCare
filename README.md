@@ -11,12 +11,14 @@ AI risk classification, emergency SOS, knowledge base + community, and a doctor 
 
 ## Architecture
 
-**One Model layer, two View layers.** The server-rendered EJS pages and the React SPA
-both go through the same controllers and models — no data logic is duplicated.
+**One Model layer, one View layer.** Express holds the Models and Controllers and
+exposes them as a JSON API; the React SPA is the View that consumes it. An
+earlier server-rendered EJS View was removed — it predated authentication and
+served patient records to anonymous requests.
 
 ```
 MaternityCare+/
-├── app.js                  # entry point — mounts web + api routes
+├── app.js                  # entry point — mounts the API routes
 ├── config/
 │   └── database.js         # SQLite connection, schema, demo seed
 ├── models/                 # MODEL — data access + domain logic
@@ -32,10 +34,8 @@ MaternityCare+/
 │       ├── symptomApiController.js
 │       └── reminderApiController.js
 ├── routes/
-│   ├── web.js              # server-rendered page routes
-│   └── api.js              # JSON API routes  (Sprint 2)
-├── views/                  # VIEW (server) — EJS templates
-└── frontend/               # VIEW (client) — React + TypeScript SPA
+│   └── api.js              # JSON API routes
+└── frontend/               # VIEW — React + TypeScript SPA
     └── src/
         ├── pages/          # route-level screens
         ├── components/     # reusable UI
@@ -61,7 +61,7 @@ npm run db:reset && npm run db:seed && npm run db:stages && npm run db:passwords
 `db:stages` adds the three life-stage accounts the main seed does not cover,
 and `db:passwords` gives every account a password.
 
-### 2. Backend — Express MVC API + EJS pages
+### 2. Backend — Express MVC API
 
 ```bash
 npm start
@@ -133,10 +133,10 @@ way to see what the app actually does. Sign out from the account menu, top right
 | `localhost:5173/onboarding` | Onboarding questionnaire |
 | **`localhost:5173/mother`** | **Mother dashboard — main Sprint 2 deliverable** |
 | `localhost:5173/about` | About — scroll-driven story |
-| `localhost:3000/dashboard` | Server-rendered EJS dashboard |
-| `localhost:3000/vitals` | Vitals logging + trend charts |
-| `localhost:3000/child` | Growth recorder + WHO percentile chart |
-| `localhost:3000/doctor` | Doctor portal |
+| `localhost:5173/doctor` | Clinician portal |
+
+`localhost:3000` serves no pages. It is the API the client fetches from, and it
+must be running for any of the above to load data.
 
 ---
 
@@ -172,7 +172,7 @@ curl http://localhost:3000/api/me
 
 ## Tech stack
 
-Node.js · Express 4 · EJS · SQLite (`node:sqlite`) · Chart.js ·
+Node.js · Express 4 · PostgreSQL (Supabase, `pg`) ·
 React 18 · TypeScript · Vite · Tailwind CSS · Framer Motion · Recharts · Lucide
 
 Django, FastAPI and Flask are **not** used.
