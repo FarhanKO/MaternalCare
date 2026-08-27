@@ -6,6 +6,7 @@ import {
   Sparkles, Stethoscope, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 import { useProfile } from '@/context/ProfileContext';
 import { ReportButton } from '@/components/ui/ReportButton';
 
@@ -35,6 +36,7 @@ const MENU = [
 export function ProfileModal({ open, onClose, score, band }: Props) {
   const { name, avatar, initials, bio, details, setAvatar, setBio, setDetail } = useProfile();
   const { week, dueDate, trimester, bloodGroup, age } = details;
+  const [signingOut, setSigningOut] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [draftBio, setDraftBio] = useState(bio);
   const [editingFact, setEditingFact] = useState<null | 'week' | 'dueDate' | 'bloodGroup' | 'age'>(null);
@@ -47,6 +49,22 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
   }, [open, onClose]);
 
   useEffect(() => { if (open) { setDraftBio(bio); setEditingBio(false); } }, [open]);
+
+  /**
+   * End the session, then leave by a full page load rather than a router
+   * navigation — so every provider is torn down and nothing of hers survives
+   * in memory for whoever signs in next. The redirect happens even if the
+   * request fails: a cookie the server has already forgotten is no reason to
+   * keep her looking at her own record.
+   */
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      await api.logout();
+    } finally {
+      window.location.assign('/signin');
+    }
+  };
 
   const pickPhoto = (file?: File) => {
     if (!file) return;
@@ -364,11 +382,15 @@ export function ProfileModal({ open, onClose, score, band }: Props) {
                 <ReportButton className="mt-2.5 w-full" />
               </div>
 
+              {/* this used to be wired to onClose: it shut the panel and left
+                  her signed in, on a medical record, on whatever device she
+                  had just decided to walk away from */}
               <button
-                onClick={onClose}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700"
+                onClick={signOut}
+                disabled={signingOut}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300/70 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-500/15 hover:text-rose-700 disabled:opacity-60"
               >
-                <LogOut className="h-[18px] w-[18px]" /> Sign out
+                <LogOut className="h-[18px] w-[18px]" /> {signingOut ? 'Signing out…' : 'Sign out'}
               </button>
             </div>
           </motion.div>

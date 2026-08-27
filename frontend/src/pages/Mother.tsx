@@ -24,7 +24,6 @@ import { CarePlan } from '@/components/mother/CarePlan';
 import { RiskPanel } from '@/components/mother/RiskPanel';
 import { StageHero } from '@/components/mother/StageHero';
 import { ChildVitals } from '@/components/mother/ChildVitals';
-import { AccountMenu } from '@/components/mother/AccountMenu';
 import { ProfileModal } from '@/components/mother/ProfileModal';
 import { SosModal } from '@/components/mother/SosModal';
 import { WeightGainCard } from '@/components/mother/WeightGainCard';
@@ -587,7 +586,8 @@ export function Mother() {
             <p className="mt-1 text-sm text-ink-muted">{localDate} · {dayNoteFor(now)}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            {account && <AccountMenu user={account} />}
+            {/* the avatar at the end of this row is the account control — it
+                opens her profile, which is where signing out lives */}
             <NotificationBell
               sosActive={!!liveAlert}
               vitalAlerts={vitals.alerts}
