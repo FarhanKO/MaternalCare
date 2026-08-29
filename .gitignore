@@ -32,6 +32,13 @@ npm-debug.log*
 
 # The guardian APK is delivered here by the Guardian MaternityCare+ project
 # (npm run apk over there). A build artifact, so it is not committed.
+
+# Python local environments / caches
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
 public/downloads/*.apk
 
 # seeded design canvases are published artifacts, not source
