@@ -16,6 +16,7 @@
  */
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const apiRoutes = require('./routes/api');
 
 const session = require('./middleware/session');
@@ -58,6 +59,21 @@ app.use(express.urlencoded({ extended: true }));
  */
 app.use(express.static(path.join(__dirname, 'public')));
 
+/*
+ * The built React client, when there is one.
+ *
+ * In development it is not here: Vite serves it on :5173 with hot reload, and
+ * this process answers only /api. In a deployment there is no second server to
+ * run, so the same process serves the client it already has the API for —
+ * which also puts them on one origin, and a session cookie the browser will
+ * actually send. `SPA fallback` below is the other half of that.
+ */
+const CLIENT_DIR = path.join(__dirname, 'frontend', 'dist');
+const hasClient = fs.existsSync(path.join(CLIENT_DIR, 'index.html'));
+if (hasClient) {
+  app.use(express.static(CLIENT_DIR));
+}
+
 // Allow the Vite dev server to call the API during development
 app.use('/api', (req, res, next) => {
   const origin = allowedOrigin(req.headers.origin);
@@ -87,9 +103,30 @@ app.use(session.attach());
 app.use('/api', apiRoutes);
 
 /*
- * 404. JSON, because everything reaching this process is either an API call or
- * a request for a static file — the pages live in the React client on its own
- * origin, and it renders its own not-found screen.
+ * SPA fallback.
+ *
+ * React Router owns /mother, /doctor, /signin and the rest. Those paths exist
+ * only in the browser, so a reload or a pasted link arrives here as a request
+ * for a file that was never on disk. Handing back index.html lets the router
+ * resolve it.
+ *
+ * Three things are deliberately excluded: anything under /api, which must
+ * answer as an API and not as a page; anything but GET, so a mistyped POST
+ * fails loudly instead of receiving HTML; and any path with a dot in it, so a
+ * missing image 404s as a missing image rather than quietly returning markup.
+ */
+if (hasClient) {
+  app.use((req, res, next) => {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api')) return next();
+    if (req.path.includes('.')) return next();
+    return res.sendFile(path.join(CLIENT_DIR, 'index.html'));
+  });
+}
+
+/*
+ * 404. JSON — what reaches here is an API call, a missing asset, or a request
+ * to a deployment with no client built into it.
  */
 app.use((req, res) => res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }));
 

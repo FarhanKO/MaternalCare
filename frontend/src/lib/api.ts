@@ -21,7 +21,18 @@ import type {
   VitalReading, WeightGain,
 } from '@/data/records';
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+/*
+ * Where the API is.
+ *
+ * In development the client is on :5173 and the API on :3000, so it needs the
+ * whole address. In a build they are one origin — the Express process serves
+ * this bundle — so a relative '/api' is correct and, unlike a baked-in host,
+ * cannot be wrong for whatever domain it ends up deployed on.
+ *
+ * VITE_API_URL still overrides both, for a split deployment.
+ */
+const BASE = import.meta.env.VITE_API_URL
+  ?? (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
 
 /** Absolute URL for a document's bytes — the API host is a different origin in dev. */
 export const fileUrl = (path: string) => `${BASE.replace(/\/api$/, '')}${path}`;

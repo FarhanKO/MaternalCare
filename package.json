@@ -1,6 +1,9 @@
 {
   "name": "maternitycare-plus",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "description": "MaternalCare+ — Maternity and Childcare monitoring platform (MVC architecture)",
   "main": "app.js",
   "scripts": {
@@ -14,9 +17,9 @@
     "db:bench": "node db/bench.js",
     "api:audit": "node db/audit-api.js",
     "db:demo-patient": "node db/seed-demo-patient.js",
-    "ml:train": "node ml-service/run.js train.py",
+    "ml:train": "node ml-service/run.js train/train.py",
     "ml:serve": "node ml-service/run.js -m uvicorn app:app --port 8000",
-    "ml:test": "node ml-service/run.js -m pytest test_service.py -q",
+    "ml:test": "node ml-service/run.js -m pytest train/test_service.py -q",
     "db:stages": "node db/seed-stages.js",
     "db:passwords": "node db/seed-passwords.js"
   },
