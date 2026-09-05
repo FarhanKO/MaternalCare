@@ -1,0 +1,16 @@
+{
+  "name": "MaternalCare+ Guardian",
+  "short_name": "Guardian",
+  "description": "Stay close to someone you love through her pregnancy, and know the moment she needs you.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f7fe",
+  "theme_color": "#e11d48",
+  "categories": ["health", "medical"],
+  "icons": [
+    { "src": "./guardian-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./guardian-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
