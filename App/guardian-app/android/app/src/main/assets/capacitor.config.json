@@ -1,0 +1,12 @@
+{
+	"appId": "plus.maternalcare.guardian",
+	"appName": "Guardian",
+	"webDir": "dist",
+	"android": {
+		"allowMixedContent": true
+	},
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	}
+}
